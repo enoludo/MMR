@@ -3,6 +3,32 @@ import { CONFIG, getSlotCountForWidth } from '../config.js';
 import { createPlaceholderTexture } from './placeholderTexture.js';
 import { spiralPointAt, recycleFadeAt } from './spiralPath.js';
 
+const GUIDE_SEGMENTS = 400;
+
+/**
+ * A thin static tube tracing the spiral curve itself, independent of any
+ * card. Without it, only 12-20 discrete cards hint at the underlying
+ * shape — spaced out and partly faded near the recycle point, that reads
+ * as cards scattered at random depths rather than a legible spiral. The
+ * tube makes the curve unambiguous regardless of camera angle or slot
+ * count.
+ */
+function buildGuideTube() {
+  const points = [];
+  for (let i = 0; i <= GUIDE_SEGMENTS; i += 1) {
+    const point = spiralPointAt(i / GUIDE_SEGMENTS);
+    points.push(new THREE.Vector3(point.x, point.y, point.z));
+  }
+  const curve = new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0);
+  const geometry = new THREE.TubeGeometry(curve, GUIDE_SEGMENTS, 0.012, 6, false);
+  const material = new THREE.MeshBasicMaterial({
+    color: 0xd6b06a,
+    transparent: true,
+    opacity: 0.35,
+  });
+  return new THREE.Mesh(geometry, material);
+}
+
 const textureLoader = new THREE.TextureLoader();
 
 /**
@@ -44,6 +70,7 @@ export class SpiralGallery {
 
     this.group = new THREE.Group();
     this.scene.add(this.group);
+    this.group.add(buildGuideTube());
 
     this.slots = [];
     this.slotCount = getSlotCountForWidth(window.innerWidth);
