@@ -1,18 +1,18 @@
-const MIN_OPACITY = 0.6; // ignore slots still fading in/out at the recycle seam
-
 /**
- * The slot currently reading as "centered": in the tunnel parametrization
- * (see spiralPath.js), every slot's radius shrinks to (near) zero exactly
- * at t = 0.5 — the moment it sits right on the camera's optical axis, i.e.
- * genuinely at screen-center, not just facing the camera from off to one
- * side. So "centered" is simply whichever fully-visible slot has its `t`
- * closest to 0.5.
+ * The hero-row (eye-level) slot currently closest to the "face camera"
+ * angle (0 mod 2*PI). Only the hero row drives the overlay — the other
+ * rows are wall filler above/below eye level, not something a viewer
+ * reads as "the centered card".
  */
 export function getCenteredSlot(slots) {
-  const visible = slots.filter((slot) => slot.mesh.material.opacity >= MIN_OPACITY);
-  const pool = visible.length > 0 ? visible : slots;
+  const heroSlots = slots.filter((slot) => slot.isHeroRow);
 
-  return pool.reduce((closest, slot) =>
-    Math.abs(slot.t - 0.5) < Math.abs(closest.t - 0.5) ? slot : closest
+  const angularDistance = (angle) => {
+    const normalized = ((angle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+    return Math.min(normalized, 2 * Math.PI - normalized);
+  };
+
+  return heroSlots.reduce((closest, slot) =>
+    angularDistance(slot.worldAngle) < angularDistance(closest.worldAngle) ? slot : closest
   );
 }

@@ -1,8 +1,9 @@
 # Galerie Spirale Interactive — MMR
 
-Galerie d'images en spirale, animée en 3D (Three.js), avec rotation pilotée
-par un scroll virtuel infini et une auto-rotation lente en idle. Une carte
-"centrée" affiche dynamiquement un titre + CTA en overlay HTML.
+Mur de cartes enroulé sur un cylindre, animé en 3D (Three.js), avec
+rotation pilotée par un scroll virtuel infini et une auto-rotation lente en
+idle. Une carte "centrée" affiche dynamiquement un titre + CTA en overlay
+HTML.
 
 ## Stack
 
@@ -37,8 +38,9 @@ projet à la galerie, il suffit d'ajouter une entrée dans
 
 - Déposez l'image correspondante dans `public/assets/images/`.
 - Aucune autre modification n'est nécessaire : le nombre d'emplacements 3D
-  (slots) est fixe et indépendant du nombre de cartes (voir plus bas), les
-  nouvelles cartes viennent simplement s'intercaler dans la rotation.
+  (colonnes × rangées) est fixe et indépendant du nombre de cartes (voir
+  plus bas), les nouvelles cartes viennent simplement s'intercaler dans le
+  mur.
 - Si une image référencée est manquante ou ne charge pas, un visuel de
   substitution (généré en canvas, avec le titre de la carte) s'affiche à sa
   place — la galerie ne casse jamais sur un asset manquant.
@@ -52,51 +54,55 @@ chargement de l'application.
 index.html                    Overlay HTML (titre/CTA) + point de montage du canvas
 src/
   main.js                     Bootstrap : boucle d'animation, câblage des modules
-  config.js                   Toutes les constantes réglables (rayon, vitesses, seuils responsive…)
+  config.js                   Toutes les constantes réglables (rayon, colonnes/rangées, vitesses…)
   style.css                   Styles de base de l'overlay et du canvas plein écran
   data/
     cards.json                Données des cartes (source de contenu)
   gallery/
-    SpiralGallery.js          Scène Three.js, génération des slots, textures, resize
-    spiralPath.js             La courbe de la spirale elle-même (angle/rayon/hauteur en fonction de t)
-    VirtualScroll.js          Accumulation wheel/touch, valeur de progression non bornée, idle → auto-rotation
-    centeredSlot.js           Calcul du slot le plus proche de l'angle "face caméra"
+    SpiralGallery.js          Scène Three.js, génération du mur, rotation, textures, resize
+    textureTiers.js           Pré-calcule 3 niveaux de flou par image (Canvas2D)
+    VirtualScroll.js          Accumulation wheel/touch, rotation non bornée, idle → auto-rotation
+    centeredSlot.js           Calcul de la colonne la plus proche de l'angle "face caméra"
     Overlay.js                Overlay HTML + crossfade GSAP entre cartes
     placeholderTexture.js     Génère une texture de repli si une image est manquante
 ```
 
-### Slots découplés des données
+### Un mur cylindrique, pas une spirale mathématique
 
-Le nombre d'emplacements visuels en 3D (`slots`, ex. 12 sur desktop) est
-fixe et indépendant du nombre de cartes réelles dans `cards.json`. Le
-contenu de chaque slot est déterminé par un modulo :
+Le mur est fait de `columnCount` colonnes réparties uniformément en angle
+autour d'un cylindre (rayon constant), chacune contenant `CONFIG.rowCount`
+cartes empilées verticalement — un mur haut de photos, pas un simple anneau
+d'une seule rangée. Le rayon étant constant, la forme est périodique en
+angle : elle peut donc tourner indéfiniment comme un seul groupe rigide,
+sans aucune couture à masquer (contrairement à une vraie spirale
+Archimédienne à rayon croissant, qui elle ne peut pas boucler proprement).
+
+### Colonnes découplées des données
+
+Le nombre de colonnes (ex. 18 sur desktop) est fixe et indépendant du
+nombre de cartes réelles dans `cards.json`. Seule la rangée "hero" (rangée
+0, à hauteur des yeux) mappe directement une colonne à
+`cardsData[colonne % cardsData.length]` et pilote l'overlay ; les autres
+rangées utilisent un décalage différent pour éviter de répéter
+identiquement les mêmes images à chaque étage du mur :
 
 ```js
-const card = cardsData[slotIndex % cardsData.length];
+const card = cardsData[cardIndex % cardsData.length];
 ```
 
-Avec 4 cartes et 12 slots, chaque carte apparaît 3 fois le long de la
-spirale. Passer à ~20 cartes ne nécessite aucune modification du code 3D :
-le modulo s'ajuste automatiquement. Le nombre de slots par palier
-responsive se règle dans `config.js` (`CONFIG.slotCount`).
+Passer de 4 à ~20 cartes ne nécessite aucune modification du code 3D : le
+modulo s'ajuste automatiquement. Le nombre de colonnes par palier
+responsive se règle dans `config.js` (`CONFIG.columnCount`).
 
-### Une vraie spirale (pas un anneau qui ondule)
+### Profondeur de champ (flou) sans passe de post-traitement
 
-`spiralPath.js` définit la courbe : pour `t` dans `[0, 1)`, l'angle croît
-continûment sur `CONFIG.spiralTurns` tours pendant que le rayon et la
-hauteur croissent (ou décroissent) **de façon monotone** avec `t` — une
-vraie spirale conique (type escalier en colimaçon), pas une onde
-sinusoïdale qui oscille en boucle sur elle-même.
-
-Une vraie spirale n'étant pas symétrique par rotation, elle ne peut pas
-être animée comme un anneau rigide qu'on fait simplement tourner (ça
-créerait une discontinuité visible à la jonction). À la place, chaque slot
-garde une identité et un point de départ fixes (`baseOffset`) le long de
-la courbe, mais sa position est recalculée à chaque frame à partir de
-`(baseOffset + t_global) % 1` (voir `SpiralGallery#update`) : le slot
-parcourt toute la spirale puis recommence, et son opacité/échelle
-retombent à 0 juste avant/après ce point de recyclage
-(`CONFIG.recycleFade`) pour que le saut soit invisible.
+Plutôt qu'un vrai flou de profondeur de champ en temps réel (fragile selon
+les GPU, coûteux), chaque image est pré-rendue une fois en 3 niveaux de
+flou via Canvas2D (`textureTiers.js`, `ctx.filter = 'blur(...)'`). À chaque
+frame, `SpiralGallery#setRotation` calcule l'écart angulaire de chaque
+carte par rapport à l'avant du mur et bascule sa texture entre ces trois
+niveaux (net / doux / flou) — fiable sur tous les appareils, coût
+négligeable.
 
 ### Rotation : scroll virtuel infini + auto-rotation idle
 
@@ -107,36 +113,37 @@ l'itération précédente.
 
 - `VirtualScroll` écoute `wheel` (desktop) et `touchmove`/`touchstart`/
   `touchend` (mobile), et accumule le delta dans une variable **non
-  bornée** (`virtualOffset`, en unités de progression sur la spirale, pas
-  en radians).
+  bornée** (`virtualRotation`, en radians).
 - Chaque frame, `main.js` lisse cette valeur cible avec un lerp
-  (`currentT += (target - currentT) * CONFIG.rotationLerp`) et l'utilise
-  pour repositionner tous les slots (`gallery.update(currentT)`).
-- Après ~1.5s sans interaction (`CONFIG.idleDelayMs`), une progression
+  (`currentRotation += (target - currentRotation) * CONFIG.rotationLerp`)
+  et l'applique à `group.rotation.y`.
+- Après ~1.5s sans interaction (`CONFIG.idleDelayMs`), une auto-rotation
   lente et constante reprend automatiquement, désactivée dès la prochaine
   interaction.
 - La caméra n'a **aucun** state ni controls (pas d'orbit/pan/zoom) : elle
-  est fixe et légèrement surélevée/inclinée pour bien lire la forme de la
-  spirale ; seuls les slots sont animés.
+  est fixe ; seule la rotation du mur est animée.
 
 ### Carte centrée + overlay
 
-À chaque frame, `getCenteredSlot` cherche, parmi les slots pas en train de
-disparaître au point de recyclage, celui dont l'angle courant est le plus
-proche de "face caméra" (0 mod 2π) — avec plusieurs tours, plusieurs slots
-peuvent être proches de cet angle en même temps sur des boucles
-différentes, donc c'est bien l'écart angulaire qui décide, pas la
-proximité brute à la caméra. La carte correspondante (via le modulo) est
+À chaque frame, `getCenteredSlot` cherche, parmi les cartes de la rangée
+hero, celle dont l'angle courant (position de base + rotation du mur) est
+le plus proche de "face caméra" (0 mod 2π). La carte correspondante est
 passée à `Overlay.setCard()`, qui ne déclenche un crossfade GSAP (fade out
 → swap du contenu → fade in) que lorsque la carte affichée change
-réellement.
+réellement — et tue proprement toute transition encore en cours pour
+éviter qu'un changement rapide n'affiche un texte périmé.
 
 ## Responsive
 
-- Le nombre de slots (`CONFIG.slotCount`) varie par palier de largeur
+- Le nombre de colonnes (`CONFIG.columnCount`) varie par palier de largeur
   d'écran (`CONFIG.breakpoints`) pour éviter la surcharge visuelle sur
   mobile.
-- Le canvas et les slots ne sont recalculés que sur l'événement `resize`
+- Sur un écran étroit/portrait, la caméra est reculée le long de son propre
+  axe de visée (voir `SpiralGallery#resize`) : le FOV d'une caméra
+  perspective n'est vertical, donc sur un ratio étroit le FOV horizontal
+  s'effondre et pousserait le mur quasi entièrement hors champ sans cette
+  compensation.
+- Le canvas et le mur ne sont recalculés que sur l'événement `resize`
   (débouncé via `requestAnimationFrame`), jamais à chaque frame de la
   boucle de rendu.
 - Le scroll virtuel gère `touchmove` en complément de `wheel` pour un

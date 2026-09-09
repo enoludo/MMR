@@ -14,21 +14,21 @@ const overlay = new Overlay({
   ctaEl: document.getElementById('card-cta'),
 });
 
-let currentT = 0;
+let currentRotation = 0;
 
 function updateCenteredCard() {
   const slot = getCenteredSlot(gallery.slots);
-  const card = cardsData[slot.index % cardsData.length];
+  const card = cardsData[slot.col % cardsData.length];
   overlay.setCard(card);
 }
 
 function animate() {
   requestAnimationFrame(animate);
 
-  const targetT = virtualScroll.tick();
-  currentT += (targetT - currentT) * CONFIG.rotationLerp;
+  const targetRotation = virtualScroll.tick();
+  currentRotation += (targetRotation - currentRotation) * CONFIG.rotationLerp;
 
-  gallery.update(currentT);
+  gallery.setRotation(currentRotation);
   updateCenteredCard();
   gallery.render();
 }
@@ -42,6 +42,6 @@ window.addEventListener('resize', () => {
   if (resizeRaf) cancelAnimationFrame(resizeRaf);
   resizeRaf = requestAnimationFrame(() => {
     gallery.resize();
-    gallery.refreshSlotCountForWidth(window.innerWidth);
+    gallery.refreshColumnCountForWidth(window.innerWidth);
   });
 });

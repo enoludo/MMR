@@ -1,44 +1,35 @@
 import * as THREE from 'three';
-import { CONFIG, getSlotCountForWidth } from '../config.js';
+import { CONFIG, getColumnCountForWidth } from '../config.js';
 import { createPlaceholderTexture } from './placeholderTexture.js';
-import { spiralPointAt, recycleFadeAt } from './spiralPath.js';
+import { buildTextureTiers } from './textureTiers.js';
 
 const textureLoader = new THREE.TextureLoader();
 
-/** Deterministic pseudo-random value in [0, 1) for a given integer seed. */
-function hash(seed) {
-  const x = Math.sin(seed * 12.9898) * 43758.5453;
-  return x - Math.floor(x);
+const SHARP_THRESHOLD = (25 * Math.PI) / 180;
+const SOFT_THRESHOLD = (55 * Math.PI) / 180;
+
+function angularDistanceToZero(angle) {
+  const normalized = ((angle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  return Math.min(normalized, 2 * Math.PI - normalized);
 }
 
 /**
- * A plane bowed outward along its width (a gentle parabolic curve), like a
- * sheet of paper curling toward the viewer — reused by every card, since
- * the curve amount is the same for all of them.
- */
-function buildCardGeometry(width, height, curveDepth) {
-  const geometry = new THREE.PlaneGeometry(width, height, 16, 1);
-  const position = geometry.attributes.position;
-
-  for (let i = 0; i < position.count; i += 1) {
-    const nx = position.getX(i) / (width / 2); // -1..1 across the card's width
-    position.setZ(i, curveDepth * (1 - nx * nx));
-  }
-  position.needsUpdate = true;
-  geometry.computeVertexNormals();
-
-  return geometry;
-}
-
-/**
- * Renders the spiral of cards. Each slot has a fixed identity/card and a
- * fixed starting offset along the spiral path (`baseOffset`), but its
- * position is recomputed every frame from `(baseOffset + globalT) mod 1`
- * (see #update) — the slot itself travels the whole spiral and recycles
- * back to the start, rather than the gallery being a rigid shape that
- * spins in place. The mapping from slot -> card data is
- * `slotIndex % cardsData.length`, so the number of real cards can grow (4
- * today, ~20 later) without touching any of the 3D logic here.
+ * A tall wall of cards wrapped around a cylinder: `columnCount` columns
+ * evenly spaced by angle, each holding `CONFIG.rowCount` cards stacked
+ * vertically. The whole wall is one rigid group that spins around its own
+ * (vertical) axis — because the radius is constant, the shape is periodic
+ * in angle, so it can rotate indefinitely with no seam to hide, unlike a
+ * true growing spiral.
+ *
+ * Only the "hero" row (row 0, at eye height) maps directly to
+ * `cardsData[column % cardsData.length]` and drives the centered-card
+ * overlay; the other rows use a shifted mapping so the wall isn't just the
+ * same handful of images stacked identically on repeat.
+ *
+ * Depth cueing comes from swapping each card's texture between three
+ * pre-blurred tiers based on its angular distance from the front (see
+ * textureTiers.js) rather than a real-time depth-of-field render pass —
+ * cheaper, and reliable across devices.
  */
 export class SpiralGallery {
   constructor({ container, cardsData }) {
@@ -46,127 +37,139 @@ export class SpiralGallery {
     this.cardsData = cardsData;
 
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(
-      CONFIG.cameraFov,
-      1,
-      0.1,
-      100
-    );
+    this.camera = new THREE.PerspectiveCamera(CONFIG.cameraFov, 1, 0.1, 100);
     // Camera is fixed for the lifetime of the app: no orbit/pan/zoom
-    // controls, and never repositioned in response to interaction. It IS
-    // pulled back on narrow/portrait viewports (see #resize) — otherwise a
-    // fixed vertical FOV combined with landscape cards makes them fill and
-    // overflow a tall, narrow screen. It looks straight down the tunnel's
-    // own axis (see spiralPath.js), which is what makes the nearest slot
-    // land exactly at screen-center rather than off to one side.
+    // controls, no repositioning. It IS pulled back on narrow/portrait
+    // viewports (see #resize) — a perspective camera's FOV is vertical
+    // only, so on a narrow aspect ratio the horizontal FOV shrinks hard,
+    // shoving the wall almost entirely out of frame. Only the wall's
+    // rotation is otherwise animated, driven by the virtual scroll value.
     this.basePosition = new THREE.Vector3(0, CONFIG.cameraHeight, CONFIG.cameraDistance);
     this.camera.position.copy(this.basePosition);
-    this.camera.lookAt(0, 0, CONFIG.cameraLookAtZ);
+    this.camera.lookAt(0, CONFIG.cameraHeight, 0);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.container.appendChild(this.renderer.domElement);
 
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.55));
-    const key = new THREE.DirectionalLight(0xffffff, 1.1);
-    key.position.set(-3, 5, 6);
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+    const key = new THREE.DirectionalLight(0xffffff, 0.6);
+    key.position.set(2, 4, 6);
     this.scene.add(key);
-    const rim = new THREE.DirectionalLight(0xffffff, 0.35);
-    rim.position.set(4, -2, -3);
-    this.scene.add(rim);
 
     this.group = new THREE.Group();
     this.scene.add(this.group);
 
     this.slots = [];
-    this.slotCount = getSlotCountForWidth(window.innerWidth);
-    this.buildSlots(this.slotCount);
+    this.columnCount = getColumnCountForWidth(window.innerWidth);
+    this.buildSlots(this.columnCount);
 
     this.resize();
   }
 
-  buildSlots(slotCount) {
+  buildSlots(columnCount) {
     // Tear down any previous layout (e.g. on a breakpoint change).
     for (const slot of this.slots) {
       this.group.remove(slot.mesh);
-      slot.mesh.material.map?.dispose();
+      slot.textures.sharp.dispose();
+      slot.textures.soft.dispose();
+      slot.textures.heavy.dispose();
       slot.mesh.material.dispose();
     }
     this.slots = [];
-    this.slotCount = slotCount;
+    this.columnCount = columnCount;
 
-    if (this.cardGeometry) this.cardGeometry.dispose();
-    this.cardGeometry = buildCardGeometry(CONFIG.cardWidth, CONFIG.cardHeight, CONFIG.cardCurveDepth);
+    if (!this.cardGeometry) {
+      this.cardGeometry = new THREE.PlaneGeometry(CONFIG.cardWidth, CONFIG.cardHeight);
+    }
 
-    for (let i = 0; i < slotCount; i += 1) {
-      const card = this.cardsData[i % this.cardsData.length];
+    const rowOffset = (CONFIG.rowCount - 1) / 2;
 
-      const material = new THREE.MeshStandardMaterial({
-        color: 0xffffff,
-        side: THREE.FrontSide,
-        roughness: 0.55,
-        metalness: 0.05,
-        transparent: true,
-      });
+    for (let col = 0; col < columnCount; col += 1) {
+      const angle = (col / columnCount) * Math.PI * 2;
 
-      const mesh = new THREE.Mesh(this.cardGeometry, material);
-      this.group.add(mesh);
+      for (let row = 0; row < CONFIG.rowCount; row += 1) {
+        const isHeroRow = row === 0;
+        const cardIndex = isHeroRow ? col : col + row * 7;
+        const card = this.cardsData[cardIndex % this.cardsData.length];
 
-      // A fixed, per-slot random tilt on top of the base "face the camera"
-      // orientation, so cards read as loosely tumbled rather than
-      // mechanically aligned to the spiral.
-      const tiltX = (hash(i * 2) - 0.5) * 2 * CONFIG.cardTiltJitter;
-      const tiltZ = (hash(i * 2 + 1) - 0.5) * 2 * CONFIG.cardTiltJitter;
+        const material = new THREE.MeshStandardMaterial({
+          color: 0xffffff,
+          side: THREE.FrontSide,
+          roughness: 0.9,
+          metalness: 0,
+        });
 
-      const slot = { index: i, baseOffset: i / slotCount, t: 0, angle: 0, tiltX, tiltZ, mesh, cardId: card.id };
-      this.slots.push(slot);
+        const mesh = new THREE.Mesh(this.cardGeometry, material);
+        mesh.position.set(
+          Math.sin(angle) * CONFIG.radius,
+          (row - rowOffset) * CONFIG.rowSpacing,
+          Math.cos(angle) * CONFIG.radius
+        );
+        // Faces outward, away from the cylinder's axis, so the column
+        // rotated to angle ~ 0 faces the viewer.
+        mesh.rotation.y = angle;
 
-      this.loadSlotTexture(mesh.material, card);
+        this.group.add(mesh);
+
+        const slot = {
+          col,
+          row,
+          angle,
+          worldAngle: angle,
+          isHeroRow,
+          mesh,
+          cardId: card.id,
+          textures: null,
+          currentTier: null,
+        };
+        this.slots.push(slot);
+
+        this.loadSlotTexture(slot, card);
+      }
     }
   }
 
-  loadSlotTexture(material, card) {
+  loadSlotTexture(slot, card) {
     textureLoader.load(
       card.image,
       (texture) => {
-        texture.colorSpace = THREE.SRGBColorSpace;
-        material.map = texture;
-        material.needsUpdate = true;
+        slot.textures = buildTextureTiers(texture.image);
+        texture.dispose();
       },
       undefined,
       () => {
-        material.map = createPlaceholderTexture(card.title);
-        material.needsUpdate = true;
+        const placeholder = createPlaceholderTexture(card.title);
+        slot.textures = buildTextureTiers(placeholder.image);
+        placeholder.dispose();
       }
     );
   }
 
-  /** Rebuild the slot layout if the responsive slot count changed. */
-  refreshSlotCountForWidth(width) {
-    const nextCount = getSlotCountForWidth(width);
-    if (nextCount !== this.slotCount) {
+  /** Rebuild the wall if the responsive column count changed. */
+  refreshColumnCountForWidth(width) {
+    const nextCount = getColumnCountForWidth(width);
+    if (nextCount !== this.columnCount) {
       this.buildSlots(nextCount);
     }
   }
 
-  /** Advance every slot along the spiral path to reflect the current scroll value. */
-  update(globalT) {
+  setRotation(radians) {
+    this.group.rotation.y = radians;
+
     for (const slot of this.slots) {
-      const t = (((slot.baseOffset + globalT) % 1) + 1) % 1;
-      const point = spiralPointAt(t);
+      slot.worldAngle = slot.angle + radians;
+      if (!slot.textures) continue;
 
-      slot.mesh.position.set(point.x, point.y, point.z);
-      // Faces the camera (billboard) regardless of where it sits in the
-      // tunnel, plus a fixed per-slot tilt for a loosely tumbled feel.
-      slot.mesh.quaternion.copy(this.camera.quaternion);
-      slot.mesh.rotateX(slot.tiltX);
-      slot.mesh.rotateZ(slot.tiltZ);
-      slot.t = t;
-      slot.angle = point.angle;
+      const distance = angularDistanceToZero(slot.worldAngle);
+      const tier =
+        distance < SHARP_THRESHOLD ? 'sharp' : distance < SOFT_THRESHOLD ? 'soft' : 'heavy';
 
-      const fade = recycleFadeAt(t);
-      slot.mesh.material.opacity = fade;
-      slot.mesh.scale.setScalar(0.6 + 0.4 * fade);
+      if (tier !== slot.currentTier) {
+        slot.currentTier = tier;
+        slot.mesh.material.map = slot.textures[tier];
+        slot.mesh.material.needsUpdate = true;
+      }
     }
   }
 
@@ -175,14 +178,13 @@ export class SpiralGallery {
     const height = this.container.clientHeight;
     const aspect = width / height;
 
-    // A perspective camera's FOV is vertical only; on a narrow/portrait
-    // viewport the effective horizontal FOV shrinks with the aspect ratio,
-    // so landscape cards balloon and overflow. Pulling the camera back
-    // along its own line of sight (scaling its position vector) keeps the
-    // same framing angle while compensating for that.
+    // Pull the camera back along its own line of sight on a narrow aspect
+    // ratio, to compensate for the shrinking horizontal FOV — keeps the
+    // wall centered and visible instead of squeezed almost entirely
+    // out of frame.
     const pullBack = aspect < 1 ? Math.sqrt(1 / aspect) : 1;
     this.camera.position.copy(this.basePosition).multiplyScalar(pullBack);
-    this.camera.lookAt(0, 0, CONFIG.cameraLookAtZ);
+    this.camera.lookAt(0, CONFIG.cameraHeight, 0);
 
     this.camera.aspect = aspect;
     this.camera.updateProjectionMatrix();
