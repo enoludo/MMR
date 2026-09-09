@@ -19,8 +19,13 @@ export class Overlay {
     if (!card || card.id === this.currentCardId) return;
     this.currentCardId = card.id;
 
-    const timeline = gsap.timeline();
-    timeline
+    // A fast scroll can change the centered card again before the previous
+    // crossfade finishes; without killing it first, the two timelines race
+    // and the older one's `.call()` can overwrite the newer text last.
+    this.timeline?.kill();
+
+    this.timeline = gsap.timeline();
+    this.timeline
       .to([this.titleEl, this.ctaEl], {
         opacity: 0,
         y: -10,

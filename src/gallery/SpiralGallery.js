@@ -1,15 +1,19 @@
 import * as THREE from 'three';
 import { CONFIG, getSlotCountForWidth } from '../config.js';
 import { createPlaceholderTexture } from './placeholderTexture.js';
+import { spiralPointAt, recycleFadeAt } from './spiralPath.js';
 
 const textureLoader = new THREE.TextureLoader();
 
 /**
- * Renders the spiral of cards. Slots are a fixed, purely-visual layout
- * (position/rotation computed from slot index) that never changes shape;
- * the mapping from slot -> card data is `slotIndex % cardsData.length`, so
- * the number of real cards can grow (4 today, ~20 later) without touching
- * any of the 3D logic here.
+ * Renders the spiral of cards. Each slot has a fixed identity/card and a
+ * fixed starting offset along the spiral path (`baseOffset`), but its
+ * position is recomputed every frame from `(baseOffset + globalT) mod 1`
+ * (see #update) — the slot itself travels the whole spiral and recycles
+ * back to the start, rather than the gallery being a rigid shape that
+ * spins in place. The mapping from slot -> card data is
+ * `slotIndex % cardsData.length`, so the number of real cards can grow (4
+ * today, ~20 later) without touching any of the 3D logic here.
  */
 export class SpiralGallery {
   constructor({ container, cardsData }) {
@@ -24,10 +28,10 @@ export class SpiralGallery {
       100
     );
     // Camera is fixed for the lifetime of the app: no orbit/pan/zoom
-    // controls are ever attached to it. Only `this.group.rotation.y`
-    // is animated, driven by the virtual scroll value.
+    // controls, no repositioning. Only the slots' positions are animated,
+    // driven by the virtual scroll value.
     this.camera.position.set(0, CONFIG.cameraHeight, CONFIG.cameraDistance);
-    this.camera.lookAt(0, 0, 0);
+    this.camera.lookAt(0, CONFIG.cameraLookAtY, 0);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -48,11 +52,6 @@ export class SpiralGallery {
     this.resize();
   }
 
-  /** Angle (radians) of a slot's base position, before group rotation. */
-  getSlotAngle(slotIndex) {
-    return (slotIndex / this.slotCount) * Math.PI * 2;
-  }
-
   buildSlots(slotCount) {
     // Tear down any previous layout (e.g. on a breakpoint change).
     for (const slot of this.slots) {
@@ -67,31 +66,21 @@ export class SpiralGallery {
     const geometry = new THREE.PlaneGeometry(CONFIG.cardWidth, CONFIG.cardHeight);
 
     for (let i = 0; i < slotCount; i += 1) {
-      const angle = this.getSlotAngle(i);
       const card = this.cardsData[i % this.cardsData.length];
-
-      const radius =
-        CONFIG.radius +
-        Math.sin(angle * CONFIG.spiralLoops) * CONFIG.radiusAmplitude;
-      const y =
-        Math.cos(angle * CONFIG.spiralLoops + CONFIG.spiralPhase) *
-        CONFIG.verticalAmplitude;
 
       const material = new THREE.MeshStandardMaterial({
         color: 0xffffff,
         side: THREE.FrontSide,
         roughness: 0.9,
         metalness: 0,
+        transparent: true,
       });
 
       const mesh = new THREE.Mesh(geometry, material);
-      mesh.position.set(Math.sin(angle) * radius, y, Math.cos(angle) * radius);
-      // Faces outward, away from the ring's center, so the slot nearest
-      // the camera (angle ~ 0 once the group is rotated) faces the viewer.
-      mesh.rotation.y = angle;
-
       this.group.add(mesh);
-      this.slots.push({ index: i, angle, mesh, cardId: card.id });
+
+      const slot = { index: i, baseOffset: i / slotCount, angle: 0, mesh, cardId: card.id };
+      this.slots.push(slot);
 
       this.loadSlotTexture(mesh.material, card);
     }
@@ -121,8 +110,22 @@ export class SpiralGallery {
     }
   }
 
-  setRotation(radians) {
-    this.group.rotation.y = radians;
+  /** Advance every slot along the spiral path to reflect the current scroll value. */
+  update(globalT) {
+    for (const slot of this.slots) {
+      const t = (((slot.baseOffset + globalT) % 1) + 1) % 1;
+      const point = spiralPointAt(t);
+
+      slot.mesh.position.set(point.x, point.y, point.z);
+      // Faces outward, away from the spiral's axis, so a slot near the
+      // camera-facing angle (~0 mod 2*PI) faces the viewer.
+      slot.mesh.rotation.y = point.angle;
+      slot.angle = point.angle;
+
+      const fade = recycleFadeAt(t);
+      slot.mesh.material.opacity = fade;
+      slot.mesh.scale.setScalar(0.6 + 0.4 * fade);
+    }
   }
 
   resize() {

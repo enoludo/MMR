@@ -1,10 +1,11 @@
 import { CONFIG } from '../config.js';
 
 /**
- * Drives rotation from an unbounded "virtual" scroll value instead of
- * `window.scrollY` — the section never actually scrolls (it's fixed to the
- * viewport), so there's no page height to run out of and no forced reflow
- * from reading scroll/document metrics on every event.
+ * Drives the spiral's progress from an unbounded "virtual" scroll value
+ * instead of `window.scrollY` — the section never actually scrolls (it's
+ * fixed to the viewport), so there's no page height to run out of and no
+ * forced reflow from reading scroll/document metrics on every event. The
+ * value is in spiral-progress units (see spiralPath.js), not radians.
  *
  * A slow constant increment is added while the user is idle, paused for a
  * short window after any wheel/touch interaction.
@@ -12,7 +13,7 @@ import { CONFIG } from '../config.js';
 export class VirtualScroll {
   constructor(target = window) {
     this.target = target;
-    this.virtualRotation = 0;
+    this.virtualOffset = 0;
     this.isUserInteracting = false;
     this.idleTimeout = null;
     this.lastTouchY = null;
@@ -37,7 +38,7 @@ export class VirtualScroll {
   }
 
   onWheel(event) {
-    this.virtualRotation += event.deltaY * CONFIG.wheelSensitivity;
+    this.virtualOffset += event.deltaY * CONFIG.wheelSensitivity;
     this.markInteraction();
   }
 
@@ -50,7 +51,7 @@ export class VirtualScroll {
     const touchY = event.touches[0]?.clientY;
     if (touchY == null || this.lastTouchY == null) return;
     const delta = this.lastTouchY - touchY;
-    this.virtualRotation += delta * CONFIG.touchSensitivity;
+    this.virtualOffset += delta * CONFIG.touchSensitivity;
     this.lastTouchY = touchY;
     this.markInteraction();
   }
@@ -60,12 +61,12 @@ export class VirtualScroll {
     this.markInteraction();
   }
 
-  /** Advance the target rotation by the idle auto-rotate speed, if idle. */
+  /** Advance the target spiral progress by the idle auto-rotate speed, if idle. */
   tick() {
     if (!this.isUserInteracting) {
-      this.virtualRotation += CONFIG.autoRotateSpeed;
+      this.virtualOffset += CONFIG.autoRotateSpeed;
     }
-    return this.virtualRotation;
+    return this.virtualOffset;
   }
 
   dispose() {

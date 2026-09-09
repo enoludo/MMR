@@ -58,7 +58,8 @@ src/
     cards.json                Données des cartes (source de contenu)
   gallery/
     SpiralGallery.js          Scène Three.js, génération des slots, textures, resize
-    VirtualScroll.js          Accumulation wheel/touch, valeur de rotation non bornée, idle → auto-rotation
+    spiralPath.js             La courbe de la spirale elle-même (angle/rayon/hauteur en fonction de t)
+    VirtualScroll.js          Accumulation wheel/touch, valeur de progression non bornée, idle → auto-rotation
     centeredSlot.js           Calcul du slot le plus proche de l'angle "face caméra"
     Overlay.js                Overlay HTML + crossfade GSAP entre cartes
     placeholderTexture.js     Génère une texture de repli si une image est manquante
@@ -74,18 +75,28 @@ contenu de chaque slot est déterminé par un modulo :
 const card = cardsData[slotIndex % cardsData.length];
 ```
 
-Avec 4 cartes et 12 slots, chaque carte apparaît 3 fois autour de la
+Avec 4 cartes et 12 slots, chaque carte apparaît 3 fois le long de la
 spirale. Passer à ~20 cartes ne nécessite aucune modification du code 3D :
-le modulo s'ajuste automatiquement (chaque carte peut alors n'apparaître
-qu'une seule fois si on porte le nombre de slots à 20, ou continuer de
-tourner avec 12 slots en faisant défiler toutes les cartes dans le temps).
-Le nombre de slots par palier responsive se règle dans `config.js`
-(`CONFIG.slotCount`).
+le modulo s'ajuste automatiquement. Le nombre de slots par palier
+responsive se règle dans `config.js` (`CONFIG.slotCount`).
 
-La forme de la spirale (rayon et hauteur de chaque slot) est calculée par
-une fonction périodique de l'angle du slot, ce qui garantit un anneau qui
-se referme parfaitement sur lui-même : la rotation peut donc être
-appliquée indéfiniment (au-delà de 2π) sans aucune discontinuité visuelle.
+### Une vraie spirale (pas un anneau qui ondule)
+
+`spiralPath.js` définit la courbe : pour `t` dans `[0, 1)`, l'angle croît
+continûment sur `CONFIG.spiralTurns` tours pendant que le rayon et la
+hauteur croissent (ou décroissent) **de façon monotone** avec `t` — une
+vraie spirale conique (type escalier en colimaçon), pas une onde
+sinusoïdale qui oscille en boucle sur elle-même.
+
+Une vraie spirale n'étant pas symétrique par rotation, elle ne peut pas
+être animée comme un anneau rigide qu'on fait simplement tourner (ça
+créerait une discontinuité visible à la jonction). À la place, chaque slot
+garde une identité et un point de départ fixes (`baseOffset`) le long de
+la courbe, mais sa position est recalculée à chaque frame à partir de
+`(baseOffset + t_global) % 1` (voir `SpiralGallery#update`) : le slot
+parcourt toute la spirale puis recommence, et son opacité/échelle
+retombent à 0 juste avant/après ce point de recyclage
+(`CONFIG.recycleFade`) pour que le saut soit invisible.
 
 ### Rotation : scroll virtuel infini + auto-rotation idle
 
@@ -96,23 +107,29 @@ l'itération précédente.
 
 - `VirtualScroll` écoute `wheel` (desktop) et `touchmove`/`touchstart`/
   `touchend` (mobile), et accumule le delta dans une variable **non
-  bornée** (`virtualRotation`).
+  bornée** (`virtualOffset`, en unités de progression sur la spirale, pas
+  en radians).
 - Chaque frame, `main.js` lisse cette valeur cible avec un lerp
-  (`currentRotation += (target - currentRotation) * CONFIG.rotationLerp`)
-  et l'applique à `group.rotation.y`.
-- Après ~1.5s sans interaction (`CONFIG.idleDelayMs`), une auto-rotation
+  (`currentT += (target - currentT) * CONFIG.rotationLerp`) et l'utilise
+  pour repositionner tous les slots (`gallery.update(currentT)`).
+- Après ~1.5s sans interaction (`CONFIG.idleDelayMs`), une progression
   lente et constante reprend automatiquement, désactivée dès la prochaine
   interaction.
-- La caméra n'a **aucun** state ni controls (pas d'orbit/pan/zoom) : seule
-  la rotation du groupe de slots est animée.
+- La caméra n'a **aucun** state ni controls (pas d'orbit/pan/zoom) : elle
+  est fixe et légèrement surélevée/inclinée pour bien lire la forme de la
+  spirale ; seuls les slots sont animés.
 
 ### Carte centrée + overlay
 
-À chaque frame, `getCenteredSlotIndex` détermine le slot le plus proche de
-l'angle "face caméra" (0 mod 2π) à partir de la rotation courante. La
-carte correspondante (via le modulo) est passée à `Overlay.setCard()`, qui
-ne déclenche un crossfade GSAP (fade out → swap du contenu → fade in) que
-lorsque la carte affichée change réellement.
+À chaque frame, `getCenteredSlot` cherche, parmi les slots pas en train de
+disparaître au point de recyclage, celui dont l'angle courant est le plus
+proche de "face caméra" (0 mod 2π) — avec plusieurs tours, plusieurs slots
+peuvent être proches de cet angle en même temps sur des boucles
+différentes, donc c'est bien l'écart angulaire qui décide, pas la
+proximité brute à la caméra. La carte correspondante (via le modulo) est
+passée à `Overlay.setCard()`, qui ne déclenche un crossfade GSAP (fade out
+→ swap du contenu → fade in) que lorsque la carte affichée change
+réellement.
 
 ## Responsive
 

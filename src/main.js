@@ -3,7 +3,7 @@ import { CONFIG } from './config.js';
 import { SpiralGallery } from './gallery/SpiralGallery.js';
 import { VirtualScroll } from './gallery/VirtualScroll.js';
 import { Overlay } from './gallery/Overlay.js';
-import { getCenteredSlotIndex } from './gallery/centeredSlot.js';
+import { getCenteredSlot } from './gallery/centeredSlot.js';
 
 const canvasContainer = document.getElementById('gallery-canvas');
 
@@ -14,21 +14,21 @@ const overlay = new Overlay({
   ctaEl: document.getElementById('card-cta'),
 });
 
-let currentRotation = 0;
+let currentT = 0;
 
 function updateCenteredCard() {
-  const slotIndex = getCenteredSlotIndex(currentRotation, gallery.slotCount);
-  const card = cardsData[slotIndex % cardsData.length];
+  const slot = getCenteredSlot(gallery.slots, gallery.camera);
+  const card = cardsData[slot.index % cardsData.length];
   overlay.setCard(card);
 }
 
 function animate() {
   requestAnimationFrame(animate);
 
-  const targetRotation = virtualScroll.tick();
-  currentRotation += (targetRotation - currentRotation) * CONFIG.rotationLerp;
+  const targetT = virtualScroll.tick();
+  currentT += (targetT - currentT) * CONFIG.rotationLerp;
 
-  gallery.setRotation(currentRotation);
+  gallery.update(currentT);
   updateCenteredCard();
   gallery.render();
 }
