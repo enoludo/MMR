@@ -17,7 +17,7 @@ const overlay = new Overlay({
 let currentT = 0;
 
 function updateCenteredCard() {
-  const slot = getCenteredSlot(gallery.slots, gallery.camera);
+  const slot = getCenteredSlot(gallery.slots);
   const card = cardsData[slot.index % cardsData.length];
   overlay.setCard(card);
 }

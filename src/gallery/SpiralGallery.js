@@ -56,11 +56,12 @@ export class SpiralGallery {
     // controls, and never repositioned in response to interaction. It IS
     // pulled back on narrow/portrait viewports (see #resize) — otherwise a
     // fixed vertical FOV combined with landscape cards makes them fill and
-    // overflow a tall, narrow screen. Only the slots' positions are
-    // animated, driven by the virtual scroll value.
+    // overflow a tall, narrow screen. It looks straight down the tunnel's
+    // own axis (see spiralPath.js), which is what makes the nearest slot
+    // land exactly at screen-center rather than off to one side.
     this.basePosition = new THREE.Vector3(0, CONFIG.cameraHeight, CONFIG.cameraDistance);
     this.camera.position.copy(this.basePosition);
-    this.camera.lookAt(0, CONFIG.cameraLookAtY, 0);
+    this.camera.lookAt(0, 0, CONFIG.cameraLookAtZ);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -117,7 +118,7 @@ export class SpiralGallery {
       const tiltX = (hash(i * 2) - 0.5) * 2 * CONFIG.cardTiltJitter;
       const tiltZ = (hash(i * 2 + 1) - 0.5) * 2 * CONFIG.cardTiltJitter;
 
-      const slot = { index: i, baseOffset: i / slotCount, angle: 0, tiltX, tiltZ, mesh, cardId: card.id };
+      const slot = { index: i, baseOffset: i / slotCount, t: 0, angle: 0, tiltX, tiltZ, mesh, cardId: card.id };
       this.slots.push(slot);
 
       this.loadSlotTexture(mesh.material, card);
@@ -155,9 +156,12 @@ export class SpiralGallery {
       const point = spiralPointAt(t);
 
       slot.mesh.position.set(point.x, point.y, point.z);
-      // Faces outward, away from the spiral's axis (so a slot near the
-      // camera-facing angle faces the viewer), plus a fixed per-slot tilt.
-      slot.mesh.rotation.set(slot.tiltX, point.angle, slot.tiltZ);
+      // Faces the camera (billboard) regardless of where it sits in the
+      // tunnel, plus a fixed per-slot tilt for a loosely tumbled feel.
+      slot.mesh.quaternion.copy(this.camera.quaternion);
+      slot.mesh.rotateX(slot.tiltX);
+      slot.mesh.rotateZ(slot.tiltZ);
+      slot.t = t;
       slot.angle = point.angle;
 
       const fade = recycleFadeAt(t);
@@ -178,7 +182,7 @@ export class SpiralGallery {
     // same framing angle while compensating for that.
     const pullBack = aspect < 1 ? Math.sqrt(1 / aspect) : 1;
     this.camera.position.copy(this.basePosition).multiplyScalar(pullBack);
-    this.camera.lookAt(0, CONFIG.cameraLookAtY, 0);
+    this.camera.lookAt(0, 0, CONFIG.cameraLookAtZ);
 
     this.camera.aspect = aspect;
     this.camera.updateProjectionMatrix();

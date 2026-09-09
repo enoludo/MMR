@@ -8,45 +8,39 @@ export const CONFIG = {
   // cards.json never requires touching this.
   slotCount: {
     mobile: 8,
-    tablet: 10,
-    desktop: 12,
+    tablet: 12,
+    desktop: 16,
   },
   breakpoints: {
     mobile: 640,
     tablet: 1024,
   },
 
-  // Spiral shape. Each slot travels along this curve, parametrized by
-  // t in [0, 1): angle grows continuously over `spiralTurns` full
-  // revolutions while radius and height grow monotonically alongside it
-  // (angle croissant + décalage vertical/profondeur progressif) — a real
-  // spiral/conical helix, not a periodic wave.
-  //
-  // A true spiral like this isn't rotationally symmetric, so it can't be
-  // spun as one rigid ring without a visible seam where it wraps back on
-  // itself. Instead, each slot's own `t` cycles through [0, 1) as the
-  // scroll value advances (see SpiralGallery#update): it flows outward
-  // along the whole spiral and recycles back to the start, fading out/in
-  // over `recycleFade` right at the wrap point so the jump is invisible.
-  // Tighter and shallower than the first pass: fewer turns and a smaller
-  // radius/height range keep the cards clustered and overlapping in a
-  // dense collage rather than spread thin around a big, sparse coil.
-  spiralTurns: 1.4,
-  radiusMin: 1.4,
-  radiusMax: 3.6,
-  heightStart: 1.6,
-  heightEnd: -1.6,
+  // The spiral is a tunnel/vortex around the camera's own line of sight,
+  // not a coil viewed from the side (see spiralPath.js for the full
+  // parametrization). A slot's `t` in [0, 1) cycles continuously as the
+  // scroll value advances (see SpiralGallery#update): depth and radius
+  // both peak/bottom out at t=0.5 (closest to the camera, right on its
+  // optical axis — genuinely screen-centered) and are at their most
+  // distant right at the t=0/1 seam, exactly where recycleFade hides the
+  // wrap-around jump.
+  spiralTurns: 2.5,
+  radiusNear: 0.25, // how far off-axis the closest card sits — small on purpose, so it's centered on screen
+  radiusFar: 6.5, // how wide the tunnel opens as cards recede
+  depthNear: 3, // world Z of the closest point (nearest the camera)
+  depthFar: -6, // world Z of the farthest point, at the recycle seam
   recycleFade: 0.06,
 
-  // Landscape, large relative to the spiral radius, so cards overlap.
-  cardWidth: 2.8,
-  cardHeight: 1.75,
-  cardCurveDepth: 0.22, // how much each card bows outward along its width
-  cardTiltJitter: 0.5, // max extra random tilt (radians) on top of facing the camera, for a scattered/tumbled feel
+  // Landscape, large relative to the near radius, so the front-most card
+  // fills a good part of the frame while others recede visibly behind it.
+  cardWidth: 2.6,
+  cardHeight: 1.6,
+  cardCurveDepth: 0.2, // how much each card bows outward along its width
+  cardTiltJitter: 0.3, // max extra random tilt (radians) on top of facing the camera, for a loosely tumbled feel
 
-  cameraDistance: 6.4,
-  cameraHeight: 0.4,
-  cameraLookAtY: -0.1,
+  cameraDistance: 8,
+  cameraHeight: 0,
+  cameraLookAtZ: -1,
   cameraFov: 50,
 
   // Virtual scroll (see VirtualScroll.js). Never bound to window.scrollY.
