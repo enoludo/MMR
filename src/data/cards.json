@@ -1,0 +1,30 @@
+[
+  {
+    "id": "proj-01",
+    "image": "/assets/images/proj-01.svg",
+    "title": "Le seuil des proportions",
+    "cta": "Découvrir",
+    "link": "/projets/proj-01"
+  },
+  {
+    "id": "proj-02",
+    "image": "/assets/images/proj-02.svg",
+    "title": "Fragments de mémoire",
+    "cta": "Découvrir",
+    "link": "/projets/proj-02"
+  },
+  {
+    "id": "proj-03",
+    "image": "/assets/images/proj-03.svg",
+    "title": "L'architecture du silence",
+    "cta": "Découvrir",
+    "link": "/projets/proj-03"
+  },
+  {
+    "id": "proj-04",
+    "image": "/assets/images/proj-04.svg",
+    "title": "Lignes de fuite",
+    "cta": "Découvrir",
+    "link": "/projets/proj-04"
+  }
+]

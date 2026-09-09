@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>MMR — Galerie Spirale</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <div id="gallery-canvas"></div>
+
+      <div id="gallery-overlay" aria-live="polite">
+        <div class="gallery-card-info">
+          <h2 class="gallery-card-title" id="card-title"></h2>
+          <a class="gallery-card-cta" id="card-cta" href="#">
+            <span class="gallery-card-cta-label"></span>
+            <span class="gallery-card-cta-arrow" aria-hidden="true">&rarr;</span>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

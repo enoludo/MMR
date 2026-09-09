@@ -1,0 +1,102 @@
+:root {
+  --overlay-color: #f5f3ef;
+  --overlay-muted: rgba(245, 243, 239, 0.7);
+  --accent: #d6b06a;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: #0b0b0d;
+  overflow: hidden;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* The 3D canvas fills the viewport and stays fixed: no real page scroll,
+   rotation is driven entirely by virtual scroll (see VirtualScroll.js). */
+#gallery-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+#gallery-canvas canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* HTML overlay for the centered card's title + CTA, rendered above the canvas
+   so it stays crisp at any resolution and remains accessible. */
+#gallery-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 1.5rem clamp(2rem, 6vh, 5rem);
+  pointer-events: none;
+  z-index: 10;
+}
+
+.gallery-card-info {
+  text-align: center;
+  max-width: 640px;
+}
+
+.gallery-card-title {
+  margin: 0 0 0.9rem;
+  color: var(--overlay-color);
+  font-weight: 500;
+  font-size: clamp(1.4rem, 3.2vw, 2.4rem);
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+.gallery-card-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  pointer-events: auto;
+  color: var(--overlay-color);
+  text-decoration: none;
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid var(--overlay-muted);
+  border-radius: 999px;
+  padding: 0.65rem 1.4rem;
+  transition: border-color 0.25s ease, background-color 0.25s ease;
+}
+
+.gallery-card-cta:hover {
+  border-color: var(--accent);
+  background-color: rgba(214, 176, 106, 0.1);
+}
+
+.gallery-card-cta-arrow {
+  transition: transform 0.25s ease;
+}
+
+.gallery-card-cta:hover .gallery-card-cta-arrow {
+  transform: translateX(3px);
+}
