@@ -28,23 +28,26 @@ export const CONFIG = {
   // scroll value advances (see SpiralGallery#update): it flows outward
   // along the whole spiral and recycles back to the start, fading out/in
   // over `recycleFade` right at the wrap point so the jump is invisible.
-  spiralTurns: 2.25,
-  radiusMin: 1.1,
-  radiusMax: 5.2,
-  heightStart: 2.6,
-  heightEnd: -2.6,
+  // Tighter and shallower than the first pass: fewer turns and a smaller
+  // radius/height range keep the cards clustered and overlapping in a
+  // dense collage rather than spread thin around a big, sparse coil.
+  spiralTurns: 1.4,
+  radiusMin: 1.4,
+  radiusMax: 3.6,
+  heightStart: 1.6,
+  heightEnd: -1.6,
   recycleFade: 0.06,
 
-  cardWidth: 1.5,
-  cardHeight: 2,
+  // Landscape, large relative to the spiral radius, so cards overlap.
+  cardWidth: 2.8,
+  cardHeight: 1.75,
+  cardCurveDepth: 0.22, // how much each card bows outward along its width
+  cardTiltJitter: 0.5, // max extra random tilt (radians) on top of facing the camera, for a scattered/tumbled feel
 
-  // Raised and angled slightly down for a 3/4 view — a head-on camera at
-  // the spiral's own height flattens the ascending/descending shape into
-  // what reads as cards floating at random depths rather than a spiral.
-  cameraDistance: 9.5,
-  cameraHeight: 3.4,
-  cameraLookAtY: -0.6,
-  cameraFov: 45,
+  cameraDistance: 6.4,
+  cameraHeight: 0.4,
+  cameraLookAtY: -0.1,
+  cameraFov: 50,
 
   // Virtual scroll (see VirtualScroll.js). Never bound to window.scrollY.
   // Values are in spiral-progress units (t), not radians: a full 1.0

@@ -3,33 +3,32 @@ import { CONFIG, getSlotCountForWidth } from '../config.js';
 import { createPlaceholderTexture } from './placeholderTexture.js';
 import { spiralPointAt, recycleFadeAt } from './spiralPath.js';
 
-const GUIDE_SEGMENTS = 400;
+const textureLoader = new THREE.TextureLoader();
 
-/**
- * A thin static tube tracing the spiral curve itself, independent of any
- * card. Without it, only 12-20 discrete cards hint at the underlying
- * shape — spaced out and partly faded near the recycle point, that reads
- * as cards scattered at random depths rather than a legible spiral. The
- * tube makes the curve unambiguous regardless of camera angle or slot
- * count.
- */
-function buildGuideTube() {
-  const points = [];
-  for (let i = 0; i <= GUIDE_SEGMENTS; i += 1) {
-    const point = spiralPointAt(i / GUIDE_SEGMENTS);
-    points.push(new THREE.Vector3(point.x, point.y, point.z));
-  }
-  const curve = new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0);
-  const geometry = new THREE.TubeGeometry(curve, GUIDE_SEGMENTS, 0.012, 6, false);
-  const material = new THREE.MeshBasicMaterial({
-    color: 0xd6b06a,
-    transparent: true,
-    opacity: 0.35,
-  });
-  return new THREE.Mesh(geometry, material);
+/** Deterministic pseudo-random value in [0, 1) for a given integer seed. */
+function hash(seed) {
+  const x = Math.sin(seed * 12.9898) * 43758.5453;
+  return x - Math.floor(x);
 }
 
-const textureLoader = new THREE.TextureLoader();
+/**
+ * A plane bowed outward along its width (a gentle parabolic curve), like a
+ * sheet of paper curling toward the viewer — reused by every card, since
+ * the curve amount is the same for all of them.
+ */
+function buildCardGeometry(width, height, curveDepth) {
+  const geometry = new THREE.PlaneGeometry(width, height, 16, 1);
+  const position = geometry.attributes.position;
+
+  for (let i = 0; i < position.count; i += 1) {
+    const nx = position.getX(i) / (width / 2); // -1..1 across the card's width
+    position.setZ(i, curveDepth * (1 - nx * nx));
+  }
+  position.needsUpdate = true;
+  geometry.computeVertexNormals();
+
+  return geometry;
+}
 
 /**
  * Renders the spiral of cards. Each slot has a fixed identity/card and a
@@ -54,23 +53,29 @@ export class SpiralGallery {
       100
     );
     // Camera is fixed for the lifetime of the app: no orbit/pan/zoom
-    // controls, no repositioning. Only the slots' positions are animated,
-    // driven by the virtual scroll value.
-    this.camera.position.set(0, CONFIG.cameraHeight, CONFIG.cameraDistance);
+    // controls, and never repositioned in response to interaction. It IS
+    // pulled back on narrow/portrait viewports (see #resize) — otherwise a
+    // fixed vertical FOV combined with landscape cards makes them fill and
+    // overflow a tall, narrow screen. Only the slots' positions are
+    // animated, driven by the virtual scroll value.
+    this.basePosition = new THREE.Vector3(0, CONFIG.cameraHeight, CONFIG.cameraDistance);
+    this.camera.position.copy(this.basePosition);
     this.camera.lookAt(0, CONFIG.cameraLookAtY, 0);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.container.appendChild(this.renderer.domElement);
 
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-    const key = new THREE.DirectionalLight(0xffffff, 0.8);
-    key.position.set(2, 4, 5);
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+    const key = new THREE.DirectionalLight(0xffffff, 1.1);
+    key.position.set(-3, 5, 6);
     this.scene.add(key);
+    const rim = new THREE.DirectionalLight(0xffffff, 0.35);
+    rim.position.set(4, -2, -3);
+    this.scene.add(rim);
 
     this.group = new THREE.Group();
     this.scene.add(this.group);
-    this.group.add(buildGuideTube());
 
     this.slots = [];
     this.slotCount = getSlotCountForWidth(window.innerWidth);
@@ -83,14 +88,14 @@ export class SpiralGallery {
     // Tear down any previous layout (e.g. on a breakpoint change).
     for (const slot of this.slots) {
       this.group.remove(slot.mesh);
-      slot.mesh.geometry.dispose();
       slot.mesh.material.map?.dispose();
       slot.mesh.material.dispose();
     }
     this.slots = [];
     this.slotCount = slotCount;
 
-    const geometry = new THREE.PlaneGeometry(CONFIG.cardWidth, CONFIG.cardHeight);
+    if (this.cardGeometry) this.cardGeometry.dispose();
+    this.cardGeometry = buildCardGeometry(CONFIG.cardWidth, CONFIG.cardHeight, CONFIG.cardCurveDepth);
 
     for (let i = 0; i < slotCount; i += 1) {
       const card = this.cardsData[i % this.cardsData.length];
@@ -98,15 +103,21 @@ export class SpiralGallery {
       const material = new THREE.MeshStandardMaterial({
         color: 0xffffff,
         side: THREE.FrontSide,
-        roughness: 0.9,
-        metalness: 0,
+        roughness: 0.55,
+        metalness: 0.05,
         transparent: true,
       });
 
-      const mesh = new THREE.Mesh(geometry, material);
+      const mesh = new THREE.Mesh(this.cardGeometry, material);
       this.group.add(mesh);
 
-      const slot = { index: i, baseOffset: i / slotCount, angle: 0, mesh, cardId: card.id };
+      // A fixed, per-slot random tilt on top of the base "face the camera"
+      // orientation, so cards read as loosely tumbled rather than
+      // mechanically aligned to the spiral.
+      const tiltX = (hash(i * 2) - 0.5) * 2 * CONFIG.cardTiltJitter;
+      const tiltZ = (hash(i * 2 + 1) - 0.5) * 2 * CONFIG.cardTiltJitter;
+
+      const slot = { index: i, baseOffset: i / slotCount, angle: 0, tiltX, tiltZ, mesh, cardId: card.id };
       this.slots.push(slot);
 
       this.loadSlotTexture(mesh.material, card);
@@ -144,9 +155,9 @@ export class SpiralGallery {
       const point = spiralPointAt(t);
 
       slot.mesh.position.set(point.x, point.y, point.z);
-      // Faces outward, away from the spiral's axis, so a slot near the
-      // camera-facing angle (~0 mod 2*PI) faces the viewer.
-      slot.mesh.rotation.y = point.angle;
+      // Faces outward, away from the spiral's axis (so a slot near the
+      // camera-facing angle faces the viewer), plus a fixed per-slot tilt.
+      slot.mesh.rotation.set(slot.tiltX, point.angle, slot.tiltZ);
       slot.angle = point.angle;
 
       const fade = recycleFadeAt(t);
@@ -158,7 +169,18 @@ export class SpiralGallery {
   resize() {
     const width = this.container.clientWidth;
     const height = this.container.clientHeight;
-    this.camera.aspect = width / height;
+    const aspect = width / height;
+
+    // A perspective camera's FOV is vertical only; on a narrow/portrait
+    // viewport the effective horizontal FOV shrinks with the aspect ratio,
+    // so landscape cards balloon and overflow. Pulling the camera back
+    // along its own line of sight (scaling its position vector) keeps the
+    // same framing angle while compensating for that.
+    const pullBack = aspect < 1 ? Math.sqrt(1 / aspect) : 1;
+    this.camera.position.copy(this.basePosition).multiplyScalar(pullBack);
+    this.camera.lookAt(0, CONFIG.cameraLookAtY, 0);
+
+    this.camera.aspect = aspect;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height);
   }

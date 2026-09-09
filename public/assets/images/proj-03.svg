@@ -1,11 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1050" viewBox="0 0 800 1050">
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000">
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#2f2a3a"/>
-      <stop offset="100%" stop-color="#0b0b0d"/>
+    <linearGradient id="g3" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f2c265"/>
+      <stop offset="100%" stop-color="#d98a3a"/>
     </linearGradient>
   </defs>
-  <rect width="800" height="1050" fill="url(#g)"/>
-  <polygon points="400,260 540,600 260,600" fill="none" stroke="#d6b06a" stroke-width="2" opacity="0.6"/>
-  <text x="400" y="900" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="34" fill="#f5f3ef" letter-spacing="2">03</text>
+  <rect width="1600" height="1000" fill="url(#g3)"/>
+  <circle cx="980" cy="360" r="130" fill="#241608"/>
+  <rect x="880" y="480" width="480" height="260" rx="18" fill="#241608"/>
+  <rect x="820" y="700" width="620" height="120" fill="#1a0f05"/>
+  <text x="80" y="900" font-family="Helvetica, Arial, sans-serif" font-size="44" fill="#241608" letter-spacing="2" opacity="0.85">03</text>
 </svg>
