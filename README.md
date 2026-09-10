@@ -267,16 +267,18 @@ en disparaissant. L'entrée diffère entre les deux :
 - Le **titre** est découpé en caractères via `SplitText` (`gsap/SplitText`,
   option `mask: 'chars'`) : chaque lettre se retrouve dans son propre
   wrapper `overflow: clip` (`.char-mask`, généré automatiquement, stylé
-  dans `style.css`) et remonte depuis `yPercent: 120` jusqu'à `0`
-  (`sine.out`, 0.5s par lettre) avec un `stagger` court (0.012s) — chaque
-  lettre démarre bien avant que la précédente ait fini, d'où l'effet de
-  cascade. La visibilité vient du masque, pas de l'opacité : la lettre
-  apparaît nette dès qu'elle dépasse le bord du masque plutôt que de se
-  fondre en place. Comme le texte change à chaque carte, l'ancien
-  découpage est révoqué (`split.revert()`) **avant** d'écraser le
-  `textContent` — dans l'autre sens, `SplitText` se retrouve à
-  manipuler des nœuds déjà détachés du DOM et échoue silencieusement,
-  ce qui bloquait net toute mise à jour du titre.
+  dans `style.css`) et remonte depuis `yPercent: 130` jusqu'à `0`
+  (`power4.out`, 0.4s par lettre) avec un `stagger` court (0.012s) —
+  chaque lettre démarre bien avant que la précédente ait fini, d'où
+  l'effet de cascade ; `power4.out` accentue nettement le ralentissement
+  en fin de course par rapport à un ease plus doux comme `sine.out`. La
+  visibilité vient du masque, pas de l'opacité : la lettre apparaît nette
+  dès qu'elle dépasse le bord du masque plutôt que de se fondre en place.
+  Comme le texte change à chaque carte, l'ancien découpage est révoqué
+  (`split.revert()`) **avant** d'écraser le `textContent` — dans l'autre
+  sens, `SplitText` se retrouve à manipuler des nœuds déjà détachés du
+  DOM et échoue silencieusement, ce qui bloquait net toute mise à jour du
+  titre.
 
 Deux points d'attention CSS/animation, tous deux liés au même `.char-mask`
 (voir plus bas) :
@@ -299,8 +301,15 @@ Deux points d'attention CSS/animation, tous deux liés au même `.char-mask`
   la boîte du masque agrandie, `yPercent: 100` (exactement la hauteur de
   la lettre elle-même) ne suffit plus à la faire sortir entièrement de la
   zone visible — son sommet reste visible, "coupé" par le bord du masque,
-  tant que l'animation n'a pas démarré. Le point de départ est donc
-  `yPercent: 120`, qui compense la marge ajoutée en bas du masque.
+  tant que l'animation n'a pas démarré. Mesuré sur un titre réel (police
+  96px) : caractère de 76.8px de haut (`line-height: 0.8`), masque
+  paddé de 24px en haut / 14.4px en bas — sortir entièrement demande donc
+  un déplacement de 24+76.8+14.4−24 = 91.2px, soit ~118.75 % de la
+  hauteur du caractère, pas 100 %. Un premier correctif à `yPercent: 120`
+  ne laissait qu'une marge d'environ 1px, invisible en théorie mais
+  mangée en pratique par l'arrondi/l'antialiasing — d'où un sommet de
+  lettre encore visible par instants. `yPercent: 130` donne une vraie
+  marge (~8-9px à cette taille) plutôt qu'une valeur pile au seuil.
 
 Le titre et le bouton reprennent les valeurs exactes de la maquette Figma
 (node `52:116`) : titre en Marquez normal, jusqu'à 96px (`clamp()` pour

@@ -67,14 +67,17 @@ export class Overlay {
         this.timeline
           .fromTo(
             this.split.chars,
-            // 120%, not 100%: `.char-mask` (style.css) pads its clip box
-            // beyond the character's own tight line-height so accents
-            // don't clip — a plain yPercent:100 (exactly the char's own
-            // height) doesn't clear that extra padding, leaving the top
-            // of every letter visibly peeking out before this tween even
-            // starts.
-            { yPercent: 120 },
-            { yPercent: 0, duration: 0.5, ease: 'sine.out', stagger: 0.012 }
+            // .char-mask (style.css) pads its clip box beyond the
+            // character's own tight line-height so accents don't clip —
+            // measured on a real title, that's a 24px top / 14.4px bottom
+            // pad on a 76.8px-tall character (96px font, line-height
+            // 0.8), meaning full clearance needs yPercent ~118.75, not
+            // 100. 130 gives real headroom rather than a ~1px margin that
+            // rounding/antialiasing can eat — which is what still let the
+            // very top sliver of each letter show before the tween
+            // started.
+            { yPercent: 130 },
+            { yPercent: 0, duration: 0.4, ease: 'power4.out', stagger: 0.012 }
           )
           .fromTo(
             this.ctaEl,
