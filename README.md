@@ -295,10 +295,20 @@ n'y a aucun scroll de page réel, donc aucune dépendance à la hauteur du
 document (`scrollHeight`, `window.scrollY`…), source de saccades dans
 l'itération précédente.
 
-- `VirtualScroll` écoute `wheel` (desktop) et `touchmove`/`touchstart`/
-  `touchend` (mobile), et accumule le delta dans une variable **non
-  bornée** (`virtualOffset`, en unités de hauteur — les mêmes unités que
-  `CONFIG.pitch` — pas en radians).
+- `VirtualScroll` écoute deux entrées indépendantes, qui accumulent toutes
+  les deux dans la même variable **non bornée** (`virtualOffset`, en unités
+  de hauteur — les mêmes unités que `CONFIG.pitch` — pas en radians) :
+  `wheel` (molette/trackpad), et un drag horizontal (clic-glisser à la
+  souris ou glissement tactile) géré via la Pointer Events API
+  (`pointerdown`/`pointermove`/`pointerup`), qui traite les deux de façon
+  identique — glisser vers la gauche fait avancer la spirale, dans le même
+  sens qu'un scroll vers le bas.
+- Le drag est écouté sur le conteneur du canvas (`dragTarget`), pas sur
+  `window` : un clic sur le header ou le CTA (hors de ce conteneur dans le
+  DOM) ne déclenche donc jamais de drag, et leurs propres gestionnaires de
+  clic restent intacts. `pointermove`/`pointerup` sont eux écoutés sur
+  `window` pour continuer à suivre le pointeur même s'il sort du canvas en
+  cours de glissement.
 - Chaque frame, `main.js` lisse cette valeur cible avec un lerp
   (`currentScrollY += (target - currentScrollY) * CONFIG.rotationLerp`) et
   l'utilise pour translater tous les slots (`gallery.update(currentScrollY)`).
@@ -310,10 +320,11 @@ l'itération précédente.
 
 ### Magnétisme : toujours retomber sur une carte centrée
 
-Sans correction, `virtualOffset` s'arrête exactement où le dernier delta de
-molette/trackpad l'a laissé — souvent entre deux cartes, puisqu'un notch de
-souris ou la traîne d'inertie d'un trackpad ne tombe presque jamais
-pile sur un multiple exact du pas entre cartes.
+Sans correction, `virtualOffset` s'arrête exactement où le dernier delta
+(molette, trackpad, ou drag relâché) l'a laissé — souvent entre deux cartes,
+puisqu'un notch de souris, la traîne d'inertie d'un trackpad, ou la position
+du pointeur au relâchement d'un drag ne tombent presque jamais pile sur un
+multiple exact du pas entre cartes.
 
 - Les cartes sont espacées d'exactement `CONFIG.pitch / CONFIG.slotsPerTurn`
   en hauteur-monde (la même relation qui définit `baseHeight` dans
@@ -321,12 +332,13 @@ pile sur un multiple exact du pas entre cartes.
   arrondir `virtualOffset` au multiple le plus proche de ce pas
   (`VirtualScroll#snapToNearestCard`).
 - Ce recalage est débounced (`CONFIG.snapDebounceMs`, 180ms) sur les
-  événements `wheel`/`touchmove`/`touchend` : il ne se déclenche qu'une
-  fois l'entrée réellement silencieuse — pas à chaque tick de molette — pour
-  laisser un scroll rapide ou l'inertie d'un trackpad se terminer avant de
-  corriger. Volontairement bien plus court que `idleDelayMs` (1.5s, qui régit
-  la reprise de l'auto-rotation) : le magnétisme doit se sentir immédiat au
-  relâchement, pas attendu.
+  événements `wheel`, `pointermove` (pendant un drag) et `pointerup` (à son
+  relâchement) : il ne se déclenche qu'une fois l'entrée réellement
+  silencieuse — pas à chaque tick de molette ou de déplacement — pour
+  laisser un scroll rapide, l'inertie d'un trackpad, ou un drag encore en
+  cours se terminer avant de corriger. Volontairement bien plus court que
+  `idleDelayMs` (1.5s, qui régit la reprise de l'auto-rotation) : le
+  magnétisme doit se sentir immédiat au relâchement, pas attendu.
 - `virtualOffset` saute directement à la valeur recalée — il n'y a pas de
   tween dédié pour l'animation visuelle du recalage : le lerp déjà en place
   (`CONFIG.rotationLerp`, voir ci-dessus) rattrape `currentScrollY` vers
@@ -469,8 +481,9 @@ avec un inset de 24px (12px en dessous de 640px), au-dessus du canvas.
 - Le canvas et les slots ne sont recalculés que sur l'événement `resize`
   (débouncé via `requestAnimationFrame`), jamais à chaque frame de la
   boucle de rendu.
-- Le scroll virtuel gère `touchmove` en complément de `wheel` pour un
-  comportement tactile équivalent.
+- Le scroll virtuel gère un drag/slide horizontal (Pointer Events, souris
+  et tactile confondus) en complément de `wheel`, pour un comportement
+  équivalent quel que soit l'input.
 
 ## Notes
 

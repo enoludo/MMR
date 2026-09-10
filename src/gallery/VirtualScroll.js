@@ -8,37 +8,53 @@ import { CONFIG } from '../config.js';
  * event. The value is in world-height units (see spiralPath.js), the same
  * units as `CONFIG.pitch` — not radians.
  *
- * A slow constant increment is added while the user is idle, paused for a
- * short window after any wheel/touch interaction.
+ * Two independent inputs feed it: `wheel` (mouse wheel/trackpad, on
+ * `wheelTarget`) and a horizontal pointer drag (mouse click-drag or a touch
+ * slide, both handled identically via the Pointer Events API, scoped to
+ * `dragTarget` so it never hijacks clicks on the header or the CTA — those
+ * live outside `dragTarget`'s subtree, so a pointerdown on them never
+ * reaches this class at all). Dragging left advances the helix forward,
+ * the same direction a downward wheel/swipe already did — one consistent
+ * "forward" gesture across every input.
  *
- * Magnetic snap: whatever raw value wheel/touch deltas leave `virtualOffset`
+ * A slow constant increment is added while the user is idle, paused for a
+ * short window after any wheel/drag interaction.
+ *
+ * Magnetic snap: whatever raw value wheel/drag deltas leave `virtualOffset`
  * at, a short debounce (`scheduleSnap`) rounds it to the nearest card's own
  * exact position (see `snapToNearestCard`) once input goes quiet — so a
- * mouse notch or a trackpad's momentum tail can never leave the helix
- * resting between two cards. The value itself just jumps to the snapped
- * target; there's no separate tween for the *visual* settle because
- * `main.js` already lerps its rendered position toward `virtualOffset`
- * every frame (`CONFIG.rotationLerp`) — that existing smoothing is what
- * makes the snap read as an eased pull into place rather than a cut.
+ * mouse notch, a trackpad's momentum tail, or a released drag can never
+ * leave the helix resting between two cards. The value itself just jumps to
+ * the snapped target; there's no separate tween for the *visual* settle
+ * because `main.js` already lerps its rendered position toward
+ * `virtualOffset` every frame (`CONFIG.rotationLerp`) — that existing
+ * smoothing is what makes the snap read as an eased pull into place rather
+ * than a cut.
  */
 export class VirtualScroll {
-  constructor(target = window) {
-    this.target = target;
+  constructor({ wheelTarget = window, dragTarget = wheelTarget } = {}) {
+    this.wheelTarget = wheelTarget;
+    this.dragTarget = dragTarget;
     this.virtualOffset = 0;
     this.isUserInteracting = false;
     this.idleTimeout = null;
     this.snapTimeout = null;
-    this.lastTouchY = null;
+    this.isDragging = false;
+    this.lastDragX = null;
 
     this.onWheel = this.onWheel.bind(this);
-    this.onTouchStart = this.onTouchStart.bind(this);
-    this.onTouchMove = this.onTouchMove.bind(this);
-    this.onTouchEnd = this.onTouchEnd.bind(this);
+    this.onPointerDown = this.onPointerDown.bind(this);
+    this.onPointerMove = this.onPointerMove.bind(this);
+    this.onPointerUp = this.onPointerUp.bind(this);
 
-    target.addEventListener('wheel', this.onWheel, { passive: true });
-    target.addEventListener('touchstart', this.onTouchStart, { passive: true });
-    target.addEventListener('touchmove', this.onTouchMove, { passive: true });
-    target.addEventListener('touchend', this.onTouchEnd, { passive: true });
+    wheelTarget.addEventListener('wheel', this.onWheel, { passive: true });
+    // Started on dragTarget (so a press on the header/CTA never counts —
+    // they sit outside it in the DOM) but tracked on window from then on,
+    // so the drag keeps following the pointer even past dragTarget's edges.
+    dragTarget.addEventListener('pointerdown', this.onPointerDown);
+    window.addEventListener('pointermove', this.onPointerMove);
+    window.addEventListener('pointerup', this.onPointerUp);
+    window.addEventListener('pointercancel', this.onPointerUp);
   }
 
   markInteraction() {
@@ -49,7 +65,7 @@ export class VirtualScroll {
     }, CONFIG.idleDelayMs);
   }
 
-  /** Debounced so it fires once input (wheel ticks, touchmove drags) has actually gone quiet, not on every single event. */
+  /** Debounced so it fires once input (wheel ticks, drag moves) has actually gone quiet, not on every single event. */
   scheduleSnap() {
     clearTimeout(this.snapTimeout);
     this.snapTimeout = setTimeout(() => this.snapToNearestCard(), CONFIG.snapDebounceMs);
@@ -67,23 +83,32 @@ export class VirtualScroll {
     this.scheduleSnap();
   }
 
-  onTouchStart(event) {
-    this.lastTouchY = event.touches[0]?.clientY ?? null;
+  onPointerDown(event) {
+    // `isPrimary` excludes extra touch points in a multi-touch gesture;
+    // for mouse/pen, restrict to the primary (left) button so e.g. a
+    // right-click-drag doesn't scroll the gallery.
+    if (!event.isPrimary || (event.pointerType !== 'touch' && event.button !== 0)) return;
+    this.isDragging = true;
+    this.lastDragX = event.clientX;
+    // Keeps delivering move/up events to this pointer even if it strays
+    // outside dragTarget mid-drag (a fast mouse drag easily does).
+    this.dragTarget.setPointerCapture?.(event.pointerId);
     this.markInteraction();
   }
 
-  onTouchMove(event) {
-    const touchY = event.touches[0]?.clientY;
-    if (touchY == null || this.lastTouchY == null) return;
-    const delta = this.lastTouchY - touchY;
-    this.virtualOffset += delta * CONFIG.touchSensitivity;
-    this.lastTouchY = touchY;
+  onPointerMove(event) {
+    if (!this.isDragging) return;
+    const delta = this.lastDragX - event.clientX;
+    this.virtualOffset += delta * CONFIG.dragSensitivity;
+    this.lastDragX = event.clientX;
     this.markInteraction();
     this.scheduleSnap();
   }
 
-  onTouchEnd() {
-    this.lastTouchY = null;
+  onPointerUp() {
+    if (!this.isDragging) return;
+    this.isDragging = false;
+    this.lastDragX = null;
     this.markInteraction();
     this.scheduleSnap();
   }
@@ -99,9 +124,10 @@ export class VirtualScroll {
   dispose() {
     clearTimeout(this.idleTimeout);
     clearTimeout(this.snapTimeout);
-    this.target.removeEventListener('wheel', this.onWheel);
-    this.target.removeEventListener('touchstart', this.onTouchStart);
-    this.target.removeEventListener('touchmove', this.onTouchMove);
-    this.target.removeEventListener('touchend', this.onTouchEnd);
+    this.wheelTarget.removeEventListener('wheel', this.onWheel);
+    this.dragTarget.removeEventListener('pointerdown', this.onPointerDown);
+    window.removeEventListener('pointermove', this.onPointerMove);
+    window.removeEventListener('pointerup', this.onPointerUp);
+    window.removeEventListener('pointercancel', this.onPointerUp);
   }
 }

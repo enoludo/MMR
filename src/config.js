@@ -106,12 +106,16 @@ export const CONFIG = {
   // radians: the whole helix visibly translates vertically as this
   // accumulates.
   wheelSensitivity: 0.0026,
-  touchSensitivity: 0.007,
+  // Shared by a mouse click-drag and a touch slide — both horizontal,
+  // both handled identically via the Pointer Events API (see
+  // VirtualScroll#onPointerMove). Higher than wheelSensitivity because a
+  // drag's pixel range is much smaller than a wheel's accumulated deltaY.
+  dragSensitivity: 0.007,
   rotationLerp: 0.08,
   autoRotateSpeed: 0.0009,
   idleDelayMs: 1500,
 
-  // Magnetic snap: once wheel/touch input has been quiet for this long, the
+  // Magnetic snap: once wheel/drag input has been quiet for this long, the
   // virtual scroll value jumps to the nearest card's exact centered
   // position (see VirtualScroll#scheduleSnap) — `rotationLerp` above is
   // what then eases the visible helix into that new target rather than

@@ -12,7 +12,7 @@ initHeader();
 const canvasContainer = document.getElementById('gallery-canvas');
 
 const gallery = new SpiralGallery({ container: canvasContainer, cardsData });
-const virtualScroll = new VirtualScroll(window);
+const virtualScroll = new VirtualScroll({ wheelTarget: window, dragTarget: canvasContainer });
 const overlay = new Overlay({
   titleEl: document.getElementById('card-title'),
   ctaEl: document.getElementById('card-cta'),

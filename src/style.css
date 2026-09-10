@@ -51,6 +51,11 @@ body {
   width: 100%;
   height: 100%;
   touch-action: none;
+  cursor: grab;
+}
+
+#gallery-canvas:active {
+  cursor: grabbing;
 }
 
 #gallery-canvas canvas {
