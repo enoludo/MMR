@@ -60,6 +60,18 @@ const BLUR_MAP_FRAGMENT = `
   sampledDiffuseColor += texture2D( map, vMapUv + texel * vec2(-3.0,  3.0) ) * 0.015;
   sampledDiffuseColor += texture2D( map, vMapUv + texel * vec2(-3.0, -3.0) ) * 0.015;
   diffuseColor *= sampledDiffuseColor;
+
+  // Rounded corners: a signed-distance-field rounded-box mask in the
+  // card's own world-unit space (vMapUv remapped from [0,1] to
+  // [-cardSize/2, cardSize/2]) rather than raw UV, so the rounding reads
+  // as a true circular arc instead of an ellipse on a non-square card.
+  vec2 cardP = ( vMapUv - 0.5 ) * uCardSize;
+  vec2 cardB = uCardSize * 0.5 - vec2( uCornerRadius );
+  vec2 cardQ = abs( cardP ) - cardB;
+  float cardDist = length( max( cardQ, 0.0 ) ) + min( max( cardQ.x, cardQ.y ), 0.0 ) - uCornerRadius;
+  float cornerMask = 1.0 - smoothstep( 0.0, 0.004, cardDist );
+  diffuseColor.a *= cornerMask;
+  if ( diffuseColor.a < 0.01 ) discard;
 #endif
 `;
 
@@ -76,8 +88,13 @@ function createCardFaceMaterial() {
     shader.uniforms.uTexel = {
       value: new THREE.Vector2(1 / CARD_TEXTURE_SIZE.width, 1 / CARD_TEXTURE_SIZE.height),
     };
+    shader.uniforms.uCardSize = { value: new THREE.Vector2(CONFIG.cardWidth, CONFIG.cardHeight) };
+    shader.uniforms.uCornerRadius = { value: CONFIG.cardCornerRadius };
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <map_pars_fragment>', '#include <map_pars_fragment>\nuniform float uBlur;\nuniform vec2 uTexel;')
+      .replace(
+        '#include <map_pars_fragment>',
+        '#include <map_pars_fragment>\nuniform float uBlur;\nuniform vec2 uTexel;\nuniform vec2 uCardSize;\nuniform float uCornerRadius;'
+      )
       .replace('#include <map_fragment>', BLUR_MAP_FRAGMENT);
     material.userData.shader = shader;
   };

@@ -128,6 +128,23 @@ cartes, dans le sens de rotation de l'hélice elle-même. Le ressort se lit
 ainsi comme un ruban légèrement banké plutôt qu'un empilement de
 rectangles parfaitement droits.
 
+### Coins arrondis, sans changer la géométrie
+
+Les cartes sont des boîtes fines (voir plus bas) : plutôt que de générer une
+géométrie de boîte à coins arrondis (le bevel serait de toute façon écrasé
+par l'épaisseur `CARD_DEPTH`, bien plus fine que le rayon voulu), l'arrondi
+est un masque de transparence calculé dans le shader des faces avant/arrière
+(`createCardFaceMaterial` dans `SpiralGallery.js`) : une SDF de rectangle
+arrondi en unités-monde (pas en UV brut, pour que l'arrondi reste un vrai
+arc de cercle même sur une carte non carrée) découpe l'alpha aux quatre
+coins, avec un `discard` sous ce seuil pour ne pas laisser un coin
+transparent écrire de la profondeur et occulter une carte derrière.
+`CONFIG.cardCornerRadius` est calibré pour lire comme ~16px sur la carte de
+premier plan à une largeur d'écran desktop courante — il n'existe pas de
+correspondance px→unité-monde unique dans une scène 3D en perspective,
+donc c'est un réglage approximatif, pas une valeur exacte à toutes les
+tailles d'écran.
+
 ### Une caméra plate, pas un profil de cône
 
 La caméra est quasiment à hauteur d'œil, à peine inclinée
@@ -255,16 +272,16 @@ avec un inset de 24px (12px en dessous de 640px), au-dessus du canvas.
 - Comme pour le titre/CTA, le header entier ignore les événements pointeur
   (`pointer-events: none`) sauf ses éléments réellement interactifs, pour ne
   jamais bloquer le scroll virtuel en dessous.
-- **Logo** : le fichier de la maquette n'a pas pu être récupéré — le
-  connecteur Figma peut lire la structure du fichier (mesures, couleurs,
-  texte) via son API, mais le téléchargement de l'asset exporté lui-même se
-  fait par une requête HTTP directe vers `figma.com`, bloquée par la
-  politique réseau de cet environnement. Un texte "mmR" tient lieu de
-  repli en attendant (`.header-logo-text` dans `index.html`) ; pour le vrai
-  logo, exportez-le depuis Figma (SVG de préférence) et envoyez le fichier
-  comme pour la police Marquez — il suffira de le déposer dans
-  `public/assets/` et de décommenter la balise `<img class="header-logo-img">`
-  déjà présente en commentaire.
+- **Logo** : le connecteur Figma peut lire la structure du fichier
+  (mesures, couleurs, texte) via son API, mais le téléchargement direct de
+  l'asset exporté est bloqué par la politique réseau de cet environnement
+  (requête HTTP directe vers `figma.com`) — le vrai logo
+  (`public/assets/logo-mmr.png`, "Musée des Maladies Rares" en script rouge)
+  a donc été fourni directement par l'utilisateur plutôt qu'exporté depuis
+  Figma, comme pour la police Marquez. Il est affiché sans fond, à
+  l'identique de la maquette (`.header-logo-img` dans `style.css`) — à
+  32px de haut, ses traits fins sont volontairement fidèles à la maquette,
+  même si ça le rend peu lisible sur un fond très chargé.
 - Les icônes (menu burger, haut-parleur) sont redessinées à la main en SVG
   inline plutôt qu'exportées de Figma (même blocage réseau que le logo) —
   ce sont des formes génériques standard, pas un tracé exact de l'icône
