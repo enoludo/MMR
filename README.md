@@ -253,6 +253,12 @@ crossfade GSAP (fade out → swap du contenu → fade in) que lorsque la carte
 affichée change réellement — et tue proprement toute transition encore en
 cours pour éviter qu'un changement rapide n'affiche un texte périmé.
 
+Le titre et le bouton reprennent les valeurs exactes de la maquette Figma
+(node `52:116`) : titre en Marquez normal, jusqu'à 96px (`clamp()` pour
+rester lisible en dessous), `line-height: 0.8` ; bouton plein blanc,
+texte noir en `Google_Sans:Medium` 14px, sans flèche (la maquette n'en a
+pas — supprimée de `index.html` par rapport à la version précédente).
+
 ## Header (depuis la maquette Figma)
 
 `#gallery-header` (dans `index.html`, stylé dans `style.css`) reproduit le
