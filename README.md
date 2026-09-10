@@ -65,7 +65,7 @@ src/
     SpiralGallery.js          Scène Three.js, génération des slots, translation, resize
     spiralPath.js             La courbe elle-même : hélice à rayon constant + pas vertical
     cardTexture.js            Texture recadrée 16:9 par carte (Canvas2D)
-    cardColor.js              Couleur moyenne (assombrie) d'une image, pour le fond
+    cardColor.js              Couleur moyenne d'une image : assombrie pour le fond, brute pour la tranche des cards
     BackgroundTint.js         Transition douce du fond vers la couleur de la carte centrée
     VirtualScroll.js          Accumulation wheel/touch, hauteur non bornée, idle → auto-scroll
     centeredSlot.js           Calcul du slot le plus proche du centre (hauteur ~ 0)
@@ -249,6 +249,28 @@ chaque changement de carte :
   que le crossfade du titre — mais seulement si sa couleur est déjà connue :
   si l'image est encore en cours de chargement, l'appel est silencieusement
   réessayé à la frame suivante plutôt que d'être perdu.
+
+### La tranche prend la couleur de sa propre carte
+
+La tranche (`edgeMaterial`, voir la section sur les coins arrondis) n'est pas
+d'une couleur unique partagée par toutes les cartes : elle prend la couleur
+moyenne — brute, non assombrie — de sa propre carte, pour qu'elle se lise
+comme "la tranche de cette œuvre" plutôt que comme un cadre neutre autour.
+
+- `cardColor.js#extractAverageColor` réutilise le même échantillonnage 8×8
+  px qu'`extractMoodColor` (factorisé dans `sampleAverageRGB`), mais sans
+  passer par sa conversion HSL assombrissante : c'est la vraie couleur
+  moyenne de l'image, pas la teinte de fond.
+- Comme pour `cardColors`, `SpiralGallery` la mémorise une seule fois par
+  carte dans `cardEdgeColors`, puis l'applique à chaque slot affichant cette
+  carte (`applyEdgeColor`) — chaque slot a sa propre instance d'`edgeMaterial`
+  même quand plusieurs partagent la même carte.
+- Point d'attention Three.js : `Color#setRGB` interprète par défaut ses
+  arguments comme déjà dans l'espace linéaire de travail, pas en sRGB — or
+  les pixels lus sur un canvas (ou une couleur hex classique) sont en sRGB.
+  Sans préciser `THREE.SRGBColorSpace` en 4ᵉ argument, la couleur ressort
+  visiblement délavée/éclaircie après la conversion linéaire→sRGB
+  d'affichage de Three.js.
 
 ### On voit le dos des cartes
 

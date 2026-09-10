@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { CONFIG, getSlotCountForWidth } from '../config.js';
 import { createPlaceholderTexture } from './placeholderTexture.js';
 import { buildCardTexture, CARD_TEXTURE_SIZE } from './cardTexture.js';
-import { extractMoodColor } from './cardColor.js';
+import { extractMoodColor, extractAverageColor } from './cardColor.js';
 import { getPeriod, wrapHeight, helixPointAt, recycleFadeAt } from './spiralPath.js';
 
 const textureLoader = new THREE.TextureLoader();
@@ -216,6 +216,7 @@ export class SpiralGallery {
 
     this.slots = [];
     this.cardColors = new Map();
+    this.cardEdgeColors = new Map();
     this.slotCount = getSlotCountForWidth(window.innerWidth);
     this.buildSlots(this.slotCount);
 
@@ -275,6 +276,30 @@ export class SpiralGallery {
     this.cardColors.set(card.id, extractMoodColor(source));
   }
 
+  /** Records `card`'s own average color once, the first time any slot loads it — see applyEdgeColor. */
+  recordCardEdgeColor(card, source) {
+    if (this.cardEdgeColors.has(card.id)) return;
+    this.cardEdgeColors.set(card.id, extractAverageColor(source));
+  }
+
+  /**
+   * Tints `slot`'s edge to `card`'s own average color instead of a flat
+   * shared one, so the tranche reads as belonging to that card rather than
+   * as a neutral frame around it. Every slot showing the same card (they
+   * recur every `cardsData.length` slots) gets its own edgeMaterial
+   * instance, so this sets `.color` per slot even though the underlying
+   * average is computed and cached once per card (recordCardEdgeColor).
+   */
+  applyEdgeColor(slot, card) {
+    const { r, g, b } = this.cardEdgeColors.get(card.id);
+    // `r/g/b` are sRGB-encoded pixel values straight off a canvas (same
+    // convention as a hex color like 0xffffff) — Color#setRGB otherwise
+    // defaults to interpreting raw numbers as already-linear, which after
+    // three.js's own linear-to-sRGB display conversion visibly washes out
+    // and brightens every color.
+    slot.edgeMaterial.color.setRGB(r / 255, g / 255, b / 255, THREE.SRGBColorSpace);
+  }
+
   loadSlotTexture(slot, card) {
     textureLoader.load(
       card.image,
@@ -283,6 +308,8 @@ export class SpiralGallery {
         slot.faceMaterial.map = slot.texture;
         slot.faceMaterial.needsUpdate = true;
         this.recordCardColor(card, loaded.image);
+        this.recordCardEdgeColor(card, loaded.image);
+        this.applyEdgeColor(slot, card);
         loaded.dispose();
       },
       undefined,
@@ -292,6 +319,8 @@ export class SpiralGallery {
         slot.faceMaterial.map = slot.texture;
         slot.faceMaterial.needsUpdate = true;
         this.recordCardColor(card, placeholder.image);
+        this.recordCardEdgeColor(card, placeholder.image);
+        this.applyEdgeColor(slot, card);
         placeholder.dispose();
       }
     );

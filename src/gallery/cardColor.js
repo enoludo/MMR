@@ -54,12 +54,8 @@ function hslToRgb(h, s, l) {
   };
 }
 
-/**
- * The page background's target color for a given card: a darkened tint of
- * that card's own average color, sampled from a tiny downscaled copy of its
- * image (cheap — a handful of pixels is enough for an average).
- */
-export function extractMoodColor(source) {
+/** Plain average RGB (0-255, unrounded) of a tiny downscaled copy of `source` — cheap, since a handful of pixels is enough for an average. */
+function sampleAverageRGB(source) {
   const sample = document.createElement('canvas');
   sample.width = 8;
   sample.height = 8;
@@ -76,12 +72,27 @@ export function extractMoodColor(source) {
     g += data[i + 1];
     b += data[i + 2];
   }
-  r /= pixelCount;
-  g /= pixelCount;
-  b /= pixelCount;
+  return { r: r / pixelCount, g: g / pixelCount, b: b / pixelCount };
+}
 
+/**
+ * The page background's target color for a given card: a darkened tint of
+ * that card's own average color (see sampleAverageRGB).
+ */
+export function extractMoodColor(source) {
+  const { r, g, b } = sampleAverageRGB(source);
   const hsl = rgbToHsl(r, g, b);
   const l = Math.min(TARGET_LIGHTNESS.max, Math.max(TARGET_LIGHTNESS.min, hsl.l));
   const s = Math.min(MAX_SATURATION, hsl.s);
   return hslToRgb(hsl.h, s, l);
+}
+
+/**
+ * The card's own average color, untouched by the mood tint's lightness/
+ * saturation clamp above — used for the card edge (see SpiralGallery.js),
+ * which should read as "this card's color", not a background-safe tint of it.
+ */
+export function extractAverageColor(source) {
+  const { r, g, b } = sampleAverageRGB(source);
+  return { r: Math.round(r), g: Math.round(g), b: Math.round(b) };
 }
