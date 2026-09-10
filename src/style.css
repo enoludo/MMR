@@ -218,22 +218,6 @@ body {
   max-width: min(1400px, 92vw);
 }
 
-/* Masks for the enter animation's "rise up from below" reveal (see
-   Overlay.js): each wraps its content with `overflow: hidden` and no fixed
-   height, so the clip region always auto-fits whatever text/card is
-   currently shown — a little extra padding, offset by a matching negative
-   margin, keeps accented capitals (e.g. "Éclats") from clipping against
-   the tight title line-height without shifting the visible layout. */
-.gallery-card-title-mask,
-.gallery-card-cta-mask {
-  overflow: hidden;
-}
-
-.gallery-card-title-mask {
-  padding-top: 0.15em;
-  margin-top: -0.15em;
-}
-
 .gallery-card-title {
   margin: 0;
   color: var(--overlay-color);
@@ -243,6 +227,19 @@ body {
   line-height: 0.8;
   text-transform: uppercase;
   text-wrap: balance;
+}
+
+/* Per-letter reveal masks (see Overlay.js: SplitText's `mask: 'chars'`
+   wraps every character in its own `.char-mask`, nested inside the title
+   itself so `em` here correctly resolves against its large font-size).
+   Each mask's height auto-hugs its character's tight line-height exactly,
+   which clips accents/cap-height against the box edges — the padding
+   buys clearance top and bottom, cancelled by an equal negative margin on
+   the same element so the added room only affects the clip region, not
+   the title's overall line spacing or footprint. */
+.gallery-card-title .char-mask {
+  padding-block: 0.25em 0.15em;
+  margin-block: -0.25em -0.15em;
 }
 
 .gallery-card-cta {

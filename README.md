@@ -251,14 +251,41 @@ relation angle/hauteur, celui qui fait aussi face à la caméra. La carte
 correspondante est passée à `Overlay.setCard()`, qui ne déclenche une
 transition GSAP que lorsque la carte affichée change réellement — et tue
 proprement toute transition encore en cours pour éviter qu'un changement
-rapide n'affiche un texte périmé. La sortie est un simple fondu en alpha
-(0.25s) ; l'entrée est un reveal masqué façon "rideau" : le titre et le
-bouton sont chacun dans un wrapper `overflow: hidden` sans hauteur fixe
-(`.gallery-card-title-mask`/`.gallery-card-cta-mask` dans `index.html`,
-toujours ajusté à la taille du contenu courant) et remontent depuis
-`yPercent: 100` jusqu'à `0` (0.5s, `power4.inOut`) — la visibilité vient du
-masque, pas de l'opacité, donc le texte apparaît net dès qu'il dépasse le
-bord du masque plutôt que de se fondre en place.
+rapide n'affiche un texte périmé.
+
+La sortie est un simple fondu en alpha (0.25s) pour le titre et le bouton.
+L'entrée diffère entre les deux :
+
+- Le **bouton** reprend l'animation d'origine : fondu + léger glissement
+  vertical (`y: 12 → 0`, 0.4s, `power2.out`).
+- Le **titre** est découpé en caractères via `SplitText` (`gsap/SplitText`,
+  option `mask: 'chars'`) : chaque lettre se retrouve dans son propre
+  wrapper `overflow: clip` (`.char-mask`, généré automatiquement, stylé
+  dans `style.css`) et remonte depuis `yPercent: 100` jusqu'à `0`
+  (`sine.out`, 0.5s par lettre) avec un `stagger` court (0.025s) — chaque
+  lettre démarre bien avant que la précédente ait fini, d'où l'effet de
+  cascade. La visibilité vient du masque, pas de l'opacité : la lettre
+  apparaît nette dès qu'elle dépasse le bord du masque plutôt que de se
+  fondre en place. Comme le texte change à chaque carte, l'ancien
+  découpage est révoqué (`split.revert()`) **avant** d'écraser le
+  `textContent` — dans l'autre sens, `SplitText` se retrouve à
+  manipuler des nœuds déjà détachés du DOM et échoue silencieusement,
+  ce qui bloquait net toute mise à jour du titre.
+
+Point d'attention CSS : la hauteur de chaque `.char-mask` épouse
+exactement la `line-height: 0.8` (volontairement serrée) du titre, ce qui
+rognerait les accents et le haut/bas des majuscules une fois masqué. Le
+correctif ajoute du `padding-block` (haut/bas asymétrique, les accents
+débordant plus par le haut) compensé par un `margin-block` négatif
+identique sur le **même élément** — le `padding` élargit la zone de clip
+du masque (qui épouse sa propre boîte), le `margin` ramène ensuite tout
+l'ensemble à sa position d'origine sans toucher à l'interligne du titre.
+Cette compensation doit se faire sur l'élément qui porte réellement le
+`overflow`, pas sur un parent : une tentative précédente appliquait le
+`padding`/`margin` sur un wrapper englobant le `<h2>`, où `em` se
+résolvait contre la taille de police du wrapper (16px par défaut) et non
+celle, bien plus grande, du titre — un buffer de 2px au lieu d'environ
+20px, donc un correctif sans effet perceptible.
 
 Le titre et le bouton reprennent les valeurs exactes de la maquette Figma
 (node `52:116`) : titre en Marquez normal, jusqu'à 96px (`clamp()` pour
