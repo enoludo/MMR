@@ -5,6 +5,9 @@ import { buildTextureTiers } from './textureTiers.js';
 import { spiralPointAt, recycleFadeAt } from './spiralPath.js';
 
 const textureLoader = new THREE.TextureLoader();
+const CARD_DEPTH = 0.04;
+const BACK_COLOR = 0x2a251d;
+const EDGE_COLOR = 0x14110d;
 
 const SHARP_THRESHOLD = (CONFIG.sharpAngleDeg * Math.PI) / 180;
 const SOFT_THRESHOLD = (CONFIG.softAngleDeg * Math.PI) / 180;
@@ -24,10 +27,14 @@ function angularDistanceToZero(angle) {
  * `slotIndex % cardsData.length`, so the number of real cards can grow (4
  * today, ~20 later) without touching any of the 3D logic here.
  *
- * Depth cueing comes from swapping each card's texture between three
- * pre-blurred tiers based on its live angular distance from the front
- * (see textureTiers.js), rather than a real-time depth-of-field render
- * pass — cheaper, and reliable across devices.
+ * Each card is a thin box, not a single-sided plane: as a slot rotates
+ * past the camera-facing angle and on toward the back, it should still be
+ * visible — just showing its blank card-back face — rather than vanish
+ * outright. The box's front face carries the card's texture (swapped
+ * between three pre-blurred tiers based on live angular distance from the
+ * front, see textureTiers.js — cheaper and more reliable than a real-time
+ * depth-of-field render pass); its back and edge faces use plain shared
+ * materials.
  */
 export class SpiralGallery {
   constructor({ container, cardsData }) {
@@ -70,27 +77,48 @@ export class SpiralGallery {
       slot.textures?.sharp.dispose();
       slot.textures?.soft.dispose();
       slot.textures?.heavy.dispose();
-      slot.mesh.material.dispose();
+      slot.frontMaterial.dispose();
+      slot.backMaterial.dispose();
+      slot.edgeMaterial.dispose();
     }
     this.slots = [];
     this.slotCount = slotCount;
 
     if (!this.cardGeometry) {
-      this.cardGeometry = new THREE.PlaneGeometry(CONFIG.cardWidth, CONFIG.cardHeight);
+      this.cardGeometry = new THREE.BoxGeometry(CONFIG.cardWidth, CONFIG.cardHeight, CARD_DEPTH);
     }
 
     for (let i = 0; i < slotCount; i += 1) {
       const card = this.cardsData[i % this.cardsData.length];
 
-      const material = new THREE.MeshStandardMaterial({
+      const frontMaterial = new THREE.MeshStandardMaterial({
         color: 0xffffff,
-        side: THREE.FrontSide,
+        roughness: 0.9,
+        metalness: 0,
+        transparent: true,
+      });
+      const backMaterial = new THREE.MeshStandardMaterial({
+        color: BACK_COLOR,
+        roughness: 0.9,
+        metalness: 0,
+        transparent: true,
+      });
+      const edgeMaterial = new THREE.MeshStandardMaterial({
+        color: EDGE_COLOR,
         roughness: 0.9,
         metalness: 0,
         transparent: true,
       });
 
-      const mesh = new THREE.Mesh(this.cardGeometry, material);
+      // BoxGeometry face groups, in order: +x, -x, +y, -y, +z (front), -z (back).
+      const mesh = new THREE.Mesh(this.cardGeometry, [
+        edgeMaterial,
+        edgeMaterial,
+        edgeMaterial,
+        edgeMaterial,
+        frontMaterial,
+        backMaterial,
+      ]);
       this.group.add(mesh);
 
       const slot = {
@@ -98,6 +126,9 @@ export class SpiralGallery {
         baseOffset: i / slotCount,
         angle: 0,
         mesh,
+        frontMaterial,
+        backMaterial,
+        edgeMaterial,
         cardId: card.id,
         textures: null,
         currentTier: null,
@@ -139,13 +170,16 @@ export class SpiralGallery {
       const point = spiralPointAt(t);
 
       slot.mesh.position.set(point.x, point.y, point.z);
-      // Faces outward, away from the spiral's axis, so a slot near the
-      // camera-facing angle (~0 mod 2*PI) faces the viewer.
+      // Faces outward, away from the spiral's axis: toward the viewer
+      // near the front (angle ~ 0), showing its back once it's rotated
+      // past ~90 degrees toward the rear.
       slot.mesh.rotation.y = point.angle;
       slot.angle = point.angle;
 
       const fade = recycleFadeAt(t);
-      slot.mesh.material.opacity = fade;
+      slot.frontMaterial.opacity = fade;
+      slot.backMaterial.opacity = fade;
+      slot.edgeMaterial.opacity = fade;
       slot.mesh.scale.setScalar(0.6 + 0.4 * fade);
 
       if (!slot.textures) continue;
@@ -154,8 +188,8 @@ export class SpiralGallery {
         distance < SHARP_THRESHOLD ? 'sharp' : distance < SOFT_THRESHOLD ? 'soft' : 'heavy';
       if (tier !== slot.currentTier) {
         slot.currentTier = tier;
-        slot.mesh.material.map = slot.textures[tier];
-        slot.mesh.material.needsUpdate = true;
+        slot.frontMaterial.map = slot.textures[tier];
+        slot.frontMaterial.needsUpdate = true;
       }
     }
   }

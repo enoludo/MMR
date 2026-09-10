@@ -18,24 +18,34 @@ export const CONFIG = {
 
   // Spiral shape. Each slot travels along this curve, parametrized by
   // t in [0, 1): angle grows continuously over `spiralTurns` full
-  // revolutions while radius and height grow monotonically alongside it —
-  // a real spiral/conical helix, not a periodic ring.
+  // revolutions while height grows monotonically alongside it — a real
+  // ascending/descending spiral, not a flat periodic ring.
   //
-  // A true spiral like this isn't rotationally symmetric, so it can't be
-  // spun as one rigid ring without a visible seam where it wraps back on
-  // itself. Instead, each slot's own `t` cycles through [0, 1) as the
-  // scroll value advances (see SpiralGallery#update): it flows along the
-  // whole spiral and recycles back to the start, fading out/in over
-  // `recycleFade` right at the wrap point so the jump is invisible.
+  // Radius, unlike height, is periodic *in angle* (radiusBase +
+  // radiusAmplitude * cos(angle)): it peaks — closest to the camera —
+  // every time the angle crosses 0 (the front), and is smallest at the
+  // back (angle = PI), every single loop. That's deliberate: it's what
+  // guarantees the card currently facing the camera is always the closest
+  // one, and that cards visibly recede toward the back as they rotate
+  // away from front, rather than radius just happening to grow with
+  // scroll progress independently of which way a card is currently facing.
+  //
+  // Height being non-periodic means the shape isn't rotationally
+  // symmetric, so it can't be spun as one rigid ring without a visible
+  // seam where it wraps back on itself. Instead, each slot's own `t`
+  // cycles through [0, 1) as the scroll value advances (see
+  // SpiralGallery#update): it flows along the whole spiral and recycles
+  // back to the start, fading out/in over `recycleFade` right at the wrap
+  // point so the jump is invisible.
   //
   // The height range is deliberately modest relative to `spiralTurns`: a
-  // full loop (2*PI of angle) only shifts height by heightRange/turns, so
+  // full loop only shifts height by (heightEnd - heightStart) / turns, so
   // whichever loop currently happens to face the camera lands close to
   // the same on-screen height as any other — that's what keeps the
   // centered card genuinely centered regardless of which loop it's on.
   spiralTurns: 2.5,
-  radiusMin: 2.2,
-  radiusMax: 6.5,
+  radiusBase: 4,
+  radiusAmplitude: 2,
   heightStart: -1.8,
   heightEnd: 1.8,
   recycleFade: 0.06,

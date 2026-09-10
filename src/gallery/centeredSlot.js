@@ -23,7 +23,7 @@ function isOnScreen(slot, camera) {
  * dead-center (0 mod 2*PI) among those.
  */
 export function getCenteredSlot(slots, camera) {
-  const fullyVisible = slots.filter((slot) => slot.mesh.material.opacity >= MIN_OPACITY);
+  const fullyVisible = slots.filter((slot) => slot.frontMaterial.opacity >= MIN_OPACITY);
   const onScreen = fullyVisible.filter((slot) => isOnScreen(slot, camera));
   const pool = onScreen.length > 0 ? onScreen : fullyVisible.length > 0 ? fullyVisible : slots;
 
