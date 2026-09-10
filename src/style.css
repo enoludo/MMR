@@ -80,20 +80,15 @@ body {
   display: flex;
   align-items: center;
   height: 48px;
-  color: var(--overlay-color);
-  font-family: var(--title-font);
-  font-size: 1.5rem;
-  letter-spacing: 0.02em;
+  padding: 0 16px;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 24px;
   pointer-events: auto;
 }
 
 .header-logo-img {
   height: 32px;
   width: auto;
-}
-
-.header-logo-img[hidden] {
-  display: none;
 }
 
 /* Perfectly centered regardless of the logo/actions' own widths (matches
@@ -188,7 +183,11 @@ body {
   }
 
   .header-logo {
-    font-size: 1.1rem;
+    padding: 0 12px;
+  }
+
+  .header-logo-img {
+    height: 24px;
   }
 
   .header-tab {
