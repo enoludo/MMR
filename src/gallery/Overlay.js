@@ -8,12 +8,18 @@ gsap.registerPlugin(SplitText);
  * (not text rendered in the 3D scene) so it stays sharp at any resolution
  * and remains accessible/selectable.
  *
- * Both fade out in place (pure alpha) on the way out. On the way in, the
- * CTA does a plain fade+slide, but the title is split into characters
- * (SplitText's `mask: 'chars'` wraps each one in its own overflow:clip
- * box — see the `.char-mask` rule in style.css) that rise up through
- * their own mask with a short stagger, so letters cascade in one after
- * another instead of waiting for each to finish before the next starts.
+ * Both fade out in place (pure alpha) on the way out, moving upward
+ * slightly as they go (the CTA does, at least — see below). On the way
+ * in, the CTA does the same slide in reverse (fromTo, not a plain `.to`,
+ * so it always starts from the same below-rest position regardless of
+ * where the exit tween left it — otherwise only the very first card
+ * would slide up on entry; every one after would inherit the exit's end
+ * position and slide *down* into place instead). The title is split into
+ * characters (SplitText's `mask: 'chars'` wraps each one in its own
+ * overflow:clip box — see the `.char-mask` rule in style.css) that rise
+ * up through their own mask with a short stagger, so letters cascade in
+ * one after another instead of waiting for each to finish before the
+ * next starts.
  */
 export class Overlay {
   constructor({ titleEl, ctaEl }) {
@@ -61,10 +67,21 @@ export class Overlay {
         this.timeline
           .fromTo(
             this.split.chars,
-            { yPercent: 100 },
-            { yPercent: 0, duration: 0.5, ease: 'sine.out', stagger: 0.025 }
+            // 120%, not 100%: `.char-mask` (style.css) pads its clip box
+            // beyond the character's own tight line-height so accents
+            // don't clip — a plain yPercent:100 (exactly the char's own
+            // height) doesn't clear that extra padding, leaving the top
+            // of every letter visibly peeking out before this tween even
+            // starts.
+            { yPercent: 120 },
+            { yPercent: 0, duration: 0.5, ease: 'sine.out', stagger: 0.012 }
           )
-          .to(this.ctaEl, { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out' }, '<');
+          .fromTo(
+            this.ctaEl,
+            { opacity: 0, y: 12 },
+            { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out' },
+            '<'
+          );
       });
   }
 }

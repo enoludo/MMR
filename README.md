@@ -253,16 +253,22 @@ transition GSAP que lorsque la carte affichée change réellement — et tue
 proprement toute transition encore en cours pour éviter qu'un changement
 rapide n'affiche un texte périmé.
 
-La sortie est un simple fondu en alpha (0.25s) pour le titre et le bouton.
-L'entrée diffère entre les deux :
+La sortie est un simple fondu en alpha (0.25s) pour le titre et le bouton
+— celui du bouton translate aussi légèrement vers le haut (`y: 0 → -10`)
+en disparaissant. L'entrée diffère entre les deux :
 
-- Le **bouton** reprend l'animation d'origine : fondu + léger glissement
-  vertical (`y: 12 → 0`, 0.4s, `power2.out`).
+- Le **bouton** fait le même glissement en sens inverse, du bas vers le
+  haut (`y: 12 → 0`, 0.4s, `power2.out`) — toujours construit avec
+  `fromTo()` plutôt que `to()`, pour repartir explicitement de `y: 12` à
+  chaque carte. Avec un simple `to()`, l'entrée hérite implicitement de
+  la position où la sortie a laissé le bouton (`y: -10`) : seule la
+  toute première carte serait correcte, tandis que chaque changement
+  suivant ferait glisser le bouton vers le **bas** au lieu du haut.
 - Le **titre** est découpé en caractères via `SplitText` (`gsap/SplitText`,
   option `mask: 'chars'`) : chaque lettre se retrouve dans son propre
   wrapper `overflow: clip` (`.char-mask`, généré automatiquement, stylé
-  dans `style.css`) et remonte depuis `yPercent: 100` jusqu'à `0`
-  (`sine.out`, 0.5s par lettre) avec un `stagger` court (0.025s) — chaque
+  dans `style.css`) et remonte depuis `yPercent: 120` jusqu'à `0`
+  (`sine.out`, 0.5s par lettre) avec un `stagger` court (0.012s) — chaque
   lettre démarre bien avant que la précédente ait fini, d'où l'effet de
   cascade. La visibilité vient du masque, pas de l'opacité : la lettre
   apparaît nette dès qu'elle dépasse le bord du masque plutôt que de se
@@ -272,20 +278,29 @@ L'entrée diffère entre les deux :
   manipuler des nœuds déjà détachés du DOM et échoue silencieusement,
   ce qui bloquait net toute mise à jour du titre.
 
-Point d'attention CSS : la hauteur de chaque `.char-mask` épouse
-exactement la `line-height: 0.8` (volontairement serrée) du titre, ce qui
-rognerait les accents et le haut/bas des majuscules une fois masqué. Le
-correctif ajoute du `padding-block` (haut/bas asymétrique, les accents
-débordant plus par le haut) compensé par un `margin-block` négatif
-identique sur le **même élément** — le `padding` élargit la zone de clip
-du masque (qui épouse sa propre boîte), le `margin` ramène ensuite tout
-l'ensemble à sa position d'origine sans toucher à l'interligne du titre.
-Cette compensation doit se faire sur l'élément qui porte réellement le
-`overflow`, pas sur un parent : une tentative précédente appliquait le
-`padding`/`margin` sur un wrapper englobant le `<h2>`, où `em` se
-résolvait contre la taille de police du wrapper (16px par défaut) et non
-celle, bien plus grande, du titre — un buffer de 2px au lieu d'environ
-20px, donc un correctif sans effet perceptible.
+Deux points d'attention CSS/animation, tous deux liés au même `.char-mask`
+(voir plus bas) :
+
+- Sa hauteur épouse exactement la `line-height: 0.8` (volontairement
+  serrée) du titre, ce qui rognerait les accents et le haut/bas des
+  majuscules une fois masqué. Le correctif ajoute du `padding-block`
+  (haut/bas asymétrique, les accents débordant plus par le haut) compensé
+  par un `margin-block` négatif identique sur le **même élément** — le
+  `padding` élargit la zone de clip du masque (qui épouse sa propre
+  boîte), le `margin` ramène ensuite tout l'ensemble à sa position
+  d'origine sans toucher à l'interligne du titre. Cette compensation doit
+  se faire sur l'élément qui porte réellement le `overflow`, pas sur un
+  parent : une tentative précédente appliquait le `padding`/`margin` sur
+  un wrapper englobant le `<h2>`, où `em` se résolvait contre la taille
+  de police du wrapper (16px par défaut) et non celle, bien plus grande,
+  du titre — un buffer de 2px au lieu d'environ 20px, donc un correctif
+  sans effet perceptible.
+- Ce même `padding-block` a un effet de bord sur l'animation : une fois
+  la boîte du masque agrandie, `yPercent: 100` (exactement la hauteur de
+  la lettre elle-même) ne suffit plus à la faire sortir entièrement de la
+  zone visible — son sommet reste visible, "coupé" par le bord du masque,
+  tant que l'animation n'a pas démarré. Le point de départ est donc
+  `yPercent: 120`, qui compense la marge ajoutée en bas du masque.
 
 Le titre et le bouton reprennent les valeurs exactes de la maquette Figma
 (node `52:116`) : titre en Marquez normal, jusqu'à 96px (`clamp()` pour
