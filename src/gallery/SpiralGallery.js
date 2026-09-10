@@ -6,7 +6,6 @@ import { getPeriod, wrapHeight, helixPointAt, recycleFadeAt } from './spiralPath
 
 const textureLoader = new THREE.TextureLoader();
 const CARD_DEPTH = 0.04;
-const BACK_COLOR = 0x2a251d;
 const EDGE_COLOR = 0x14110d;
 
 const SHARP_THRESHOLD = (CONFIG.sharpAngleDeg * Math.PI) / 180;
@@ -33,11 +32,11 @@ function angularDistanceToZero(angle) {
  *
  * Each card is a thin box, not a single-sided plane: as a slot rotates
  * past the camera-facing angle and on toward the back, it should still be
- * visible — just showing its blank card-back face — rather than vanish
- * outright. The box's front face carries the card's texture (swapped
- * between three pre-blurred tiers based on live angular distance from the
- * front, see textureTiers.js); its back and edge faces use plain shared-
- * look materials.
+ * visible — showing the same image on its back face — rather than vanish
+ * outright. Both the front and back faces carry the card's texture
+ * (swapped between three pre-blurred tiers based on live angular distance
+ * from the front, see textureTiers.js); only the thin edge faces use a
+ * plain shared-look material.
  */
 export class SpiralGallery {
   constructor({ container, cardsData }) {
@@ -102,7 +101,7 @@ export class SpiralGallery {
         transparent: true,
       });
       const backMaterial = new THREE.MeshStandardMaterial({
-        color: BACK_COLOR,
+        color: 0xffffff,
         roughness: 0.9,
         metalness: 0,
         transparent: true,
@@ -194,6 +193,8 @@ export class SpiralGallery {
         slot.currentTier = tier;
         slot.frontMaterial.map = slot.textures[tier];
         slot.frontMaterial.needsUpdate = true;
+        slot.backMaterial.map = slot.textures[tier];
+        slot.backMaterial.needsUpdate = true;
       }
     }
   }
