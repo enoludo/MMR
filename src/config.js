@@ -22,9 +22,13 @@ export const CONFIG = {
   // are evenly spaced by construction (angularly within a turn, and
   // vertically between turns), which is what keeps them from ever
   // clipping into each other.
-  radius: 4.2,
-  pitch: 2.2,
-  slotsPerTurn: 8,
+  // Radius bumped up alongside slotsPerTurn: 10 cards/turn means a tighter
+  // 36° angular step, so the radius grows too to keep the chord spacing
+  // between adjacent cards comfortably wider than cardWidth (unchanged) —
+  // otherwise they'd clip into each other at the old radius.
+  radius: 5.2,
+  pitch: 3.3, // +50% over the previous 2.2
+  slotsPerTurn: 10,
   turnsRendered: 5, // total slots = slotsPerTurn * turnsRendered; only ~2-3 turns are ever actually in frame — the rest is buffer so the recycle point (see below) stays off-screen
 
   breakpoints: {
@@ -38,7 +42,7 @@ export const CONFIG = {
   // A flat, near-eye-level camera — barely raised or tilted — so the
   // helix reads as cards sliding past at varying depth, not as a cone's
   // visible side silhouette.
-  cameraDistance: 8.5,
+  cameraDistance: 9.5, // radius + ~4.3, matching the previous distance-to-front so cards stay the same apparent size
   cameraHeight: 0,
   cameraLookAtY: 0,
   cameraFov: 46,
