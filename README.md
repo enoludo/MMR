@@ -60,7 +60,9 @@ src/
   gallery/
     SpiralGallery.js          Scène Three.js, génération des slots, translation, resize
     spiralPath.js             La courbe elle-même : hélice à rayon constant + pas vertical
-    textureTiers.js           Pré-calcule 3 niveaux de flou par image (Canvas2D)
+    cardTexture.js            Texture recadrée 16:9 par carte (Canvas2D)
+    cardColor.js              Couleur moyenne (assombrie) d'une image, pour le fond
+    BackgroundTint.js         Transition douce du fond vers la couleur de la carte centrée
     VirtualScroll.js          Accumulation wheel/touch, hauteur non bornée, idle → auto-scroll
     centeredSlot.js           Calcul du slot le plus proche du centre (hauteur ~ 0)
     Overlay.js                Overlay HTML + crossfade GSAP entre cartes
@@ -124,16 +126,29 @@ plongeant révélerait le profil du ressort vu de côté ; vue presque de
 face, la même hélice se lit comme des cartes qui glissent verticalement à
 des profondeurs variées, pas comme une forme géométrique reconnaissable.
 
-### Profondeur de champ (flou) sans passe de post-traitement
+### Profondeur de champ : un flou continu, pas des paliers
 
-Plutôt qu'un vrai flou de profondeur de champ en temps réel (fragile selon
-les GPU, coûteux — une première tentative avec un `BokehPass` Three.js
-n'a produit aucun flou visible et ajoute un rendu de profondeur complet à
-chaque frame), chaque image est pré-rendue une fois en 3 niveaux de flou
-via Canvas2D (`textureTiers.js`, `ctx.filter = 'blur(...)'`). À chaque
-frame, `SpiralGallery#update` calcule l'écart angulaire de chaque carte
-par rapport à l'avant et bascule sa texture entre ces trois niveaux
-(net / doux / flou) — fiable sur tous les appareils, coût négligeable.
+Une première version pré-rendait chaque image en 3 niveaux de flou fixes
+(net / doux / flou) et basculait entre eux selon l'angle — visuellement, ça
+se voyait comme un "saut" net → flou plutôt qu'une transition. La version
+actuelle calcule le flou en direct, dans le shader du matériau de chaque
+face de carte (`createCardFaceMaterial` dans `SpiralGallery.js`) : un hook
+`onBeforeCompile` remplace le simple `texture2D(map, uv)` du matériau
+standard par une moyenne pondérée de 25 échantillons (3 anneaux) autour de
+ce point, dont le rayon (`uBlur`, en texels) est un uniform mis à jour à
+chaque frame — en continu, pas en paliers.
+
+Ce rayon est dérivé de l'écart angulaire de la carte par rapport à l'avant,
+via une interpolation "smoothstep" entre `CONFIG.blurStartDeg` (encore net)
+et `CONFIG.blurFullDeg` (flou maximal, `CONFIG.maxBlurTexels`) : à
+`uBlur == 0`, les 25 échantillons tombent tous sur le même texel, donc
+c'est visuellement identique à l'absence de flou — la transition du net au
+flou est donc un vrai dégradé continu, pas un changement brusque de
+texture. C'est plus cher qu'un flou pré-calculé (25 lectures de texture par
+pixel au lieu d'une), mais reste largement dans le budget pour la
+cinquantaine de cartes affichées, sans le rendu de profondeur complet
+qu'aurait nécessité un vrai `BokehPass` (tenté puis abandonné : aucun flou
+visible dans nos tests).
 
 ### Transparence en profondeur
 
@@ -147,6 +162,29 @@ restent des concepts distincts : `getCenteredSlot` doit continuer à
 détecter la carte centrée même quand elle n'est pas encore face caméra à
 pleine opacité, donc il se base sur `slot.recycleFade` plutôt que sur
 l'opacité réelle du matériau.
+
+### Un fond qui prend la couleur de la carte centrée
+
+Le fond de la page (`document.body`) se teinte de la couleur moyenne de la
+carte actuellement centrée, avec une transition douce (GSAP, ~1.2s) à
+chaque changement de carte :
+
+- `cardColor.js#extractMoodColor` échantillonne l'image (redimensionnée en
+  8×8 px, suffisant pour une moyenne) au moment où sa texture se charge, et
+  convertit la couleur moyenne obtenue en HSL pour n'en garder que la
+  teinte : la luminosité est bornée à une plage sombre fixe (8–16 %) et la
+  saturation plafonnée, afin que le texte clair de l'overlay reste toujours
+  lisible quelle que soit la photo — un mur de musée blanc et lumineux ne
+  fait donc pas passer le fond au blanc, mais donne un fond sombre légèrement
+  teinté de sa dominante de couleur.
+- `SpiralGallery` mémorise cette couleur par carte dans `cardColors` (une
+  `Map` de `card.id` vers `{r, g, b}`), calculée une seule fois par carte
+  même si elle apparaît dans plusieurs slots.
+- `BackgroundTint` (câblé dans `main.js`, aux côtés d'`Overlay`) déclenche
+  la transition dès que la carte centrée change — sur le même événement
+  que le crossfade du titre — mais seulement si sa couleur est déjà connue :
+  si l'image est encore en cours de chargement, l'appel est silencieusement
+  réessayé à la frame suivante plutôt que d'être perdu.
 
 ### On voit le dos des cartes
 
@@ -208,7 +246,7 @@ cours pour éviter qu'un changement rapide n'affiche un texte périmé.
 
 - Les photos dans `public/assets/images/` sont recadrées (jamais
   déformées) au format 16:9 des cartes, quel que soit leur ratio d'origine
-  — voir `textureTiers.js#coverRect`, qui reproduit un `object-fit: cover`
+  — voir `cardTexture.js#coverRect`, qui reproduit un `object-fit: cover`
   en Canvas2D.
 - Pour un bundle plus léger, [OGL](https://github.com/oframe/ogl) peut
   remplacer Three.js dans `SpiralGallery.js` sans impacter le reste de

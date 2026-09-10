@@ -47,12 +47,14 @@ export const CONFIG = {
   cameraLookAtY: 0,
   cameraFov: 46,
 
-  // Depth cueing: each card's texture is pre-blurred once into three
-  // tiers (see textureTiers.js) and swapped based on live angular
-  // distance from the front, cheaper and more reliable than a real-time
-  // depth-of-field render pass.
-  sharpAngleDeg: 20,
-  softAngleDeg: 50,
+  // Depth cueing: a live shader blur (see SpiralGallery's onBeforeCompile
+  // hook) grows continuously with a card's angular distance from the
+  // front, rather than snapping between a handful of pre-baked tiers —
+  // cards this close to the front stay perfectly sharp, cards this far
+  // are at maximum blur, and everything in between is a smooth ramp.
+  blurStartDeg: 15,
+  blurFullDeg: 85,
+  maxBlurTexels: 12,
 
   // Depth-based transparency: cards fade from fully opaque at the front
   // (angle ~ 0, closest to the camera) to nearly transparent at the back

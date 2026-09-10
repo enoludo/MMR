@@ -1,19 +1,86 @@
 import * as THREE from 'three';
 import { CONFIG, getSlotCountForWidth } from '../config.js';
 import { createPlaceholderTexture } from './placeholderTexture.js';
-import { buildTextureTiers } from './textureTiers.js';
+import { buildCardTexture, CARD_TEXTURE_SIZE } from './cardTexture.js';
+import { extractMoodColor } from './cardColor.js';
 import { getPeriod, wrapHeight, helixPointAt, recycleFadeAt } from './spiralPath.js';
 
 const textureLoader = new THREE.TextureLoader();
 const CARD_DEPTH = 0.04;
 const EDGE_COLOR = 0x14110d;
 
-const SHARP_THRESHOLD = (CONFIG.sharpAngleDeg * Math.PI) / 180;
-const SOFT_THRESHOLD = (CONFIG.softAngleDeg * Math.PI) / 180;
+const BLUR_START = (CONFIG.blurStartDeg * Math.PI) / 180;
+const BLUR_FULL = (CONFIG.blurFullDeg * Math.PI) / 180;
 
 function angularDistanceToZero(angle) {
   const normalized = ((angle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
   return Math.min(normalized, 2 * Math.PI - normalized);
+}
+
+/** 0 at/before BLUR_START, 1 at/past BLUR_FULL, smoothstep-eased in between. */
+function blurAmountAt(distance) {
+  const t = Math.min(1, Math.max(0, (distance - BLUR_START) / (BLUR_FULL - BLUR_START)));
+  const eased = t * t * (3 - 2 * t);
+  return eased * CONFIG.maxBlurTexels;
+}
+
+// A 25-tap (3-ring) blur with a uniform, continuously variable radius (in
+// texels), injected into MeshStandardMaterial's own fragment shader in
+// place of its single texture2D lookup. At `uBlur == 0` every tap lands on
+// the same texel, so this is pixel-identical to no blur at all — meaning
+// the sharp-to-blurred transition is a smooth, continuous ramp as `uBlur`
+// grows, rather than a jump between fixed pre-baked tiers.
+const BLUR_MAP_FRAGMENT = `
+#ifdef USE_MAP
+  vec2 texel = uTexel * uBlur;
+  vec4 sampledDiffuseColor = texture2D( map, vMapUv ) * 0.2;
+  sampledDiffuseColor += texture2D( map, vMapUv + texel * vec2( 1.0,  0.0) ) * 0.055;
+  sampledDiffuseColor += texture2D( map, vMapUv + texel * vec2(-1.0,  0.0) ) * 0.055;
+  sampledDiffuseColor += texture2D( map, vMapUv + texel * vec2( 0.0,  1.0) ) * 0.055;
+  sampledDiffuseColor += texture2D( map, vMapUv + texel * vec2( 0.0, -1.0) ) * 0.055;
+  sampledDiffuseColor += texture2D( map, vMapUv + texel * vec2( 1.0,  1.0) ) * 0.055;
+  sampledDiffuseColor += texture2D( map, vMapUv + texel * vec2( 1.0, -1.0) ) * 0.055;
+  sampledDiffuseColor += texture2D( map, vMapUv + texel * vec2(-1.0,  1.0) ) * 0.055;
+  sampledDiffuseColor += texture2D( map, vMapUv + texel * vec2(-1.0, -1.0) ) * 0.055;
+  sampledDiffuseColor += texture2D( map, vMapUv + texel * vec2( 2.0,  0.0) ) * 0.03;
+  sampledDiffuseColor += texture2D( map, vMapUv + texel * vec2(-2.0,  0.0) ) * 0.03;
+  sampledDiffuseColor += texture2D( map, vMapUv + texel * vec2( 0.0,  2.0) ) * 0.03;
+  sampledDiffuseColor += texture2D( map, vMapUv + texel * vec2( 0.0, -2.0) ) * 0.03;
+  sampledDiffuseColor += texture2D( map, vMapUv + texel * vec2( 2.0,  2.0) ) * 0.03;
+  sampledDiffuseColor += texture2D( map, vMapUv + texel * vec2( 2.0, -2.0) ) * 0.03;
+  sampledDiffuseColor += texture2D( map, vMapUv + texel * vec2(-2.0,  2.0) ) * 0.03;
+  sampledDiffuseColor += texture2D( map, vMapUv + texel * vec2(-2.0, -2.0) ) * 0.03;
+  sampledDiffuseColor += texture2D( map, vMapUv + texel * vec2( 3.0,  0.0) ) * 0.015;
+  sampledDiffuseColor += texture2D( map, vMapUv + texel * vec2(-3.0,  0.0) ) * 0.015;
+  sampledDiffuseColor += texture2D( map, vMapUv + texel * vec2( 0.0,  3.0) ) * 0.015;
+  sampledDiffuseColor += texture2D( map, vMapUv + texel * vec2( 0.0, -3.0) ) * 0.015;
+  sampledDiffuseColor += texture2D( map, vMapUv + texel * vec2( 3.0,  3.0) ) * 0.015;
+  sampledDiffuseColor += texture2D( map, vMapUv + texel * vec2( 3.0, -3.0) ) * 0.015;
+  sampledDiffuseColor += texture2D( map, vMapUv + texel * vec2(-3.0,  3.0) ) * 0.015;
+  sampledDiffuseColor += texture2D( map, vMapUv + texel * vec2(-3.0, -3.0) ) * 0.015;
+  diffuseColor *= sampledDiffuseColor;
+#endif
+`;
+
+/** A card face material whose blur radius (`uBlur`, in texels) can be set continuously, per instance, every frame. */
+function createCardFaceMaterial() {
+  const material = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 0.9,
+    metalness: 0,
+    transparent: true,
+  });
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uBlur = { value: 0 };
+    shader.uniforms.uTexel = {
+      value: new THREE.Vector2(1 / CARD_TEXTURE_SIZE.width, 1 / CARD_TEXTURE_SIZE.height),
+    };
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <map_pars_fragment>', '#include <map_pars_fragment>\nuniform float uBlur;\nuniform vec2 uTexel;')
+      .replace('#include <map_fragment>', BLUR_MAP_FRAGMENT);
+    material.userData.shader = shader;
+  };
+  return material;
 }
 
 /**
@@ -33,10 +100,10 @@ function angularDistanceToZero(angle) {
  * Each card is a thin box, not a single-sided plane: as a slot rotates
  * past the camera-facing angle and on toward the back, it should still be
  * visible — showing the same image on its back face — rather than vanish
- * outright. Both the front and back faces carry the card's texture
- * (swapped between three pre-blurred tiers based on live angular distance
- * from the front, see textureTiers.js); only the thin edge faces use a
- * plain shared-look material.
+ * outright. Both the front and back faces carry the card's texture, blurred
+ * continuously by a live shader based on angular distance from the front
+ * (see createCardFaceMaterial); only the thin edge faces use a plain
+ * shared-look material.
  */
 export class SpiralGallery {
   constructor({ container, cardsData }) {
@@ -66,6 +133,7 @@ export class SpiralGallery {
     this.scene.add(this.group);
 
     this.slots = [];
+    this.cardColors = new Map();
     this.slotCount = getSlotCountForWidth(window.innerWidth);
     this.buildSlots(this.slotCount);
 
@@ -76,9 +144,7 @@ export class SpiralGallery {
     // Tear down any previous layout (e.g. on a breakpoint change).
     for (const slot of this.slots) {
       this.group.remove(slot.mesh);
-      slot.textures?.sharp.dispose();
-      slot.textures?.soft.dispose();
-      slot.textures?.heavy.dispose();
+      slot.texture?.dispose();
       slot.frontMaterial.dispose();
       slot.backMaterial.dispose();
       slot.edgeMaterial.dispose();
@@ -94,18 +160,8 @@ export class SpiralGallery {
     for (let i = 0; i < slotCount; i += 1) {
       const card = this.cardsData[i % this.cardsData.length];
 
-      const frontMaterial = new THREE.MeshStandardMaterial({
-        color: 0xffffff,
-        roughness: 0.9,
-        metalness: 0,
-        transparent: true,
-      });
-      const backMaterial = new THREE.MeshStandardMaterial({
-        color: 0xffffff,
-        roughness: 0.9,
-        metalness: 0,
-        transparent: true,
-      });
+      const frontMaterial = createCardFaceMaterial();
+      const backMaterial = createCardFaceMaterial();
       const edgeMaterial = new THREE.MeshStandardMaterial({
         color: EDGE_COLOR,
         roughness: 0.9,
@@ -133,8 +189,7 @@ export class SpiralGallery {
         backMaterial,
         edgeMaterial,
         cardId: card.id,
-        textures: null,
-        currentTier: null,
+        texture: null,
       };
       this.slots.push(slot);
 
@@ -142,17 +197,33 @@ export class SpiralGallery {
     }
   }
 
+  /** Records `card`'s mood color once, the first time any slot loads it (see cardColor.js). */
+  recordCardColor(card, source) {
+    if (this.cardColors.has(card.id)) return;
+    this.cardColors.set(card.id, extractMoodColor(source));
+  }
+
   loadSlotTexture(slot, card) {
     textureLoader.load(
       card.image,
-      (texture) => {
-        slot.textures = buildTextureTiers(texture.image);
-        texture.dispose();
+      (loaded) => {
+        slot.texture = buildCardTexture(loaded.image);
+        slot.frontMaterial.map = slot.texture;
+        slot.frontMaterial.needsUpdate = true;
+        slot.backMaterial.map = slot.texture;
+        slot.backMaterial.needsUpdate = true;
+        this.recordCardColor(card, loaded.image);
+        loaded.dispose();
       },
       undefined,
       () => {
         const placeholder = createPlaceholderTexture(card.title);
-        slot.textures = buildTextureTiers(placeholder.image);
+        slot.texture = buildCardTexture(placeholder.image);
+        slot.frontMaterial.map = slot.texture;
+        slot.frontMaterial.needsUpdate = true;
+        slot.backMaterial.map = slot.texture;
+        slot.backMaterial.needsUpdate = true;
+        this.recordCardColor(card, placeholder.image);
         placeholder.dispose();
       }
     );
@@ -191,16 +262,9 @@ export class SpiralGallery {
       slot.backMaterial.opacity = opacity;
       slot.edgeMaterial.opacity = opacity;
 
-      if (!slot.textures) continue;
-      const tier =
-        distance < SHARP_THRESHOLD ? 'sharp' : distance < SOFT_THRESHOLD ? 'soft' : 'heavy';
-      if (tier !== slot.currentTier) {
-        slot.currentTier = tier;
-        slot.frontMaterial.map = slot.textures[tier];
-        slot.frontMaterial.needsUpdate = true;
-        slot.backMaterial.map = slot.textures[tier];
-        slot.backMaterial.needsUpdate = true;
-      }
+      const blur = blurAmountAt(distance);
+      if (slot.frontMaterial.userData.shader) slot.frontMaterial.userData.shader.uniforms.uBlur.value = blur;
+      if (slot.backMaterial.userData.shader) slot.backMaterial.userData.shader.uniforms.uBlur.value = blur;
     }
   }
 
