@@ -39,6 +39,12 @@ export const CONFIG = {
   cardWidth: 2.56,
   cardHeight: 1.44, // exactly 16:9
 
+  // Every card is rolled by this fixed amount around its own line of sight
+  // (in the same rotational sense the helix itself turns as height
+  // increases), so the coil reads as a continuous, slightly banked ribbon
+  // rather than a stack of flat, perfectly upright rectangles.
+  cardTiltDeg: 4,
+
   // A flat, near-eye-level camera — barely raised or tilted — so the
   // helix reads as cards sliding past at varying depth, not as a cone's
   // visible side silhouette.

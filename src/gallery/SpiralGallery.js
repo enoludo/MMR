@@ -11,6 +11,7 @@ const EDGE_COLOR = 0x14110d;
 
 const BLUR_START = (CONFIG.blurStartDeg * Math.PI) / 180;
 const BLUR_FULL = (CONFIG.blurFullDeg * Math.PI) / 180;
+const CARD_TILT = (CONFIG.cardTiltDeg * Math.PI) / 180;
 
 function angularDistanceToZero(angle) {
   const normalized = ((angle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
@@ -248,6 +249,10 @@ export class SpiralGallery {
       // the front (angle ~ 0), showing its back once it's rotated past
       // ~90 degrees toward the rear.
       slot.mesh.rotation.y = point.angle;
+      // A fixed roll around the card's own line of sight, in the same
+      // rotational sense as the helix's own turn — a subtle bank into the
+      // spiral rather than an upright, flat rectangle.
+      slot.mesh.rotation.z = CARD_TILT;
       slot.angle = point.angle;
 
       const fade = recycleFadeAt(y, this.period);

@@ -118,6 +118,15 @@ tours réellement instanciés, `CONFIG.slotsPerTurn * turns`) se règle dans
 à l'écran, le reste sert de zone tampon pour que le point de recyclage
 reste hors champ.
 
+### Un léger roulis, dans le sens de la spirale
+
+Chaque carte reçoit, en plus de sa rotation autour de l'axe de l'hélice
+(`rotation.y = point.angle`), un roulis fixe autour de sa propre ligne de
+mire (`rotation.z = CONFIG.cardTiltDeg`, ≤ 5°) — le même pour toutes les
+cartes, dans le sens de rotation de l'hélice elle-même. Le ressort se lit
+ainsi comme un ruban légèrement banké plutôt qu'un empilement de
+rectangles parfaitement droits.
+
 ### Une caméra plate, pas un profil de cône
 
 La caméra est quasiment à hauteur d'œil, à peine inclinée
@@ -244,6 +253,17 @@ cours pour éviter qu'un changement rapide n'affiche un texte périmé.
 
 ## Notes
 
+- Le titre de la carte centrée utilise la police **Marquez**
+  (`public/fonts/Marquez.otf`, chargée via `@font-face` dans `style.css`),
+  en majuscules (`text-transform: uppercase`). Le bouton "Découvrir"
+  utilise **Google Sans** — une police interne à Google, non distribuable
+  comme webfont : elle n'est déclarée qu'en premier choix de la pile
+  (`--button-font`) pour les visiteurs qui l'ont déjà installée localement
+  (certains appareils ChromeOS/Android), avec **Roboto** (chargée depuis
+  Google Fonts dans `index.html`) comme repli visible par tout le monde
+  d'autre. Si la vraie police Google Sans doit être utilisée telle quelle,
+  il faudra fournir son fichier (comme pour Marquez) pour l'intégrer via
+  `@font-face`.
 - Les photos dans `public/assets/images/` sont recadrées (jamais
   déformées) au format 16:9 des cartes, quel que soit leur ratio d'origine
   — voir `cardTexture.js#coverRect`, qui reproduit un `object-fit: cover`

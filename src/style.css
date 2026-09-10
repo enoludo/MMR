@@ -1,7 +1,22 @@
+@font-face {
+  font-family: 'Marquez';
+  src: url('/fonts/Marquez.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --overlay-color: #f5f3ef;
   --overlay-muted: rgba(245, 243, 239, 0.7);
   --accent: #d6b06a;
+  --title-font: 'Marquez', 'Helvetica Neue', Arial, sans-serif;
+  /* "Google Sans" is a Google-internal font, not distributed as a webfont —
+     it's listed first for the rare visitor who happens to have it installed
+     locally (some ChromeOS/Android devices do); Roboto (loaded in
+     index.html), from the same type family, is the fallback everyone else
+     actually sees. */
+  --button-font: 'Google Sans', Roboto, Arial, sans-serif;
   color-scheme: dark;
 }
 
@@ -65,10 +80,12 @@ body {
 .gallery-card-title {
   margin: 0 0 0.9rem;
   color: var(--overlay-color);
+  font-family: var(--title-font);
   font-weight: 500;
   font-size: clamp(1.4rem, 3.2vw, 2.4rem);
   letter-spacing: 0.01em;
   line-height: 1.2;
+  text-transform: uppercase;
   text-wrap: balance;
 }
 
@@ -79,6 +96,7 @@ body {
   pointer-events: auto;
   color: var(--overlay-color);
   text-decoration: none;
+  font-family: var(--button-font);
   font-size: 0.95rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
