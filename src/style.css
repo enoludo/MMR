@@ -59,6 +59,150 @@ body {
   height: 100% !important;
 }
 
+/* Header bar (logo / view switcher / actions), from the Figma header design.
+   Inset 24px from the viewport edges, 48px tall, matching node 52:153. The
+   wrapper itself ignores pointer events (so it never blocks the virtual
+   scroll underneath) — only its actual interactive children opt back in. */
+#gallery-header {
+  position: fixed;
+  top: 24px;
+  left: 24px;
+  right: 24px;
+  height: 48px;
+  z-index: 20;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.header-logo {
+  display: flex;
+  align-items: center;
+  height: 48px;
+  color: var(--overlay-color);
+  font-family: var(--title-font);
+  font-size: 1.5rem;
+  letter-spacing: 0.02em;
+  pointer-events: auto;
+}
+
+.header-logo-img {
+  height: 32px;
+  width: auto;
+}
+
+.header-logo-img[hidden] {
+  display: none;
+}
+
+/* Perfectly centered regardless of the logo/actions' own widths (matches
+   the Figma source: the tab container's true position is centered within
+   the header frame, not merely left-aligned in a middle grid third). */
+.header-tabs {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  display: flex;
+  height: 48px;
+  padding: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border-radius: 24px;
+  pointer-events: auto;
+}
+
+.header-tab {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: #fff;
+  font-family: var(--button-font);
+  font-size: 0.875rem;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.header-tab.is-active {
+  background: #000;
+}
+
+.header-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  height: 48px;
+  pointer-events: auto;
+}
+
+.header-icon-btn {
+  appearance: none;
+  border: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.header-icon-btn--mute {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* The `hidden` attribute's `display: none` UA rule isn't reliably applied to
+   SVG elements across browsers, unlike plain HTML elements — spelled out
+   explicitly here rather than assumed. */
+.header-icon-btn svg[hidden] {
+  display: none;
+}
+
+.header-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+@media (max-width: 640px) {
+  #gallery-header {
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    height: 40px;
+  }
+
+  .header-logo,
+  .header-tabs,
+  .header-actions,
+  .header-icon-btn {
+    height: 40px;
+  }
+
+  .header-logo {
+    font-size: 1.1rem;
+  }
+
+  .header-tab {
+    height: 32px;
+    padding: 0 10px;
+    font-size: 0.75rem;
+  }
+
+  .header-icon-btn {
+    width: 40px;
+    border-radius: 20px;
+  }
+}
+
 /* HTML overlay for the centered card's title + CTA, rendered above the canvas
    so it stays crisp at any resolution and remains accessible. */
 #gallery-overlay {

@@ -58,6 +58,7 @@ src/
   data/
     cards.json                Données des cartes (source de contenu)
   gallery/
+    Header.js                 Câble le switch Spirale/Grille et le bouton mute (visuel seul)
     SpiralGallery.js          Scène Three.js, génération des slots, translation, resize
     spiralPath.js             La courbe elle-même : hélice à rayon constant + pas vertical
     cardTexture.js            Texture recadrée 16:9 par carte (Canvas2D)
@@ -234,6 +235,40 @@ correspondante est passée à `Overlay.setCard()`, qui ne déclenche un
 crossfade GSAP (fade out → swap du contenu → fade in) que lorsque la carte
 affichée change réellement — et tue proprement toute transition encore en
 cours pour éviter qu'un changement rapide n'affiche un texte périmé.
+
+## Header (depuis la maquette Figma)
+
+`#gallery-header` (dans `index.html`, stylé dans `style.css`) reproduit le
+header du fichier Figma "MMR" (node `52:153`) : logo à gauche, switch
+Spirale/Grille centré, boutons mute + menu à droite — en `position: fixed`,
+avec un inset de 24px (12px en dessous de 640px), au-dessus du canvas.
+
+- Le switch et les deux boutons ronds sont fidèles aux valeurs exactes de la
+  maquette (tailles, `border-radius`, `backdrop-filter: blur(15px)`,
+  opacités `rgba(255,255,255,0.1)`/`0.2`, police du switch = `--button-font`
+  déjà en place pour le CTA). Le switch Spirale/Grille bascule visuellement
+  au clic (`Header.js`) — il n'y a pas encore de vraie vue "Grille" à
+  afficher, donc cliquer dessus ne fait pour l'instant que changer l'onglet
+  actif. Le bouton mute bascule pareillement entre deux icônes (haut-parleur
+  / haut-parleur barré) sans qu'il y ait de son à couper dans l'app pour
+  l'instant.
+- Comme pour le titre/CTA, le header entier ignore les événements pointeur
+  (`pointer-events: none`) sauf ses éléments réellement interactifs, pour ne
+  jamais bloquer le scroll virtuel en dessous.
+- **Logo** : le fichier de la maquette n'a pas pu être récupéré — le
+  connecteur Figma peut lire la structure du fichier (mesures, couleurs,
+  texte) via son API, mais le téléchargement de l'asset exporté lui-même se
+  fait par une requête HTTP directe vers `figma.com`, bloquée par la
+  politique réseau de cet environnement. Un texte "mmR" tient lieu de
+  repli en attendant (`.header-logo-text` dans `index.html`) ; pour le vrai
+  logo, exportez-le depuis Figma (SVG de préférence) et envoyez le fichier
+  comme pour la police Marquez — il suffira de le déposer dans
+  `public/assets/` et de décommenter la balise `<img class="header-logo-img">`
+  déjà présente en commentaire.
+- Les icônes (menu burger, haut-parleur) sont redessinées à la main en SVG
+  inline plutôt qu'exportées de Figma (même blocage réseau que le logo) —
+  ce sont des formes génériques standard, pas un tracé exact de l'icône
+  "Streamline Phosphor" utilisée dans la maquette.
 
 ## Responsive
 

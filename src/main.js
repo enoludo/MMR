@@ -5,6 +5,9 @@ import { VirtualScroll } from './gallery/VirtualScroll.js';
 import { Overlay } from './gallery/Overlay.js';
 import { BackgroundTint } from './gallery/BackgroundTint.js';
 import { getCenteredSlot } from './gallery/centeredSlot.js';
+import { initHeader } from './gallery/Header.js';
+
+initHeader();
 
 const canvasContainer = document.getElementById('gallery-canvas');
 
