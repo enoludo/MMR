@@ -150,10 +150,10 @@ plutôt que de le remplacer.
 Les cartes sont des boîtes fines (voir plus bas) : plutôt que de générer une
 géométrie de boîte à coins arrondis (le bevel serait de toute façon écrasé
 par l'épaisseur `CARD_DEPTH`, bien plus fine que le rayon voulu), l'arrondi
-est un masque de transparence calculé dans le shader des faces avant/arrière
-(`createCardFaceMaterial` dans `SpiralGallery.js`) : une SDF de rectangle
-arrondi en unités-monde (pas en UV brut, pour que l'arrondi reste un vrai
-arc de cercle même sur une carte non carrée) découpe l'alpha aux quatre
+est un masque de transparence calculé dans le shader — une SDF de
+rectangle arrondi en unités-monde (`CORNER_MASK_CORE` dans
+`SpiralGallery.js`, pas en UV brut, pour que l'arrondi reste un vrai arc
+de cercle même sur une carte non carrée) découpe l'alpha aux quatre
 coins, avec un `discard` sous ce seuil pour ne pas laisser un coin
 transparent écrire de la profondeur et occulter une carte derrière.
 `CONFIG.cardCornerRadius` est calibré pour lire comme ~16px sur la carte de
@@ -161,6 +161,20 @@ premier plan à une largeur d'écran desktop courante — il n'existe pas de
 correspondance px→unité-monde unique dans une scène 3D en perspective,
 donc c'est un réglage approximatif, pas une valeur exacte à toutes les
 tailles d'écran.
+
+Ce même masque est appliqué aux quatre faces de tranche (`createEdgeMaterial`),
+pas seulement à l'avant/arrière — sans ça, la tranche (fine mais bien réelle
+en 3D, elle) resterait un prisme rectangulaire à angles droits, et son coin
+carré dépasserait visiblement de l'arrondi de la face avant/arrière une
+fois la carte vue de biais. Les faces de tranche n'ont pas d'UV adaptées
+(elles mappent profondeur×hauteur ou largeur×profondeur, jamais
+largeur×hauteur) pour réutiliser directement la même formule que
+l'avant/arrière : `createEdgeMaterial` fait donc transiter la position
+locale du vertex (`position.xy`) jusqu'au fragment shader via un varying
+dédié. Comme `BoxGeometry` centre la boîte sur l'origine, ce `position.xy`
+est déjà exactement la coordonnée "espace-carte" qu'il faut sur n'importe
+laquelle des 6 faces, tranches comprises — la même formule d'arrondi
+s'applique donc telle quelle, sans traitement particulier par face.
 
 ### Une caméra plate, pas un profil de cône
 

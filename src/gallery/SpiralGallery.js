@@ -39,6 +39,28 @@ function centeredScaleAt(distance) {
   return CONFIG.centeredScale - (CONFIG.centeredScale - 1) * eased;
 }
 
+// Rounded corners: a signed-distance-field rounded-box mask in the card's
+// own world-unit space, assuming `cardP` (that space's local xy) is
+// already defined by whichever call site splices this in. Front/back
+// faces derive it from vMapUv (remapped from [0,1] to [-cardSize/2,
+// cardSize/2]); the edge faces derive the equivalent from the raw local
+// vertex position instead, since their UVs map to (depth, height) or
+// (width, depth), not the (width, height) this mask needs — see
+// createEdgeMaterial. Either way the result is a true circular arc rather
+// than an ellipse on a non-square card, and `discard`, not just a low
+// alpha, keeps a fully-masked corner from still writing depth and
+// occluding whatever card sits behind it.
+const CORNER_MASK_CORE = `
+  vec2 cardB = uCardSize * 0.5 - vec2( uCornerRadius );
+  vec2 cardQ = abs( cardP ) - cardB;
+  float cardDist = length( max( cardQ, 0.0 ) ) + min( max( cardQ.x, cardQ.y ), 0.0 ) - uCornerRadius;
+  float cornerMask = 1.0 - smoothstep( 0.0, 0.004, cardDist );
+  diffuseColor.a *= cornerMask;
+  if ( diffuseColor.a < 0.01 ) discard;
+`;
+
+const CORNER_MASK_UNIFORMS_GLSL = 'uniform vec2 uCardSize;\nuniform float uCornerRadius;';
+
 // A 25-tap (3-ring) blur with a uniform, continuously variable radius (in
 // texels), injected into MeshStandardMaterial's own fragment shader in
 // place of its single texture2D lookup. At `uBlur == 0` every tap lands on
@@ -75,17 +97,8 @@ const BLUR_MAP_FRAGMENT = `
   sampledDiffuseColor += texture2D( map, vMapUv + texel * vec2(-3.0, -3.0) ) * 0.015;
   diffuseColor *= sampledDiffuseColor;
 
-  // Rounded corners: a signed-distance-field rounded-box mask in the
-  // card's own world-unit space (vMapUv remapped from [0,1] to
-  // [-cardSize/2, cardSize/2]) rather than raw UV, so the rounding reads
-  // as a true circular arc instead of an ellipse on a non-square card.
   vec2 cardP = ( vMapUv - 0.5 ) * uCardSize;
-  vec2 cardB = uCardSize * 0.5 - vec2( uCornerRadius );
-  vec2 cardQ = abs( cardP ) - cardB;
-  float cardDist = length( max( cardQ, 0.0 ) ) + min( max( cardQ.x, cardQ.y ), 0.0 ) - uCornerRadius;
-  float cornerMask = 1.0 - smoothstep( 0.0, 0.004, cardDist );
-  diffuseColor.a *= cornerMask;
-  if ( diffuseColor.a < 0.01 ) discard;
+  ${CORNER_MASK_CORE}
 #endif
 `;
 
@@ -105,12 +118,40 @@ function createCardFaceMaterial() {
     shader.uniforms.uCardSize = { value: new THREE.Vector2(CONFIG.cardWidth, CONFIG.cardHeight) };
     shader.uniforms.uCornerRadius = { value: CONFIG.cardCornerRadius };
     shader.fragmentShader = shader.fragmentShader
-      .replace(
-        '#include <map_pars_fragment>',
-        '#include <map_pars_fragment>\nuniform float uBlur;\nuniform vec2 uTexel;\nuniform vec2 uCardSize;\nuniform float uCornerRadius;'
-      )
+      .replace('#include <map_pars_fragment>', `#include <map_pars_fragment>\nuniform float uBlur;\nuniform vec2 uTexel;\n${CORNER_MASK_UNIFORMS_GLSL}`)
       .replace('#include <map_fragment>', BLUR_MAP_FRAGMENT);
     material.userData.shader = shader;
+  };
+  return material;
+}
+
+/**
+ * The thin edge/side faces get the same rounded-corner treatment as the
+ * front/back (see CORNER_MASK_CORE), but can't derive card-space xy from
+ * their own UVs (those map to depth×height or width×depth, not
+ * width×height) — so a local-position varying is threaded through from
+ * the vertex shader instead. BoxGeometry's local `position.xy` already IS
+ * that card-space coordinate on every one of the box's faces, edges
+ * included, so this needs no per-face-direction special-casing: the exact
+ * same test that rounds a corner on the front face also correctly rounds
+ * the matching corner where the two edge faces meet it.
+ */
+function createEdgeMaterial() {
+  const material = new THREE.MeshStandardMaterial({
+    color: EDGE_COLOR,
+    roughness: 0.9,
+    metalness: 0,
+    transparent: true,
+  });
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uCardSize = { value: new THREE.Vector2(CONFIG.cardWidth, CONFIG.cardHeight) };
+    shader.uniforms.uCornerRadius = { value: CONFIG.cardCornerRadius };
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec2 vCardXY;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvCardXY = position.xy;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>\nvarying vec2 vCardXY;\n${CORNER_MASK_UNIFORMS_GLSL}`)
+      .replace('#include <color_fragment>', `#include <color_fragment>\nvec2 cardP = vCardXY;\n${CORNER_MASK_CORE}`);
   };
   return material;
 }
@@ -194,12 +235,7 @@ export class SpiralGallery {
 
       const frontMaterial = createCardFaceMaterial();
       const backMaterial = createCardFaceMaterial();
-      const edgeMaterial = new THREE.MeshStandardMaterial({
-        color: EDGE_COLOR,
-        roughness: 0.9,
-        metalness: 0,
-        transparent: true,
-      });
+      const edgeMaterial = createEdgeMaterial();
 
       // BoxGeometry face groups, in order: +x, -x, +y, -y, +z (front), -z (back).
       const mesh = new THREE.Mesh(this.cardGeometry, [
