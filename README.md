@@ -128,6 +128,23 @@ cartes, dans le sens de rotation de l'hélice elle-même. Le ressort se lit
 ainsi comme un ruban légèrement banké plutôt qu'un empilement de
 rectangles parfaitement droits.
 
+### La carte centrale grandit légèrement
+
+En plus du flou/de la transparence en profondeur, la carte au premier plan
+grossit jusqu'à `CONFIG.centeredScale` (1.2×) en entrant dans la zone
+centrale, et revient à sa taille normale en la quittant —
+`centeredScaleAt()` dans `SpiralGallery.js`, un `smoothstep` de l'écart
+angulaire par rapport à l'avant, recalculé à chaque frame comme le flou et
+l'opacité. C'est ce recalcul continu (plutôt qu'un tween GSAP déclenché au
+changement de carte centrée) qui donne l'animation : comme l'angle de
+chaque carte évolue en continu avec le scroll, la valeur de zoom suit
+sans à-coup, sans état ni minuterie à gérer par carte. La zone de montée
+(`centeredScaleAngleDeg`, 18°) fait la moitié du pas angulaire entre deux
+cartes à `slotsPerTurn: 10` (36°), pour qu'une carte revienne pile à
+l'échelle 1 au moment où sa voisine entame sa propre montée en échelle.
+Ce facteur se multiplie à celui, déjà existant, du fondu de recyclage
+plutôt que de le remplacer.
+
 ### Coins arrondis, sans changer la géométrie
 
 Les cartes sont des boîtes fines (voir plus bas) : plutôt que de générer une

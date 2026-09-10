@@ -12,6 +12,7 @@ const EDGE_COLOR = 0x14110d;
 const BLUR_START = (CONFIG.blurStartDeg * Math.PI) / 180;
 const BLUR_FULL = (CONFIG.blurFullDeg * Math.PI) / 180;
 const CARD_TILT = (CONFIG.cardTiltDeg * Math.PI) / 180;
+const CENTERED_SCALE_RANGE = (CONFIG.centeredScaleAngleDeg * Math.PI) / 180;
 
 function angularDistanceToZero(angle) {
   const normalized = ((angle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
@@ -23,6 +24,19 @@ function blurAmountAt(distance) {
   const t = Math.min(1, Math.max(0, (distance - BLUR_START) / (BLUR_FULL - BLUR_START)));
   const eased = t * t * (3 - 2 * t);
   return eased * CONFIG.maxBlurTexels;
+}
+
+/**
+ * 1 at angle 0 (dead center), ramping smoothly down to CONFIG.centeredScale
+ * at CENTERED_SCALE_RANGE and beyond — recomputed fresh from the card's
+ * current angle every frame, so as the helix keeps rotating this reads as
+ * a smooth grow/shrink animation without any separate tween or state to
+ * track per card.
+ */
+function centeredScaleAt(distance) {
+  const t = Math.min(1, distance / CENTERED_SCALE_RANGE);
+  const eased = t * t * (3 - 2 * t);
+  return CONFIG.centeredScale - (CONFIG.centeredScale - 1) * eased;
 }
 
 // A 25-tap (3-ring) blur with a uniform, continuously variable radius (in
@@ -274,9 +288,10 @@ export class SpiralGallery {
 
       const fade = recycleFadeAt(y, this.period);
       slot.recycleFade = fade;
-      slot.mesh.scale.setScalar(0.6 + 0.4 * fade);
 
       const distance = angularDistanceToZero(point.angle);
+      slot.mesh.scale.setScalar((0.6 + 0.4 * fade) * centeredScaleAt(distance));
+
       const depthOpacity =
         CONFIG.frontOpacity - (CONFIG.frontOpacity - CONFIG.backOpacity) * (distance / Math.PI);
       const opacity = fade * depthOpacity;

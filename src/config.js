@@ -77,6 +77,14 @@ export const CONFIG = {
   frontOpacity: 1,
   backOpacity: 0.1,
 
+  // The centered card grows to this scale, smoothly ramping up as it
+  // enters the central zone and back down to 1 as it leaves — see
+  // centeredScaleAngleDeg, the angular half-width of that zone. Half the
+  // 36° angular step between cards at slotsPerTurn=10, so one card is
+  // back at scale 1 right as its neighbor's own zone begins.
+  centeredScale: 1.2,
+  centeredScaleAngleDeg: 18,
+
   // How close to the top/bottom of the rendered span (see `turnsRendered`)
   // a card starts fading out before it recycles to the opposite end —
   // belt-and-suspenders on top of that span already keeping the recycle
