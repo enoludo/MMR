@@ -280,6 +280,32 @@ l'itération précédente.
 - La caméra n'a **aucun** state ni controls (pas d'orbit/pan/zoom) : seuls
   les slots sont animés.
 
+### Magnétisme : toujours retomber sur une carte centrée
+
+Sans correction, `virtualOffset` s'arrête exactement où le dernier delta de
+molette/trackpad l'a laissé — souvent entre deux cartes, puisqu'un notch de
+souris ou la traîne d'inertie d'un trackpad ne tombe presque jamais
+pile sur un multiple exact du pas entre cartes.
+
+- Les cartes sont espacées d'exactement `CONFIG.pitch / CONFIG.slotsPerTurn`
+  en hauteur-monde (la même relation qui définit `baseHeight` dans
+  `SpiralGallery#buildSlots`) : "la carte la plus proche" revient donc à
+  arrondir `virtualOffset` au multiple le plus proche de ce pas
+  (`VirtualScroll#snapToNearestCard`).
+- Ce recalage est débounced (`CONFIG.snapDebounceMs`, 180ms) sur les
+  événements `wheel`/`touchmove`/`touchend` : il ne se déclenche qu'une
+  fois l'entrée réellement silencieuse — pas à chaque tick de molette — pour
+  laisser un scroll rapide ou l'inertie d'un trackpad se terminer avant de
+  corriger. Volontairement bien plus court que `idleDelayMs` (1.5s, qui régit
+  la reprise de l'auto-rotation) : le magnétisme doit se sentir immédiat au
+  relâchement, pas attendu.
+- `virtualOffset` saute directement à la valeur recalée — il n'y a pas de
+  tween dédié pour l'animation visuelle du recalage : le lerp déjà en place
+  (`CONFIG.rotationLerp`, voir ci-dessus) rattrape `currentScrollY` vers
+  cette nouvelle cible, ce qui suffit à donner l'impression d'un
+  magnétisme qui ramène la carte en douceur plutôt que de couper
+  brutalement dessus.
+
 ### Carte centrée + overlay
 
 À chaque frame, `getCenteredSlot` cherche, parmi les slots à l'écran et

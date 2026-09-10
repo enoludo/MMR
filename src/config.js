@@ -103,6 +103,16 @@ export const CONFIG = {
   rotationLerp: 0.08,
   autoRotateSpeed: 0.0009,
   idleDelayMs: 1500,
+
+  // Magnetic snap: once wheel/touch input has been quiet for this long, the
+  // virtual scroll value jumps to the nearest card's exact centered
+  // position (see VirtualScroll#scheduleSnap) — `rotationLerp` above is
+  // what then eases the visible helix into that new target rather than
+  // cutting to it. Deliberately much shorter than `idleDelayMs` (which
+  // instead governs when idle auto-rotation resumes): the snap should feel
+  // like it fires the instant the wheel/trackpad settles, not wait for the
+  // longer idle window auto-rotate uses.
+  snapDebounceMs: 180,
 };
 
 export function getSlotCountForWidth(width) {

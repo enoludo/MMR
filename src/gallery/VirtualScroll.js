@@ -10,6 +10,16 @@ import { CONFIG } from '../config.js';
  *
  * A slow constant increment is added while the user is idle, paused for a
  * short window after any wheel/touch interaction.
+ *
+ * Magnetic snap: whatever raw value wheel/touch deltas leave `virtualOffset`
+ * at, a short debounce (`scheduleSnap`) rounds it to the nearest card's own
+ * exact position (see `snapToNearestCard`) once input goes quiet — so a
+ * mouse notch or a trackpad's momentum tail can never leave the helix
+ * resting between two cards. The value itself just jumps to the snapped
+ * target; there's no separate tween for the *visual* settle because
+ * `main.js` already lerps its rendered position toward `virtualOffset`
+ * every frame (`CONFIG.rotationLerp`) — that existing smoothing is what
+ * makes the snap read as an eased pull into place rather than a cut.
  */
 export class VirtualScroll {
   constructor(target = window) {
@@ -17,6 +27,7 @@ export class VirtualScroll {
     this.virtualOffset = 0;
     this.isUserInteracting = false;
     this.idleTimeout = null;
+    this.snapTimeout = null;
     this.lastTouchY = null;
 
     this.onWheel = this.onWheel.bind(this);
@@ -38,9 +49,22 @@ export class VirtualScroll {
     }, CONFIG.idleDelayMs);
   }
 
+  /** Debounced so it fires once input (wheel ticks, touchmove drags) has actually gone quiet, not on every single event. */
+  scheduleSnap() {
+    clearTimeout(this.snapTimeout);
+    this.snapTimeout = setTimeout(() => this.snapToNearestCard(), CONFIG.snapDebounceMs);
+  }
+
+  /** Cards sit exactly `pitch / slotsPerTurn` world-height units apart (see spiralPath.js) — rounding to the nearest multiple of that step is rounding to the nearest card. */
+  snapToNearestCard() {
+    const step = CONFIG.pitch / CONFIG.slotsPerTurn;
+    this.virtualOffset = Math.round(this.virtualOffset / step) * step;
+  }
+
   onWheel(event) {
     this.virtualOffset += event.deltaY * CONFIG.wheelSensitivity;
     this.markInteraction();
+    this.scheduleSnap();
   }
 
   onTouchStart(event) {
@@ -55,11 +79,13 @@ export class VirtualScroll {
     this.virtualOffset += delta * CONFIG.touchSensitivity;
     this.lastTouchY = touchY;
     this.markInteraction();
+    this.scheduleSnap();
   }
 
   onTouchEnd() {
     this.lastTouchY = null;
     this.markInteraction();
+    this.scheduleSnap();
   }
 
   /** Advance the target scroll height by the idle auto-scroll speed, if idle. */
@@ -72,6 +98,7 @@ export class VirtualScroll {
 
   dispose() {
     clearTimeout(this.idleTimeout);
+    clearTimeout(this.snapTimeout);
     this.target.removeEventListener('wheel', this.onWheel);
     this.target.removeEventListener('touchstart', this.onTouchStart);
     this.target.removeEventListener('touchmove', this.onTouchMove);
