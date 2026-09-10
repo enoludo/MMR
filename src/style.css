@@ -227,6 +227,7 @@ body {
   line-height: 0.8;
   text-transform: uppercase;
   text-wrap: balance;
+  max-width: 60vw;
 }
 
 /* Per-letter reveal masks (see Overlay.js: SplitText's `mask: 'chars'`

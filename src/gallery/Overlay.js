@@ -56,9 +56,17 @@ export class Overlay {
         this.ctaEl.href = card.link;
 
         this.split = new SplitText(this.titleEl, {
-          type: 'chars',
+          // 'words' too, not just 'chars': each character is its own
+          // atomic inline-block (needed so the mask can clip/translate it
+          // independently), and atomic inline-level boxes are each a line-
+          // break opportunity in their own right — without a word-level
+          // wrapper holding its characters together, the browser was
+          // free to wrap mid-word (e.g. "SILENCIEUS" / "E") the moment
+          // the title's max-width forced a line break.
+          type: 'words, chars',
           mask: 'chars',
           charsClass: 'char',
+          wordsClass: 'word',
         });
         gsap.set(this.titleEl, { opacity: 1 });
 

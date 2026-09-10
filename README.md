@@ -282,9 +282,9 @@ en disparaissant. L'entrée diffère entre les deux :
   toute première carte serait correcte, tandis que chaque changement
   suivant ferait glisser le bouton vers le **bas** au lieu du haut.
 - Le **titre** est découpé en caractères via `SplitText` (`gsap/SplitText`,
-  option `mask: 'chars'`) : chaque lettre se retrouve dans son propre
-  wrapper `overflow: clip` (`.char-mask`, généré automatiquement, stylé
-  dans `style.css`) et remonte depuis `yPercent: 130` jusqu'à `0`
+  `type: 'words, chars'`, `mask: 'chars'`) : chaque lettre se retrouve dans
+  son propre wrapper `overflow: clip` (`.char-mask`, généré automatiquement,
+  stylé dans `style.css`) et remonte depuis `yPercent: 130` jusqu'à `0`
   (`power4.out`, 0.4s par lettre) avec un `stagger` court (0.012s) —
   chaque lettre démarre bien avant que la précédente ait fini, d'où
   l'effet de cascade ; `power4.out` accentue nettement le ralentissement
@@ -296,6 +296,19 @@ en disparaissant. L'entrée diffère entre les deux :
   sens, `SplitText` se retrouve à manipuler des nœuds déjà détachés du
   DOM et échoue silencieusement, ce qui bloquait net toute mise à jour du
   titre.
+
+Le titre passe sur plusieurs lignes dès qu'il dépasserait 60 % de la
+largeur de l'écran (`max-width: 60vw` sur `.gallery-card-title`,
+`text-wrap: balance` pour équilibrer les lignes). Le `type` de `SplitText`
+inclut `'words'` en plus de `'chars'` pour ça précisément : chaque
+caractère masqué est un `inline-block` atomique (nécessaire pour le
+translater/masquer indépendamment), et un `inline-block` est de fait une
+opportunité de saut de ligne à lui seul — sans un wrapper au niveau du
+mot pour regrouper ses lettres, le navigateur coupait au milieu d'un mot
+dès que le titre passait à la ligne (`"L'ÉROSION S" / "ILENCIEUSE"`,
+observé avec `type: 'chars'` seul). Le mot n'est pas masqué (seul `'chars'`
+est passé à `mask`) : il sert uniquement à empêcher la coupure, chaque
+lettre à l'intérieur garde son propre masque et son animation individuelle.
 
 Deux points d'attention CSS/animation, tous deux liés au même `.char-mask`
 (voir plus bas) :
