@@ -4,6 +4,13 @@ import gsap from 'gsap';
  * HTML overlay showing the centered card's title + CTA. Kept as real DOM
  * (not text rendered in the 3D scene) so it stays sharp at any resolution
  * and remains accessible/selectable.
+ *
+ * The outgoing card fades out in place (pure alpha), then the incoming one
+ * rises up into view through its mask wrapper (see the `-mask` elements in
+ * index.html: `overflow: hidden` with no fixed height, so each always
+ * clips right at its own content's edge) — a reveal rather than a
+ * fade+slide, since visibility comes from being clipped out below the
+ * mask, not from opacity.
  */
 export class Overlay {
   constructor({ titleEl, ctaEl }) {
@@ -12,7 +19,7 @@ export class Overlay {
     this.ctaLabelEl = ctaEl.querySelector('.gallery-card-cta-label');
     this.currentCardId = null;
 
-    gsap.set([this.titleEl, this.ctaEl], { opacity: 0, y: 12 });
+    gsap.set([this.titleEl, this.ctaEl], { opacity: 0, yPercent: 100 });
   }
 
   setCard(card) {
@@ -28,7 +35,6 @@ export class Overlay {
     this.timeline
       .to([this.titleEl, this.ctaEl], {
         opacity: 0,
-        y: -10,
         duration: 0.25,
         ease: 'power1.in',
       })
@@ -39,8 +45,8 @@ export class Overlay {
       })
       .fromTo(
         [this.titleEl, this.ctaEl],
-        { opacity: 0, y: 12 },
-        { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out', stagger: 0.05 }
+        { opacity: 1, yPercent: 100 },
+        { yPercent: 0, duration: 0.5, ease: 'power4.inOut', stagger: 0.05 }
       );
   }
 }

@@ -218,6 +218,22 @@ body {
   max-width: min(1400px, 92vw);
 }
 
+/* Masks for the enter animation's "rise up from below" reveal (see
+   Overlay.js): each wraps its content with `overflow: hidden` and no fixed
+   height, so the clip region always auto-fits whatever text/card is
+   currently shown — a little extra padding, offset by a matching negative
+   margin, keeps accented capitals (e.g. "Éclats") from clipping against
+   the tight title line-height without shifting the visible layout. */
+.gallery-card-title-mask,
+.gallery-card-cta-mask {
+  overflow: hidden;
+}
+
+.gallery-card-title-mask {
+  padding-top: 0.15em;
+  margin-top: -0.15em;
+}
+
 .gallery-card-title {
   margin: 0;
   color: var(--overlay-color);

@@ -248,10 +248,17 @@ l'itération précédente.
 pas en train de disparaître au point de recyclage, celui dont la hauteur
 est la plus proche de 0 (le niveau de la caméra) — et donc, grâce à la
 relation angle/hauteur, celui qui fait aussi face à la caméra. La carte
-correspondante est passée à `Overlay.setCard()`, qui ne déclenche un
-crossfade GSAP (fade out → swap du contenu → fade in) que lorsque la carte
-affichée change réellement — et tue proprement toute transition encore en
-cours pour éviter qu'un changement rapide n'affiche un texte périmé.
+correspondante est passée à `Overlay.setCard()`, qui ne déclenche une
+transition GSAP que lorsque la carte affichée change réellement — et tue
+proprement toute transition encore en cours pour éviter qu'un changement
+rapide n'affiche un texte périmé. La sortie est un simple fondu en alpha
+(0.25s) ; l'entrée est un reveal masqué façon "rideau" : le titre et le
+bouton sont chacun dans un wrapper `overflow: hidden` sans hauteur fixe
+(`.gallery-card-title-mask`/`.gallery-card-cta-mask` dans `index.html`,
+toujours ajusté à la taille du contenu courant) et remontent depuis
+`yPercent: 100` jusqu'à `0` (0.5s, `power4.inOut`) — la visibilité vient du
+masque, pas de l'opacité, donc le texte apparaît net dès qu'il dépasse le
+bord du masque plutôt que de se fondre en place.
 
 Le titre et le bouton reprennent les valeurs exactes de la maquette Figma
 (node `52:116`) : titre en Marquez normal, jusqu'à 96px (`clamp()` pour
