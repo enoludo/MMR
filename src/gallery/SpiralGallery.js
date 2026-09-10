@@ -7,7 +7,7 @@ import { getPeriod, wrapHeight, helixPointAt, recycleFadeAt } from './spiralPath
 
 const textureLoader = new THREE.TextureLoader();
 const CARD_DEPTH = 0.04;
-const EDGE_COLOR = 0x14110d;
+const EDGE_COLOR = 0xffffff;
 
 const BLUR_START = (CONFIG.blurStartDeg * Math.PI) / 180;
 const BLUR_FULL = (CONFIG.blurFullDeg * Math.PI) / 180;
