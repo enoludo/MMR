@@ -3,42 +3,36 @@
     "id": "maladie-de-huntington",
     "image": "/assets/images/la-maladie-de-huntington.webp",
     "title": "La Maladie de Huntington",
-    "cta": "Découvrir",
-    "link": "/projets/maladie-de-huntington"
+    "cta": "Découvrir"
   },
   {
     "id": "entre-deux",
     "image": "/assets/images/l-entre-deux.webp",
     "title": "L'Entre-Deux",
-    "cta": "Découvrir",
-    "link": "/projets/entre-deux"
+    "cta": "Découvrir"
   },
   {
     "id": "boucles-sans-titre",
     "image": "/assets/images/boucles-sans-titre.webp",
     "title": "L'Érosion Silencieuse",
-    "cta": "Découvrir",
-    "link": "/projets/boucles-sans-titre"
+    "cta": "Découvrir"
   },
   {
     "id": "filtre-imparfait",
     "image": "/assets/images/le-filtre-imparfait.webp",
     "title": "Le Filtre Imparfait",
-    "cta": "Découvrir",
-    "link": "/projets/filtre-imparfait"
+    "cta": "Découvrir"
   },
   {
     "id": "souffle-declats",
     "image": "/assets/images/souffle-declats.webp",
     "title": "Souffle d'Éclats",
-    "cta": "Découvrir",
-    "link": "/projets/souffle-declats"
+    "cta": "Découvrir"
   },
   {
     "id": "geant-de-marbre",
     "image": "/assets/images/geant-de-marbre.webp",
     "title": "Le Seuil des Proportions",
-    "cta": "Découvrir",
-    "link": "/projets/geant-de-marbre"
+    "cta": "Découvrir"
   }
 ]

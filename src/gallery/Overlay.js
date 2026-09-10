@@ -20,6 +20,10 @@ gsap.registerPlugin(SplitText);
  * up through their own mask with a short stagger, so letters cascade in
  * one after another instead of waiting for each to finish before the
  * next starts.
+ *
+ * The CTA has no real destination (cards.json carries no `link` — there's
+ * nowhere to send it, and a stale/guessed URL would just 404), so a click
+ * simply reloads the page instead of navigating anywhere.
  */
 export class Overlay {
   constructor({ titleEl, ctaEl }) {
@@ -30,6 +34,11 @@ export class Overlay {
     this.split = null;
 
     gsap.set(this.ctaEl, { opacity: 0, y: 12 });
+
+    this.ctaEl.addEventListener('click', (event) => {
+      event.preventDefault();
+      window.location.reload();
+    });
   }
 
   setCard(card) {
@@ -53,7 +62,6 @@ export class Overlay {
 
         this.titleEl.textContent = card.title;
         this.ctaLabelEl.textContent = card.cta;
-        this.ctaEl.href = card.link;
 
         this.split = new SplitText(this.titleEl, {
           // 'words' too, not just 'chars': each character is its own

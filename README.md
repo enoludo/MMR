@@ -31,8 +31,7 @@ projet à la galerie, il suffit d'ajouter une entrée dans
   "id": "proj-05",
   "image": "/assets/images/proj-05.jpg",
   "title": "Titre du projet",
-  "cta": "Découvrir",
-  "link": "/projets/proj-05"
+  "cta": "Découvrir"
 }
 ```
 
@@ -43,6 +42,10 @@ projet à la galerie, il suffit d'ajouter une entrée dans
 - Si une image référencée est manquante ou ne charge pas, un visuel de
   substitution (généré en canvas, avec le titre de la carte) s'affiche à sa
   place — la galerie ne casse jamais sur un asset manquant.
+- Le bouton CTA ("Découvrir") ne pointe vers aucune page de projet : un clic
+  recharge simplement la page courante (voir `Overlay.js`). Tant qu'il
+  n'existe pas de vraies pages projet à lier, c'est plus sûr qu'un lien
+  statique qui renverrait une 404.
 
 Aucun redémarrage du serveur n'est nécessaire : `cards.json` est importé au
 chargement de l'application.
@@ -145,36 +148,39 @@ l'échelle 1 au moment où sa voisine entame sa propre montée en échelle.
 Ce facteur se multiplie à celui, déjà existant, du fondu de recyclage
 plutôt que de le remplacer.
 
-### Coins arrondis, sans changer la géométrie
+### Coins arrondis : une vraie géométrie, tranche comprise
 
-Les cartes sont des boîtes fines (voir plus bas) : plutôt que de générer une
-géométrie de boîte à coins arrondis (le bevel serait de toute façon écrasé
-par l'épaisseur `CARD_DEPTH`, bien plus fine que le rayon voulu), l'arrondi
-est un masque de transparence calculé dans le shader — une SDF de
-rectangle arrondi en unités-monde (`CORNER_MASK_CORE` dans
-`SpiralGallery.js`, pas en UV brut, pour que l'arrondi reste un vrai arc
-de cercle même sur une carte non carrée) découpe l'alpha aux quatre
-coins, avec un `discard` sous ce seuil pour ne pas laisser un coin
-transparent écrire de la profondeur et occulter une carte derrière.
-`CONFIG.cardCornerRadius` est calibré pour lire comme ~16px sur la carte de
+Les cartes ne sont plus des `BoxGeometry` : leur forme est un rectangle
+arrondi (`createRoundedCardShape` dans `SpiralGallery.js`, un `THREE.Shape`
+tracé avec `.absarc()` à chaque coin) extrudé sur l'épaisseur `CARD_DEPTH`
+via `THREE.ExtrudeGeometry` (`buildCardGeometry`). L'arrondi est donc un
+rayon de géométrie réel, pas un masque de transparence calculé après coup
+dans le shader — une première version faisait ça (une SDF de rectangle
+arrondi qui `discard`ait l'alpha aux coins), mais un masque plat appliqué
+à une tranche restée un prisme à angles droits ne peut que couper cette
+tranche au ras de l'arrondi ; il ne peut pas la faire suivre la courbe.
+Extruder la forme arrondie donne au contraire à *chaque* face — avant,
+arrière, et les faces de tranche entre les deux — le même arc de cercle à
+chaque coin : la tranche épouse littéralement la courbe plutôt que d'être
+tranchée dedans.
+
+`ExtrudeGeometry` regroupe les faces générées en deux groupes de matériau :
+le groupe 0 ("lid", les capuchons avant+arrière) et le groupe 1 (les faces
+de tranche extrudées). Le mesh n'utilise donc plus que deux matériaux
+(`faceMaterial`, `edgeMaterial`) au lieu des trois d'avant (front/back/edge
+séparés) — une simplification directe, puisque l'avant et l'arrière ont
+toujours affiché exactement la même texture avec le même flou/opacité (voir
+`#update`). L'UV par défaut d'`ExtrudeGeometry` renvoie des coordonnées
+locales brutes, pas normalisées 0..1 ; `createCardUVGenerator` les
+renormalise contre la largeur/hauteur de la carte pour que `vUv` se
+comporte comme sur un plan ou une boîte, ce dont le shader de flou
+dépend.
+
+`CONFIG.cardCornerRadius` est calibré pour lire comme ~8px sur la carte de
 premier plan à une largeur d'écran desktop courante — il n'existe pas de
 correspondance px→unité-monde unique dans une scène 3D en perspective,
 donc c'est un réglage approximatif, pas une valeur exacte à toutes les
 tailles d'écran.
-
-Ce même masque est appliqué aux quatre faces de tranche (`createEdgeMaterial`),
-pas seulement à l'avant/arrière — sans ça, la tranche (fine mais bien réelle
-en 3D, elle) resterait un prisme rectangulaire à angles droits, et son coin
-carré dépasserait visiblement de l'arrondi de la face avant/arrière une
-fois la carte vue de biais. Les faces de tranche n'ont pas d'UV adaptées
-(elles mappent profondeur×hauteur ou largeur×profondeur, jamais
-largeur×hauteur) pour réutiliser directement la même formule que
-l'avant/arrière : `createEdgeMaterial` fait donc transiter la position
-locale du vertex (`position.xy`) jusqu'au fragment shader via un varying
-dédié. Comme `BoxGeometry` centre la boîte sur l'origine, ce `position.xy`
-est déjà exactement la coordonnée "espace-carte" qu'il faut sur n'importe
-laquelle des 6 faces, tranches comprises — la même formule d'arrondi
-s'applique donc telle quelle, sans traitement particulier par face.
 
 ### Une caméra plate, pas un profil de cône
 
@@ -246,12 +252,13 @@ chaque changement de carte :
 
 ### On voit le dos des cartes
 
-Chaque carte est une boîte fine (pas un simple plan à une face) : la face
-avant porte la texture de l'image, la face arrière et les tranches
-utilisent des matériaux neutres partagés. Une carte qui continue de
-tourner au-delà de la position "face caméra" reste donc visible en
-s'éloignant vers l'arrière, dos tourné vers le spectateur, plutôt que de
-disparaître.
+Chaque carte a une véritable épaisseur (pas un simple plan à une face) : le
+groupe "lid" de la géométrie (avant + arrière, voir la section sur les
+coins arrondis ci-dessus) partage un seul `faceMaterial` texturé avec
+l'image de la carte, et la tranche utilise un `edgeMaterial` neutre séparé.
+Une carte qui continue de tourner au-delà de la position "face caméra"
+reste donc visible en s'éloignant vers l'arrière, texturée comme l'avant,
+plutôt que de disparaître ou de montrer un dos neutre.
 
 ### Translation verticale : scroll virtuel infini + auto-scroll idle
 

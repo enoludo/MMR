@@ -39,13 +39,16 @@ export const CONFIG = {
   cardWidth: 2.56,
   cardHeight: 1.44, // exactly 16:9
 
-  // Rounds the front/back faces' corners (see the shader mask in
-  // SpiralGallery.js). There's no single px-to-world-unit ratio in a 3D
+  // Rounds every corner of the card, edges included — it's an actual
+  // geometry radius (the card shape is extruded from a rounded rectangle,
+  // see SpiralGallery.js), not a shader trick, so the edge faces follow
+  // the same curve as the front/back instead of just having their square
+  // corners masked away. There's no single px-to-world-unit ratio in a 3D
   // scene — apparent size depends on viewport width and camera distance —
-  // so this is calibrated to read as ~16px on the frontmost card at a
+  // so this is calibrated to read as ~8px on the frontmost card at a
   // typical (~1400px-wide) desktop viewport, not an exact px value at
   // every size.
-  cardCornerRadius: 0.065,
+  cardCornerRadius: 0.0325,
 
   // Every card is rolled by this fixed amount around its own line of sight
   // (in the same rotational sense the helix itself turns as height

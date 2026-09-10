@@ -39,27 +39,72 @@ function centeredScaleAt(distance) {
   return CONFIG.centeredScale - (CONFIG.centeredScale - 1) * eased;
 }
 
-// Rounded corners: a signed-distance-field rounded-box mask in the card's
-// own world-unit space, assuming `cardP` (that space's local xy) is
-// already defined by whichever call site splices this in. Front/back
-// faces derive it from vMapUv (remapped from [0,1] to [-cardSize/2,
-// cardSize/2]); the edge faces derive the equivalent from the raw local
-// vertex position instead, since their UVs map to (depth, height) or
-// (width, depth), not the (width, height) this mask needs — see
-// createEdgeMaterial. Either way the result is a true circular arc rather
-// than an ellipse on a non-square card, and `discard`, not just a low
-// alpha, keeps a fully-masked corner from still writing depth and
-// occluding whatever card sits behind it.
-const CORNER_MASK_CORE = `
-  vec2 cardB = uCardSize * 0.5 - vec2( uCornerRadius );
-  vec2 cardQ = abs( cardP ) - cardB;
-  float cardDist = length( max( cardQ, 0.0 ) ) + min( max( cardQ.x, cardQ.y ), 0.0 ) - uCornerRadius;
-  float cornerMask = 1.0 - smoothstep( 0.0, 0.004, cardDist );
-  diffuseColor.a *= cornerMask;
-  if ( diffuseColor.a < 0.01 ) discard;
-`;
+/**
+ * A rounded rectangle, centered on the origin — the card's actual shape
+ * (see buildCardGeometry), not a rectangle with its corners masked away
+ * afterward. Traced as 4 straight edges joined by 4 quarter-circle arcs so
+ * extruding it gives every face — front, back, *and* the side/edge faces
+ * in between — the same true curve at each corner, rather than the edges
+ * remaining a flat rectangular prism whose square corners either poke out
+ * past a rounded front face or get abruptly clipped by a shader mask.
+ */
+function createRoundedCardShape(width, height, radius) {
+  const w = width / 2;
+  const h = height / 2;
+  const r = Math.min(radius, w, h);
+  const shape = new THREE.Shape();
+  shape.moveTo(-w + r, -h);
+  shape.lineTo(w - r, -h);
+  shape.absarc(w - r, -h + r, r, -Math.PI / 2, 0, false);
+  shape.lineTo(w, h - r);
+  shape.absarc(w - r, h - r, r, 0, Math.PI / 2, false);
+  shape.lineTo(-w + r, h);
+  shape.absarc(-w + r, h - r, r, Math.PI / 2, Math.PI, false);
+  shape.lineTo(-w, -h + r);
+  shape.absarc(-w + r, -h + r, r, Math.PI, (Math.PI * 3) / 2, false);
+  return shape;
+}
 
-const CORNER_MASK_UNIFORMS_GLSL = 'uniform vec2 uCardSize;\nuniform float uCornerRadius;';
+// ExtrudeGeometry's default UVGenerator returns raw local coordinates, not
+// normalized 0..1 — this normalizes the front/back ("lid") faces against
+// the card's own width/height so vUv behaves exactly like it would on a
+// plane or box, which the blur shader (BLUR_MAP_FRAGMENT) assumes. The
+// side (edge) faces don't carry a texture, so their UV isn't meaningful;
+// still needs to return valid Vector2s.
+function createCardUVGenerator(width, height) {
+  const toUV = (vertices, i) => new THREE.Vector2(vertices[i * 3] / width + 0.5, vertices[i * 3 + 1] / height + 0.5);
+  return {
+    generateTopUV(geometry, vertices, a, b, c) {
+      return [toUV(vertices, a), toUV(vertices, b), toUV(vertices, c)];
+    },
+    generateSideWallUV(geometry, vertices, a, b, c, d) {
+      return [toUV(vertices, a), toUV(vertices, b), toUV(vertices, c), toUV(vertices, d)];
+    },
+  };
+}
+
+/**
+ * The card's geometry: `createRoundedCardShape` extruded to CARD_DEPTH and
+ * re-centered on all 3 axes (ExtrudeGeometry extrudes from z=0 to
+ * z=depth by default) so the mesh's position/rotation still refer to the
+ * card's true center, matching how the rest of this file already treats
+ * it. Face groups: 0 = front+back together (ExtrudeGeometry puts both
+ * "lid" caps in one group — front/back already always show the exact
+ * same texture with the exact same blur/opacity, see #update, so one
+ * shared material is a straight simplification, not a compromise), 1 =
+ * the extruded sides (the edge, now genuinely curved at each corner).
+ */
+function buildCardGeometry() {
+  const shape = createRoundedCardShape(CONFIG.cardWidth, CONFIG.cardHeight, CONFIG.cardCornerRadius);
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: CARD_DEPTH,
+    bevelEnabled: false,
+    curveSegments: 12,
+    UVGenerator: createCardUVGenerator(CONFIG.cardWidth, CONFIG.cardHeight),
+  });
+  geometry.translate(0, 0, -CARD_DEPTH / 2);
+  return geometry;
+}
 
 // A 25-tap (3-ring) blur with a uniform, continuously variable radius (in
 // texels), injected into MeshStandardMaterial's own fragment shader in
@@ -96,13 +141,10 @@ const BLUR_MAP_FRAGMENT = `
   sampledDiffuseColor += texture2D( map, vMapUv + texel * vec2(-3.0,  3.0) ) * 0.015;
   sampledDiffuseColor += texture2D( map, vMapUv + texel * vec2(-3.0, -3.0) ) * 0.015;
   diffuseColor *= sampledDiffuseColor;
-
-  vec2 cardP = ( vMapUv - 0.5 ) * uCardSize;
-  ${CORNER_MASK_CORE}
 #endif
 `;
 
-/** A card face material whose blur radius (`uBlur`, in texels) can be set continuously, per instance, every frame. */
+/** The card's front+back material — blur radius (`uBlur`, in texels) can be set continuously, per instance, every frame. Rounded corners come from the geometry itself now (see buildCardGeometry), not a shader mask. */
 function createCardFaceMaterial() {
   const material = new THREE.MeshStandardMaterial({
     color: 0xffffff,
@@ -115,43 +157,10 @@ function createCardFaceMaterial() {
     shader.uniforms.uTexel = {
       value: new THREE.Vector2(1 / CARD_TEXTURE_SIZE.width, 1 / CARD_TEXTURE_SIZE.height),
     };
-    shader.uniforms.uCardSize = { value: new THREE.Vector2(CONFIG.cardWidth, CONFIG.cardHeight) };
-    shader.uniforms.uCornerRadius = { value: CONFIG.cardCornerRadius };
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <map_pars_fragment>', `#include <map_pars_fragment>\nuniform float uBlur;\nuniform vec2 uTexel;\n${CORNER_MASK_UNIFORMS_GLSL}`)
+      .replace('#include <map_pars_fragment>', '#include <map_pars_fragment>\nuniform float uBlur;\nuniform vec2 uTexel;')
       .replace('#include <map_fragment>', BLUR_MAP_FRAGMENT);
     material.userData.shader = shader;
-  };
-  return material;
-}
-
-/**
- * The thin edge/side faces get the same rounded-corner treatment as the
- * front/back (see CORNER_MASK_CORE), but can't derive card-space xy from
- * their own UVs (those map to depth×height or width×depth, not
- * width×height) — so a local-position varying is threaded through from
- * the vertex shader instead. BoxGeometry's local `position.xy` already IS
- * that card-space coordinate on every one of the box's faces, edges
- * included, so this needs no per-face-direction special-casing: the exact
- * same test that rounds a corner on the front face also correctly rounds
- * the matching corner where the two edge faces meet it.
- */
-function createEdgeMaterial() {
-  const material = new THREE.MeshStandardMaterial({
-    color: EDGE_COLOR,
-    roughness: 0.9,
-    metalness: 0,
-    transparent: true,
-  });
-  material.onBeforeCompile = (shader) => {
-    shader.uniforms.uCardSize = { value: new THREE.Vector2(CONFIG.cardWidth, CONFIG.cardHeight) };
-    shader.uniforms.uCornerRadius = { value: CONFIG.cardCornerRadius };
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec2 vCardXY;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvCardXY = position.xy;');
-    shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\nvarying vec2 vCardXY;\n${CORNER_MASK_UNIFORMS_GLSL}`)
-      .replace('#include <color_fragment>', `#include <color_fragment>\nvec2 cardP = vCardXY;\n${CORNER_MASK_CORE}`);
   };
   return material;
 }
@@ -218,8 +227,7 @@ export class SpiralGallery {
     for (const slot of this.slots) {
       this.group.remove(slot.mesh);
       slot.texture?.dispose();
-      slot.frontMaterial.dispose();
-      slot.backMaterial.dispose();
+      slot.faceMaterial.dispose();
       slot.edgeMaterial.dispose();
     }
     this.slots = [];
@@ -227,25 +235,22 @@ export class SpiralGallery {
     this.period = getPeriod(slotCount);
 
     if (!this.cardGeometry) {
-      this.cardGeometry = new THREE.BoxGeometry(CONFIG.cardWidth, CONFIG.cardHeight, CARD_DEPTH);
+      this.cardGeometry = buildCardGeometry();
     }
 
     for (let i = 0; i < slotCount; i += 1) {
       const card = this.cardsData[i % this.cardsData.length];
 
-      const frontMaterial = createCardFaceMaterial();
-      const backMaterial = createCardFaceMaterial();
-      const edgeMaterial = createEdgeMaterial();
+      const faceMaterial = createCardFaceMaterial();
+      const edgeMaterial = new THREE.MeshStandardMaterial({
+        color: EDGE_COLOR,
+        roughness: 0.9,
+        metalness: 0,
+        transparent: true,
+      });
 
-      // BoxGeometry face groups, in order: +x, -x, +y, -y, +z (front), -z (back).
-      const mesh = new THREE.Mesh(this.cardGeometry, [
-        edgeMaterial,
-        edgeMaterial,
-        edgeMaterial,
-        edgeMaterial,
-        frontMaterial,
-        backMaterial,
-      ]);
+      // buildCardGeometry's face groups, in order: 0 = front+back ("lid"), 1 = the extruded sides.
+      const mesh = new THREE.Mesh(this.cardGeometry, [faceMaterial, edgeMaterial]);
       this.group.add(mesh);
 
       const slot = {
@@ -253,8 +258,7 @@ export class SpiralGallery {
         baseHeight: (i / slotCount - 0.5) * this.period,
         angle: 0,
         mesh,
-        frontMaterial,
-        backMaterial,
+        faceMaterial,
         edgeMaterial,
         cardId: card.id,
         texture: null,
@@ -276,10 +280,8 @@ export class SpiralGallery {
       card.image,
       (loaded) => {
         slot.texture = buildCardTexture(loaded.image);
-        slot.frontMaterial.map = slot.texture;
-        slot.frontMaterial.needsUpdate = true;
-        slot.backMaterial.map = slot.texture;
-        slot.backMaterial.needsUpdate = true;
+        slot.faceMaterial.map = slot.texture;
+        slot.faceMaterial.needsUpdate = true;
         this.recordCardColor(card, loaded.image);
         loaded.dispose();
       },
@@ -287,10 +289,8 @@ export class SpiralGallery {
       () => {
         const placeholder = createPlaceholderTexture(card.title);
         slot.texture = buildCardTexture(placeholder.image);
-        slot.frontMaterial.map = slot.texture;
-        slot.frontMaterial.needsUpdate = true;
-        slot.backMaterial.map = slot.texture;
-        slot.backMaterial.needsUpdate = true;
+        slot.faceMaterial.map = slot.texture;
+        slot.faceMaterial.needsUpdate = true;
         this.recordCardColor(card, placeholder.image);
         placeholder.dispose();
       }
@@ -331,13 +331,11 @@ export class SpiralGallery {
       const depthOpacity =
         CONFIG.frontOpacity - (CONFIG.frontOpacity - CONFIG.backOpacity) * (distance / Math.PI);
       const opacity = fade * depthOpacity;
-      slot.frontMaterial.opacity = opacity;
-      slot.backMaterial.opacity = opacity;
+      slot.faceMaterial.opacity = opacity;
       slot.edgeMaterial.opacity = opacity;
 
       const blur = blurAmountAt(distance);
-      if (slot.frontMaterial.userData.shader) slot.frontMaterial.userData.shader.uniforms.uBlur.value = blur;
-      if (slot.backMaterial.userData.shader) slot.backMaterial.userData.shader.uniforms.uBlur.value = blur;
+      if (slot.faceMaterial.userData.shader) slot.faceMaterial.userData.shader.uniforms.uBlur.value = blur;
     }
   }
 
