@@ -309,6 +309,21 @@ l'itération précédente.
   clic restent intacts. `pointermove`/`pointerup` sont eux écoutés sur
   `window` pour continuer à suivre le pointeur même s'il sort du canvas en
   cours de glissement.
+- Un drag ne fait pas avancer `virtualOffset` à un taux fixe et
+  déconnecté : au `pointerdown`, `SpiralGallery#pickDragAnchor` lance un
+  rayon (`THREE.Raycaster`) depuis le point cliqué et, s'il touche une
+  carte, retient le point exact touché en coordonnées locales à cette
+  carte — un coin comme un autre point. À chaque `pointermove`,
+  `VirtualScroll#dragUnitsPerPixel` estime numériquement (deux évaluations
+  de `SpiralGallery#anchorScreenX`, de part et d'autre de `virtualOffset`
+  actuel) la vitesse à l'écran de CE point précis, dans SON état courant
+  (position, angle, tilt, échelle) — pas juste celle du centre de la carte —
+  et en déduit le déplacement de `virtualOffset` qui garde ce point sous le
+  curseur. Comme cette vitesse est recalculée à chaque mouvement plutôt que
+  figée au clic, le suivi reste correct sur toute la durée du geste, même
+  quand la carte tourne/grossit en approchant du centre. `CONFIG.dragSensitivity`
+  ne sert plus que de repli, quand le drag démarre sur du vide (aucune carte
+  sous le curseur).
 - Chaque frame, `main.js` lisse cette valeur cible avec un lerp
   (`currentScrollY += (target - currentScrollY) * CONFIG.rotationLerp`) et
   l'utilise pour translater tous les slots (`gallery.update(currentScrollY)`).
@@ -332,13 +347,21 @@ multiple exact du pas entre cartes.
   arrondir `virtualOffset` au multiple le plus proche de ce pas
   (`VirtualScroll#snapToNearestCard`).
 - Ce recalage est débounced (`CONFIG.snapDebounceMs`, 180ms) sur les
-  événements `wheel`, `pointermove` (pendant un drag) et `pointerup` (à son
-  relâchement) : il ne se déclenche qu'une fois l'entrée réellement
-  silencieuse — pas à chaque tick de molette ou de déplacement — pour
-  laisser un scroll rapide, l'inertie d'un trackpad, ou un drag encore en
-  cours se terminer avant de corriger. Volontairement bien plus court que
-  `idleDelayMs` (1.5s, qui régit la reprise de l'auto-rotation) : le
-  magnétisme doit se sentir immédiat au relâchement, pas attendu.
+  événements `wheel` et `pointerup` : il ne se déclenche qu'une fois l'entrée
+  réellement silencieuse — pas à chaque tick de molette — pour laisser un
+  scroll rapide ou l'inertie d'un trackpad se terminer avant de corriger.
+  Volontairement bien plus court que `idleDelayMs` (1.5s, qui régit la
+  reprise de l'auto-rotation) : le magnétisme doit se sentir immédiat au
+  relâchement, pas attendu.
+- Délibérément jamais programmé depuis `pointermove` lui-même : tant que le
+  bouton/doigt reste appuyé, une pause en cours de geste ne doit jamais faire
+  bondir la carte hors de la main qui la tient encore — seul `pointerup`
+  (relâchement réel) programme le recalage. Un bug précis a d'ailleurs été
+  corrigé ici pendant le développement : `scheduleSnap` était encore appelé
+  depuis `onPointerMove`, et un simple temps mort de plus de 180ms pendant un
+  drag maintenu (souris immobile, bouton toujours enfoncé) suffisait à faire
+  recentrer brutalement `virtualOffset` sous le curseur, en plein milieu du
+  geste.
 - `virtualOffset` saute directement à la valeur recalée — il n'y a pas de
   tween dédié pour l'animation visuelle du recalage : le lerp déjà en place
   (`CONFIG.rotationLerp`, voir ci-dessus) rattrape `currentScrollY` vers

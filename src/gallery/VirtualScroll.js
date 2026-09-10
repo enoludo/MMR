@@ -1,5 +1,11 @@
 import { CONFIG } from '../config.js';
 
+// How far apart (in world-height units) the two probe points are when
+// numerically estimating the anchor's screen-space speed (see
+// #dragUnitsPerPixel) — small enough to be a good local derivative, far
+// enough above floating-point noise given world coordinates a few units wide.
+const ANCHOR_PROBE_EPS = 0.001;
+
 /**
  * Drives the helix's vertical position from an unbounded "virtual" scroll
  * value instead of `window.scrollY` — the section never actually scrolls
@@ -17,30 +23,44 @@ import { CONFIG } from '../config.js';
  * the same direction a downward wheel/swipe already did — one consistent
  * "forward" gesture across every input.
  *
+ * A drag doesn't move `virtualOffset` at some fixed, disconnected rate: if
+ * `pickDragAnchor`/`anchorScreenX` are supplied (see SpiralGallery, which
+ * implements both), whatever point of whatever card was actually grabbed on
+ * pointerdown keeps tracking the cursor 1:1 for the rest of the gesture —
+ * grab a card by a corner and that corner, not just the card's center,
+ * stays under the pointer. `CONFIG.dragSensitivity` only applies as a
+ * fallback, when the drag started over empty space with no card to anchor to.
+ *
  * A slow constant increment is added while the user is idle, paused for a
  * short window after any wheel/drag interaction.
  *
- * Magnetic snap: whatever raw value wheel/drag deltas leave `virtualOffset`
- * at, a short debounce (`scheduleSnap`) rounds it to the nearest card's own
- * exact position (see `snapToNearestCard`) once input goes quiet — so a
- * mouse notch, a trackpad's momentum tail, or a released drag can never
- * leave the helix resting between two cards. The value itself just jumps to
- * the snapped target; there's no separate tween for the *visual* settle
- * because `main.js` already lerps its rendered position toward
- * `virtualOffset` every frame (`CONFIG.rotationLerp`) — that existing
+ * Magnetic snap: whatever raw value wheel ticks or a released drag leave
+ * `virtualOffset` at, a short debounce (`scheduleSnap`) rounds it to the
+ * nearest card's own exact position (see `snapToNearestCard`) once input
+ * goes quiet — so a mouse notch, a trackpad's momentum tail, or a released
+ * drag can never leave the helix resting between two cards. Never scheduled
+ * from `onPointerMove` itself, only `onWheel`/`onPointerUp`: snapping while
+ * the pointer is still held down would yank whatever was grabbed out from
+ * under a hand that's merely paused mid-drag, not released it. The value
+ * itself just jumps to the snapped target; there's no separate tween for
+ * the *visual* settle because `main.js` already lerps its rendered position
+ * toward `virtualOffset` every frame (`CONFIG.rotationLerp`) — that existing
  * smoothing is what makes the snap read as an eased pull into place rather
  * than a cut.
  */
 export class VirtualScroll {
-  constructor({ wheelTarget = window, dragTarget = wheelTarget } = {}) {
+  constructor({ wheelTarget = window, dragTarget = wheelTarget, pickDragAnchor, anchorScreenX } = {}) {
     this.wheelTarget = wheelTarget;
     this.dragTarget = dragTarget;
+    this.pickDragAnchor = pickDragAnchor;
+    this.anchorScreenX = anchorScreenX;
     this.virtualOffset = 0;
     this.isUserInteracting = false;
     this.idleTimeout = null;
     this.snapTimeout = null;
     this.isDragging = false;
     this.lastDragX = null;
+    this.dragAnchor = null;
 
     this.onWheel = this.onWheel.bind(this);
     this.onPointerDown = this.onPointerDown.bind(this);
@@ -90,25 +110,52 @@ export class VirtualScroll {
     if (!event.isPrimary || (event.pointerType !== 'touch' && event.button !== 0)) return;
     this.isDragging = true;
     this.lastDragX = event.clientX;
+    this.dragAnchor = this.pickDragAnchor?.(event.clientX, event.clientY) ?? null;
     // Keeps delivering move/up events to this pointer even if it strays
     // outside dragTarget mid-drag (a fast mouse drag easily does).
     this.dragTarget.setPointerCapture?.(event.pointerId);
     this.markInteraction();
   }
 
+  /**
+   * How much `virtualOffset` should change per CSS pixel the pointer just
+   * moved, so that whatever was grabbed on pointerdown (see `dragAnchor`)
+   * keeps tracking the cursor. Estimated by nudging `virtualOffset` a tiny
+   * amount each way and seeing how far the anchor's projected screen X
+   * moves — the local slope of screen-X vs. scroll, at the anchor's current
+   * position, not some flat global rate: as the card carrying that anchor
+   * moves, curves, tilts, and scales along the helix, this speed changes
+   * with it, so recomputing it on every move (not just once, at pointerdown)
+   * is what keeps the tracking accurate for the whole gesture. Falls back
+   * to the fixed `CONFIG.dragSensitivity` when nothing was grabbed (the drag
+   * started over empty space) or the estimate is degenerate.
+   */
+  dragUnitsPerPixel() {
+    if (!this.dragAnchor || !this.anchorScreenX) return -CONFIG.dragSensitivity;
+    const lo = this.anchorScreenX(this.dragAnchor, this.virtualOffset - ANCHOR_PROBE_EPS);
+    const hi = this.anchorScreenX(this.dragAnchor, this.virtualOffset + ANCHOR_PROBE_EPS);
+    const pxPerUnit = (hi - lo) / (2 * ANCHOR_PROBE_EPS);
+    if (!Number.isFinite(pxPerUnit) || Math.abs(pxPerUnit) < 1e-6) return -CONFIG.dragSensitivity;
+    return 1 / pxPerUnit;
+  }
+
   onPointerMove(event) {
     if (!this.isDragging) return;
-    const delta = this.lastDragX - event.clientX;
-    this.virtualOffset += delta * CONFIG.dragSensitivity;
+    const cursorDeltaPx = event.clientX - this.lastDragX;
+    this.virtualOffset += cursorDeltaPx * this.dragUnitsPerPixel();
     this.lastDragX = event.clientX;
     this.markInteraction();
-    this.scheduleSnap();
+    // Deliberately no scheduleSnap() here: while the pointer is still down,
+    // a paused-but-still-dragging hand should never have the card yanked
+    // out from under it into a snapped position. Only releasing (below)
+    // schedules the debounce that eventually snaps.
   }
 
   onPointerUp() {
     if (!this.isDragging) return;
     this.isDragging = false;
     this.lastDragX = null;
+    this.dragAnchor = null;
     this.markInteraction();
     this.scheduleSnap();
   }

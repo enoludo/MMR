@@ -106,10 +106,12 @@ export const CONFIG = {
   // radians: the whole helix visibly translates vertically as this
   // accumulates.
   wheelSensitivity: 0.0026,
-  // Shared by a mouse click-drag and a touch slide — both horizontal,
-  // both handled identically via the Pointer Events API (see
-  // VirtualScroll#onPointerMove). Higher than wheelSensitivity because a
-  // drag's pixel range is much smaller than a wheel's accumulated deltaY.
+  // Fallback only: a drag (mouse click-drag or touch slide, both handled
+  // identically via the Pointer Events API) normally tracks whatever card
+  // point was actually grabbed 1:1 with the cursor (see SpiralGallery's
+  // pickDragAnchor/anchorScreenX and VirtualScroll#dragUnitsPerPixel), at
+  // whatever rate that requires — this only applies when the drag started
+  // over empty space, with no card to anchor to.
   dragSensitivity: 0.007,
   rotationLerp: 0.08,
   autoRotateSpeed: 0.0009,

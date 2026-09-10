@@ -9,6 +9,18 @@ const textureLoader = new THREE.TextureLoader();
 const CARD_DEPTH = 0.04;
 const EDGE_COLOR = 0xffffff;
 
+// Reused across calls (drag-anchor picking/projection, see pickDragAnchor
+// and anchorScreenX) instead of allocated fresh each time — these run on
+// every pointerdown/pointermove of a drag, not just once per frame.
+const dragRaycaster = new THREE.Raycaster();
+const _dragNdc = new THREE.Vector2();
+const _dragMatrix = new THREE.Matrix4();
+const _dragQuat = new THREE.Quaternion();
+const _dragEuler = new THREE.Euler(0, 0, 0, 'XYZ');
+const _dragPos = new THREE.Vector3();
+const _dragScale = new THREE.Vector3();
+const _dragPoint = new THREE.Vector3();
+
 const BLUR_START = (CONFIG.blurStartDeg * Math.PI) / 180;
 const BLUR_FULL = (CONFIG.blurFullDeg * Math.PI) / 180;
 const CARD_TILT = (CONFIG.cardTiltDeg * Math.PI) / 180;
@@ -42,6 +54,22 @@ function centeredScaleAt(distance) {
   const t = Math.min(1, distance / CENTERED_SCALE_RANGE);
   const eased = t * t * (3 - 2 * t);
   return CONFIG.centeredScale - (CONFIG.centeredScale - 1) * eased;
+}
+
+/**
+ * Where a slot with the given `baseHeight` sits for a given `scrollY` — the
+ * one formula `update()` applies to every slot each frame, factored out so
+ * it can also be evaluated hypothetically (a different, probe `scrollY`,
+ * without touching any actual mesh) for drag-tracking math (see
+ * SpiralGallery#anchorScreenX).
+ */
+function computeSlotPlacement(baseHeight, scrollY, period) {
+  const y = wrapHeight(baseHeight - scrollY, period);
+  const point = helixPointAt(y);
+  const fade = recycleFadeAt(y, period);
+  const distance = angularDistanceToZero(point.angle);
+  const scale = (0.6 + 0.4 * fade) * centeredScaleAt(distance);
+  return { point, fade, distance, scale };
 }
 
 /**
@@ -348,8 +376,7 @@ export class SpiralGallery {
   /** Translate the whole coil vertically to reflect the current scroll value. */
   update(scrollY) {
     for (const slot of this.slots) {
-      const y = wrapHeight(slot.baseHeight - scrollY, this.period);
-      const point = helixPointAt(y);
+      const { point, fade, distance, scale } = computeSlotPlacement(slot.baseHeight, scrollY, this.period);
 
       slot.mesh.position.set(point.x, point.y, point.z);
       // Faces outward, away from the helix's axis: toward the viewer near
@@ -361,12 +388,8 @@ export class SpiralGallery {
       // spiral rather than an upright, flat rectangle.
       slot.mesh.rotation.z = CARD_TILT;
       slot.angle = point.angle;
-
-      const fade = recycleFadeAt(y, this.period);
       slot.recycleFade = fade;
-
-      const distance = angularDistanceToZero(point.angle);
-      slot.mesh.scale.setScalar((0.6 + 0.4 * fade) * centeredScaleAt(distance));
+      slot.mesh.scale.setScalar(scale);
 
       const depthOpacity =
         CONFIG.frontOpacity - (CONFIG.frontOpacity - CONFIG.backOpacity) * (distance / Math.PI);
@@ -377,6 +400,50 @@ export class SpiralGallery {
       const blur = blurAmountAt(distance);
       if (slot.faceMaterial.userData.shader) slot.faceMaterial.userData.shader.uniforms.uBlur.value = blur;
     }
+  }
+
+  /**
+   * The card (if any) under (clientX, clientY) and the exact point on it
+   * that was hit, in that card's own local space — an "anchor" a drag can
+   * then keep tracking 1:1 as the helix moves (see anchorScreenX), corner
+   * or center alike, rather than moving the whole coil at some disconnected
+   * fixed rate. Returns null over empty space (nothing to anchor to).
+   */
+  pickDragAnchor(clientX, clientY) {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    _dragNdc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+    dragRaycaster.setFromCamera(_dragNdc, this.camera);
+
+    const hit = dragRaycaster.intersectObjects(this.slots.map((slot) => slot.mesh), false)[0];
+    if (!hit) return null;
+    const slot = this.slots.find((s) => s.mesh === hit.object);
+    if (!slot) return null;
+
+    return { slot, localPoint: slot.mesh.worldToLocal(hit.point.clone()) };
+  }
+
+  /**
+   * Where `anchor`'s fixed local-space point would land on screen (CSS
+   * pixels, page/client space to match PointerEvent.clientX) if the helix
+   * were at `scrollY` — computed the same way `update()` places the real
+   * mesh, just applied to a throwaway matrix instead of touching it, so it
+   * can be probed at nearby scrollY values without disturbing the actual
+   * render.
+   */
+  anchorScreenX(anchor, scrollY) {
+    const { slot, localPoint } = anchor;
+    const { point, scale } = computeSlotPlacement(slot.baseHeight, scrollY, this.period);
+
+    _dragEuler.set(0, point.angle, CARD_TILT);
+    _dragQuat.setFromEuler(_dragEuler);
+    _dragPos.set(point.x, point.y, point.z);
+    _dragScale.setScalar(scale);
+    _dragMatrix.compose(_dragPos, _dragQuat, _dragScale);
+
+    _dragPoint.copy(localPoint).applyMatrix4(_dragMatrix).project(this.camera);
+
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    return ((_dragPoint.x + 1) / 2) * rect.width + rect.left;
   }
 
   resize() {
