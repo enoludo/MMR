@@ -1,30 +1,37 @@
 [
   {
-    "id": "proj-01",
-    "image": "/assets/images/proj-01.svg",
-    "title": "Le seuil des proportions",
+    "id": "maladie-de-huntington",
+    "image": "/assets/images/la-maladie-de-huntington.webp",
+    "title": "La Maladie de Huntington",
     "cta": "Découvrir",
-    "link": "/projets/proj-01"
+    "link": "/projets/maladie-de-huntington"
   },
   {
-    "id": "proj-02",
-    "image": "/assets/images/proj-02.svg",
-    "title": "Fragments de mémoire",
+    "id": "entre-deux",
+    "image": "/assets/images/l-entre-deux.webp",
+    "title": "L'Entre-Deux",
     "cta": "Découvrir",
-    "link": "/projets/proj-02"
+    "link": "/projets/entre-deux"
   },
   {
-    "id": "proj-03",
-    "image": "/assets/images/proj-03.svg",
-    "title": "L'architecture du silence",
+    "id": "boucles-sans-titre",
+    "image": "/assets/images/boucles-sans-titre.webp",
+    "title": "Sans titre",
     "cta": "Découvrir",
-    "link": "/projets/proj-03"
+    "link": "/projets/boucles-sans-titre"
   },
   {
-    "id": "proj-04",
-    "image": "/assets/images/proj-04.svg",
-    "title": "Lignes de fuite",
+    "id": "filtre-imparfait",
+    "image": "/assets/images/le-filtre-imparfait.webp",
+    "title": "Le Filtre Imparfait",
     "cta": "Découvrir",
-    "link": "/projets/proj-04"
+    "link": "/projets/filtre-imparfait"
+  },
+  {
+    "id": "souffle-declats",
+    "image": "/assets/images/souffle-declats.webp",
+    "title": "Souffle d'Éclats",
+    "cta": "Découvrir",
+    "link": "/projets/souffle-declats"
   }
 ]

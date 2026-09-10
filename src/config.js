@@ -36,8 +36,8 @@ export const CONFIG = {
     tablet: 1024,
   },
 
-  cardWidth: 2.6,
-  cardHeight: 1.5,
+  cardWidth: 2.56,
+  cardHeight: 1.44, // exactly 16:9
 
   // A flat, near-eye-level camera — barely raised or tilted — so the
   // helix reads as cards sliding past at varying depth, not as a cone's

@@ -24,7 +24,7 @@ const PALETTES = [
 export function createPlaceholderTexture(label) {
   const canvas = document.createElement('canvas');
   canvas.width = 1600;
-  canvas.height = 1000;
+  canvas.height = 900; // 16:9, matching CONFIG.cardWidth/cardHeight
   const ctx = canvas.getContext('2d');
 
   const palette = PALETTES[Math.floor(hashString(label ?? '') * PALETTES.length)];

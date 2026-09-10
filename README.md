@@ -193,10 +193,10 @@ cours pour éviter qu'un changement rapide n'affiche un texte périmé.
 
 ## Notes
 
-- Les images placées dans `public/assets/images/` sont des SVG de
-  substitution : remplacez-les par vos visuels définitifs (jpg/png/webp)
-  en gardant les mêmes chemins déclarés dans `cards.json`, ou modifiez les
-  chemins.
+- Les photos dans `public/assets/images/` sont recadrées (jamais
+  déformées) au format 16:9 des cartes, quel que soit leur ratio d'origine
+  — voir `textureTiers.js#coverRect`, qui reproduit un `object-fit: cover`
+  en Canvas2D.
 - Pour un bundle plus léger, [OGL](https://github.com/oframe/ogl) peut
   remplacer Three.js dans `SpiralGallery.js` sans impacter le reste de
   l'architecture (données, scroll virtuel, overlay).
