@@ -135,6 +135,19 @@ frame, `SpiralGallery#update` calcule l'écart angulaire de chaque carte
 par rapport à l'avant et bascule sa texture entre ces trois niveaux
 (net / doux / flou) — fiable sur tous les appareils, coût négligeable.
 
+### Transparence en profondeur
+
+En plus du flou, chaque carte devient progressivement transparente à mesure
+qu'elle s'éloigne de l'avant : opacité 100 % à l'angle 0 (face caméra),
+dégradée linéairement jusqu'à 10 % à 180° (au plus loin, à l'arrière du
+ressort) — voir `CONFIG.frontOpacity`/`CONFIG.backOpacity` et
+`SpiralGallery#update`. Ce fondu de profondeur se combine (par
+multiplication) avec le fondu de recyclage déjà existant, mais les deux
+restent des concepts distincts : `getCenteredSlot` doit continuer à
+détecter la carte centrée même quand elle n'est pas encore face caméra à
+pleine opacité, donc il se base sur `slot.recycleFade` plutôt que sur
+l'opacité réelle du matériau.
+
 ### On voit le dos des cartes
 
 Chaque carte est une boîte fine (pas un simple plan à une face) : la face

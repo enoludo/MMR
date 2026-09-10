@@ -180,13 +180,18 @@ export class SpiralGallery {
       slot.angle = point.angle;
 
       const fade = recycleFadeAt(y, this.period);
-      slot.frontMaterial.opacity = fade;
-      slot.backMaterial.opacity = fade;
-      slot.edgeMaterial.opacity = fade;
+      slot.recycleFade = fade;
       slot.mesh.scale.setScalar(0.6 + 0.4 * fade);
 
-      if (!slot.textures) continue;
       const distance = angularDistanceToZero(point.angle);
+      const depthOpacity =
+        CONFIG.frontOpacity - (CONFIG.frontOpacity - CONFIG.backOpacity) * (distance / Math.PI);
+      const opacity = fade * depthOpacity;
+      slot.frontMaterial.opacity = opacity;
+      slot.backMaterial.opacity = opacity;
+      slot.edgeMaterial.opacity = opacity;
+
+      if (!slot.textures) continue;
       const tier =
         distance < SHARP_THRESHOLD ? 'sharp' : distance < SOFT_THRESHOLD ? 'soft' : 'heavy';
       if (tier !== slot.currentTier) {

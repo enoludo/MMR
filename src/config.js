@@ -54,6 +54,13 @@ export const CONFIG = {
   sharpAngleDeg: 20,
   softAngleDeg: 50,
 
+  // Depth-based transparency: cards fade from fully opaque at the front
+  // (angle ~ 0, closest to the camera) to nearly transparent at the back
+  // (angle ~ 180°, farthest away), reinforcing the sense of depth beyond
+  // the blur tiers above.
+  frontOpacity: 1,
+  backOpacity: 0.1,
+
   // How close to the top/bottom of the rendered span (see `turnsRendered`)
   // a card starts fading out before it recycles to the opposite end —
   // belt-and-suspenders on top of that span already keeping the recycle
