@@ -14,6 +14,11 @@ const BLUR_FULL = (CONFIG.blurFullDeg * Math.PI) / 180;
 const CARD_TILT = (CONFIG.cardTiltDeg * Math.PI) / 180;
 const CENTERED_SCALE_RANGE = (CONFIG.centeredScaleAngleDeg * Math.PI) / 180;
 
+/** Mixes an sRGB channel (0-255) toward white by `amount` (0 = untouched, 1 = pure white). */
+function lightenChannel(value, amount) {
+  return value + (255 - value) * amount;
+}
+
 function angularDistanceToZero(angle) {
   const normalized = ((angle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
   return Math.min(normalized, 2 * Math.PI - normalized);
@@ -292,12 +297,18 @@ export class SpiralGallery {
    */
   applyEdgeColor(slot, card) {
     const { r, g, b } = this.cardEdgeColors.get(card.id);
+    const lighten = CONFIG.cardEdgeLighten;
     // `r/g/b` are sRGB-encoded pixel values straight off a canvas (same
     // convention as a hex color like 0xffffff) — Color#setRGB otherwise
     // defaults to interpreting raw numbers as already-linear, which after
     // three.js's own linear-to-sRGB display conversion visibly washes out
     // and brightens every color.
-    slot.edgeMaterial.color.setRGB(r / 255, g / 255, b / 255, THREE.SRGBColorSpace);
+    slot.edgeMaterial.color.setRGB(
+      lightenChannel(r, lighten) / 255,
+      lightenChannel(g, lighten) / 255,
+      lightenChannel(b, lighten) / 255,
+      THREE.SRGBColorSpace
+    );
   }
 
   loadSlotTexture(slot, card) {

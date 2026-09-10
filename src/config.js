@@ -50,6 +50,13 @@ export const CONFIG = {
   // every size.
   cardCornerRadius: 0.0325,
 
+  // The card edge is tinted with that card's own average color (see
+  // cardColor.js#extractAverageColor), but used at full strength that tint
+  // reads as too subtle/dark against the front face's much brighter
+  // texture — this lightens it by mixing it toward white (0 = untouched,
+  // 1 = pure white) so the edge stays legibly colored but visible.
+  cardEdgeLighten: 0.3,
+
   // Every card is rolled by this fixed amount around its own line of sight
   // (in the same rotational sense the helix itself turns as height
   // increases), so the coil reads as a continuous, slightly banked ribbon

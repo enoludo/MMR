@@ -271,6 +271,12 @@ comme "la tranche de cette œuvre" plutôt que comme un cadre neutre autour.
   Sans préciser `THREE.SRGBColorSpace` en 4ᵉ argument, la couleur ressort
   visiblement délavée/éclaircie après la conversion linéaire→sRGB
   d'affichage de Three.js.
+- La couleur moyenne brute était trop discrète face à la face avant, bien
+  plus lumineuse (texture nette contre tranche unie) : `CONFIG.cardEdgeLighten`
+  (0.3) éclaircit chaque canal en le mélangeant vers le blanc
+  (`lightenChannel` dans `SpiralGallery.js`) avant application, pour que la
+  tranche reste identifiable comme "la couleur de cette carte" tout en étant
+  bien visible.
 
 ### On voit le dos des cartes
 
