@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { CONFIG, getSlotCountForWidth } from '../config.js';
 import { createPlaceholderTexture } from './placeholderTexture.js';
 import { buildTextureTiers } from './textureTiers.js';
-import { spiralPointAt, recycleFadeAt } from './spiralPath.js';
+import { getPeriod, wrapHeight, helixPointAt, recycleFadeAt } from './spiralPath.js';
 
 const textureLoader = new THREE.TextureLoader();
 const CARD_DEPTH = 0.04;
@@ -18,12 +18,16 @@ function angularDistanceToZero(angle) {
 }
 
 /**
- * Renders the spiral of cards. Each slot has a fixed identity/card and a
- * fixed starting offset along the spiral path (`baseOffset`), but its
- * position is recomputed every frame from `(baseOffset + globalT) mod 1`
- * (see #update) — the slot itself travels the whole spiral and recycles
- * back to the start, rather than the gallery being a rigid shape that
- * spins in place. The mapping from slot -> card data is
+ * Renders the gallery as a true helix — a single constant radius, like a
+ * spring/coil (see spiralPath.js) — that visibly translates vertically as
+ * the user scrolls, rather than a ring that spins in place. Each slot has
+ * a fixed identity/card and a fixed baseline height along the coil, but
+ * its actual height each frame is `wrapHeight(baseHeight - scrollY,
+ * period)` (see #update): once a card scrolls past the top or bottom of
+ * the rendered span it reappears at the opposite end, `period` (an exact
+ * number of full turns) further along — seamless, because the screw
+ * relationship means that position already lines up with a neighboring
+ * card. The mapping from slot -> card data is
  * `slotIndex % cardsData.length`, so the number of real cards can grow (4
  * today, ~20 later) without touching any of the 3D logic here.
  *
@@ -32,9 +36,8 @@ function angularDistanceToZero(angle) {
  * visible — just showing its blank card-back face — rather than vanish
  * outright. The box's front face carries the card's texture (swapped
  * between three pre-blurred tiers based on live angular distance from the
- * front, see textureTiers.js — cheaper and more reliable than a real-time
- * depth-of-field render pass); its back and edge faces use plain shared
- * materials.
+ * front, see textureTiers.js); its back and edge faces use plain shared-
+ * look materials.
  */
 export class SpiralGallery {
   constructor({ container, cardsData }) {
@@ -83,6 +86,7 @@ export class SpiralGallery {
     }
     this.slots = [];
     this.slotCount = slotCount;
+    this.period = getPeriod(slotCount);
 
     if (!this.cardGeometry) {
       this.cardGeometry = new THREE.BoxGeometry(CONFIG.cardWidth, CONFIG.cardHeight, CARD_DEPTH);
@@ -123,7 +127,7 @@ export class SpiralGallery {
 
       const slot = {
         index: i,
-        baseOffset: i / slotCount,
+        baseHeight: (i / slotCount - 0.5) * this.period,
         angle: 0,
         mesh,
         frontMaterial,
@@ -155,7 +159,7 @@ export class SpiralGallery {
     );
   }
 
-  /** Rebuild the slot layout if the responsive slot count changed. */
+  /** Rebuild the coil if the responsive slot count changed. */
   refreshSlotCountForWidth(width) {
     const nextCount = getSlotCountForWidth(width);
     if (nextCount !== this.slotCount) {
@@ -163,20 +167,20 @@ export class SpiralGallery {
     }
   }
 
-  /** Advance every slot along the spiral path to reflect the current scroll value. */
-  update(globalT) {
+  /** Translate the whole coil vertically to reflect the current scroll value. */
+  update(scrollY) {
     for (const slot of this.slots) {
-      const t = (((slot.baseOffset + globalT) % 1) + 1) % 1;
-      const point = spiralPointAt(t);
+      const y = wrapHeight(slot.baseHeight - scrollY, this.period);
+      const point = helixPointAt(y);
 
       slot.mesh.position.set(point.x, point.y, point.z);
-      // Faces outward, away from the spiral's axis: toward the viewer
-      // near the front (angle ~ 0), showing its back once it's rotated
-      // past ~90 degrees toward the rear.
+      // Faces outward, away from the helix's axis: toward the viewer near
+      // the front (angle ~ 0), showing its back once it's rotated past
+      // ~90 degrees toward the rear.
       slot.mesh.rotation.y = point.angle;
       slot.angle = point.angle;
 
-      const fade = recycleFadeAt(t);
+      const fade = recycleFadeAt(y, this.period);
       slot.frontMaterial.opacity = fade;
       slot.backMaterial.opacity = fade;
       slot.edgeMaterial.opacity = fade;

@@ -14,7 +14,7 @@ const overlay = new Overlay({
   ctaEl: document.getElementById('card-cta'),
 });
 
-let currentT = 0;
+let currentScrollY = 0;
 
 function updateCenteredCard() {
   const slot = getCenteredSlot(gallery.slots, gallery.camera);
@@ -25,10 +25,10 @@ function updateCenteredCard() {
 function animate() {
   requestAnimationFrame(animate);
 
-  const targetT = virtualScroll.tick();
-  currentT += (targetT - currentT) * CONFIG.rotationLerp;
+  const targetScrollY = virtualScroll.tick();
+  currentScrollY += (targetScrollY - currentScrollY) * CONFIG.rotationLerp;
 
-  gallery.update(currentT);
+  gallery.update(currentScrollY);
   updateCenteredCard();
   gallery.render();
 }

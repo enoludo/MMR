@@ -1,26 +1,18 @@
-function angularDistanceToZero(angle) {
-  const normalized = ((angle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-  return Math.min(normalized, 2 * Math.PI - normalized);
-}
-
-const MIN_OPACITY = 0.6; // ignore slots still fading in/out at the recycle seam
+const MIN_OPACITY = 0.6; // ignore slots still fading in/out at the recycle point
 const FRUSTUM_MARGIN = 0.85; // NDC space [-1, 1]; a slot outside this is off-screen (or too close to the edge)
 
-// With more than one turn, several slots can share an angle close to 0 at
-// once, on different loops of the spiral — at very different radius/height.
-// Angle alone can't tell those apart: one may sit dead center on screen
-// while another, at the same angle but a further loop, is swung up or down
-// off-screen entirely. Filtering to what's actually visible first is what
-// makes "closest angle" mean "the card the viewer is looking at".
 function isOnScreen(slot, camera) {
   const ndc = slot.mesh.position.clone().project(camera);
   return Math.abs(ndc.x) < FRUSTUM_MARGIN && Math.abs(ndc.y) < FRUSTUM_MARGIN;
 }
 
 /**
- * The slot currently reading as "centered" to the viewer: on screen, fully
- * visible (not mid recycle-fade), and with the smallest angular offset from
- * dead-center (0 mod 2*PI) among those.
+ * The slot currently reading as "centered" to the viewer. Because a
+ * card's angle is derived directly from its height (angle = height /
+ * pitch * 2*PI — see spiralPath.js), "facing the camera" and "at the
+ * camera's own height" are the same condition: whichever visible,
+ * on-screen slot has the smallest |height| is both the closest card and
+ * the one dead-center on screen.
  */
 export function getCenteredSlot(slots, camera) {
   const fullyVisible = slots.filter((slot) => slot.frontMaterial.opacity >= MIN_OPACITY);
@@ -28,6 +20,6 @@ export function getCenteredSlot(slots, camera) {
   const pool = onScreen.length > 0 ? onScreen : fullyVisible.length > 0 ? fullyVisible : slots;
 
   return pool.reduce((closest, slot) =>
-    angularDistanceToZero(slot.angle) < angularDistanceToZero(closest.angle) ? slot : closest
+    Math.abs(slot.mesh.position.y) < Math.abs(closest.mesh.position.y) ? slot : closest
   );
 }

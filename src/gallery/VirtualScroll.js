@@ -1,11 +1,12 @@
 import { CONFIG } from '../config.js';
 
 /**
- * Drives the spiral's progress from an unbounded "virtual" scroll value
- * instead of `window.scrollY` — the section never actually scrolls (it's
- * fixed to the viewport), so there's no page height to run out of and no
- * forced reflow from reading scroll/document metrics on every event. The
- * value is in spiral-progress units (see spiralPath.js), not radians.
+ * Drives the helix's vertical position from an unbounded "virtual" scroll
+ * value instead of `window.scrollY` — the section never actually scrolls
+ * (it's fixed to the viewport), so there's no page height to run out of
+ * and no forced reflow from reading scroll/document metrics on every
+ * event. The value is in world-height units (see spiralPath.js), the same
+ * units as `CONFIG.pitch` — not radians.
  *
  * A slow constant increment is added while the user is idle, paused for a
  * short window after any wheel/touch interaction.
@@ -61,7 +62,7 @@ export class VirtualScroll {
     this.markInteraction();
   }
 
-  /** Advance the target spiral progress by the idle auto-rotate speed, if idle. */
+  /** Advance the target scroll height by the idle auto-scroll speed, if idle. */
   tick() {
     if (!this.isUserInteracting) {
       this.virtualOffset += CONFIG.autoRotateSpeed;
