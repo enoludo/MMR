@@ -109,9 +109,19 @@ export class VirtualScroll {
    * SliderControls.js for why that mapping is this way round: increasing
    * `virtualOffset` is the same direction a leftward drag already moves
    * things, which pulls in whatever was on the right.
+   *
+   * Rounds to the nearest card *first*, then steps from there — rather than
+   * just adding a step to whatever `virtualOffset` currently is — so this
+   * always lands exactly centered even if the current value was already a
+   * little off-grid (idle auto-rotate drifts continuously, and a wheel/drag
+   * gesture's own magnetic snap is debounced, so it may not have caught up
+   * yet). Without this, clicking an arrow while off-grid would carry that
+   * same offset into the result and land between two cards instead of on one.
    */
   stepToAdjacentCard(direction) {
-    this.virtualOffset += direction * cardStep();
+    const step = cardStep();
+    const currentIndex = Math.round(this.virtualOffset / step);
+    this.virtualOffset = (currentIndex + direction) * step;
     this.markInteraction();
   }
 

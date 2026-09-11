@@ -508,6 +508,14 @@ directement réutilisé via `.header-icon-btn` plutôt que dupliqué.
   `virtualOffset` saute directement à sa nouvelle valeur et c'est le lerp
   déjà en place (`CONFIG.rotationLerp`) qui anime la transition visuelle —
   aucun tween dédié.
+- `stepToAdjacentCard` arrondit d'abord `virtualOffset` à la carte la plus
+  proche (même calcul que `snapToNearestCard`) avant d'appliquer le pas,
+  plutôt que d'additionner le pas directement à sa valeur courante :
+  l'auto-rotation en idle dérive en continu, et le recalage magnétique d'un
+  wheel/drag est débounced donc peut ne pas avoir encore eu lieu — sans cet
+  arrondi préalable, cliquer sur une flèche pendant que `virtualOffset` est
+  légèrement décalé aurait reporté ce même décalage sur le résultat, et fait
+  atterrir entre deux cartes plutôt que pile sur une.
 - Cette correspondance gauche/droite découle directement de la même
   relation angle/hauteur qui régit tout le reste de la spirale : augmenter
   `virtualOffset` d'un pas fait apparaître au centre la carte qui se
