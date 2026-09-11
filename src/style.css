@@ -198,6 +198,14 @@ body {
     width: 40px;
     border-radius: 20px;
   }
+
+  .gallery-slider-controls {
+    bottom: 12px;
+  }
+
+  .gallery-slider-controls .header-icon-btn {
+    height: 40px;
+  }
 }
 
 /* HTML overlay for the centered card's title + CTA, rendered above the canvas
@@ -267,4 +275,25 @@ body {
 
 .gallery-card-cta:hover {
   background-color: #ececec;
+}
+
+/* Prev/next controls (Figma's "SliderControls" block), bottom-centered the
+   same 24px inset the header uses at its own edge. Reuses .header-icon-btn
+   as-is: same glass-pill treatment (size, blur, background), no need for a
+   second copy of those tokens. */
+.gallery-slider-controls {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  gap: 8px;
+}
+
+/* One asset, mirrored — same approach as the Figma source, which reuses a
+   single caret glyph and flips it for the opposite direction rather than
+   shipping two near-identical assets. */
+.slider-arrow-icon--next {
+  transform: scaleX(-1);
 }

@@ -6,6 +6,7 @@ import { Overlay } from './gallery/Overlay.js';
 import { BackgroundTint } from './gallery/BackgroundTint.js';
 import { getCenteredSlot } from './gallery/centeredSlot.js';
 import { initHeader } from './gallery/Header.js';
+import { initSliderControls } from './gallery/SliderControls.js';
 
 initHeader();
 
@@ -22,6 +23,7 @@ const overlay = new Overlay({
   titleEl: document.getElementById('card-title'),
   ctaEl: document.getElementById('card-cta'),
 });
+initSliderControls(virtualScroll);
 // Matches style.css's static `body { background }`, so the very first
 // transition (once the front card's mood color is known) starts from the
 // same color that was already on screen.

@@ -6,6 +6,11 @@ import { CONFIG } from '../config.js';
 // enough above floating-point noise given world coordinates a few units wide.
 const ANCHOR_PROBE_EPS = 0.001;
 
+/** Cards sit exactly this far apart, in world-height units (see spiralPath.js). */
+function cardStep() {
+  return CONFIG.pitch / CONFIG.slotsPerTurn;
+}
+
 /**
  * Drives the helix's vertical position from an unbounded "virtual" scroll
  * value instead of `window.scrollY` — the section never actually scrolls
@@ -91,10 +96,23 @@ export class VirtualScroll {
     this.snapTimeout = setTimeout(() => this.snapToNearestCard(), CONFIG.snapDebounceMs);
   }
 
-  /** Cards sit exactly `pitch / slotsPerTurn` world-height units apart (see spiralPath.js) — rounding to the nearest multiple of that step is rounding to the nearest card. */
+  /** Rounding to the nearest multiple of a card's own step is rounding to the nearest card. */
   snapToNearestCard() {
-    const step = CONFIG.pitch / CONFIG.slotsPerTurn;
+    const step = cardStep();
     this.virtualOffset = Math.round(this.virtualOffset / step) * step;
+  }
+
+  /**
+   * Steps by exactly one card, for the prev/next arrow controls — `+1`
+   * advances (the card currently sitting to the right becomes centered),
+   * `-1` retreats (the one on the left becomes centered). See
+   * SliderControls.js for why that mapping is this way round: increasing
+   * `virtualOffset` is the same direction a leftward drag already moves
+   * things, which pulls in whatever was on the right.
+   */
+  stepToAdjacentCard(direction) {
+    this.virtualOffset += direction * cardStep();
+    this.markInteraction();
   }
 
   onWheel(event) {

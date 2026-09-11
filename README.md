@@ -486,10 +486,41 @@ avec un inset de 24px (12px en dessous de 640px), au-dessus du canvas.
   l'identique de la maquette (`.header-logo-img` dans `style.css`) — à
   32px de haut, ses traits fins sont volontairement fidèles à la maquette,
   même si ça le rend peu lisible sur un fond très chargé.
-- Les icônes (menu burger, haut-parleur) sont redessinées à la main en SVG
-  inline plutôt qu'exportées de Figma (même blocage réseau que le logo) —
-  ce sont des formes génériques standard, pas un tracé exact de l'icône
-  "Streamline Phosphor" utilisée dans la maquette.
+- Les icônes (menu burger, haut-parleur activé/coupé) sont les tracés SVG
+  exacts de la maquette ("Streamline Phosphor"), fournis directement par
+  l'utilisateur plutôt qu'exportés de Figma — même blocage réseau que le
+  logo. Chaque `<path>` est inline dans `index.html`, `fill="currentColor"`
+  pour suivre la couleur du bouton.
+
+## Navigation flèches (depuis la maquette Figma)
+
+`.gallery-slider-controls` (dans `index.html`) reproduit le bloc
+"SliderControls" du fichier Figma (node `240:1798`) : deux boutons ronds à
+flèche, centrés en bas de l'écran avec un inset de 24px (12px en dessous de
+640px) — le même traitement "pilule verre" que les boutons du header,
+directement réutilisé via `.header-icon-btn` plutôt que dupliqué.
+
+- Un clic sur la flèche gauche/droite fait avancer la spirale d'exactement
+  une carte (`VirtualScroll#stepToAdjacentCard`, câblé dans
+  `SliderControls.js`) — "gauche" et "droite" sont pris au sens littéral,
+  spatial : la flèche gauche amène au centre la carte actuellement affichée
+  à gauche, la droite celle actuellement à droite. Comme pour le magnétisme,
+  `virtualOffset` saute directement à sa nouvelle valeur et c'est le lerp
+  déjà en place (`CONFIG.rotationLerp`) qui anime la transition visuelle —
+  aucun tween dédié.
+- Cette correspondance gauche/droite découle directement de la même
+  relation angle/hauteur qui régit tout le reste de la spirale : augmenter
+  `virtualOffset` d'un pas fait apparaître au centre la carte qui se
+  trouvait juste avant à `baseHeight + pas`, laquelle est aussi celle qui
+  projette à x > 0 (donc visuellement à droite) juste avant le clic — c'est
+  exactement le même sens qu'un drag vers la gauche (voir plus haut) ou un
+  scroll vers le bas — une seule convention "avancer" cohérente pour toute
+  entrée.
+- Un seul asset SVG (flèche pointant à gauche, fourni par l'utilisateur)
+  sert aux deux boutons : le bouton droit applique juste
+  `transform: scaleX(-1)` (`.slider-arrow-icon--next`) — même logique que
+  la maquette Figma, qui réutilise elle aussi un unique glyphe "Caret" reflété
+  plutôt que deux assets distincts.
 
 ## Responsive
 
