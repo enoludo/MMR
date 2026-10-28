@@ -15,3 +15,6 @@ blender/salle/*.exr
 # Fichiers temporaires
 _a_supprimer
 .DS_Store
+
+# Copies locales de l’état d’une salle avant refonte (calculs de lumière bruts)
+blender/sauvegardes
