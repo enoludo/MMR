@@ -13,6 +13,7 @@ Une entrée par session, la plus récente en haut. Le détail technique est dans
 
 ## 28/10/2026 — Claude Code (transitions : plus de temps mort au retour)
 
+- **En ligne sur Fluidbook Toolbox** : environnement `mmr-lab` (https://mmr-lab.labs.cubedesigners.com/, mot de passe et filtre IP de la Toolbox). Les environnements « static » refusent le `.htaccess` : chaque adresse (`/oeuvre/<id>/`, `/a-propos/`) a sa copie de `index.html` pour pouvoir être ouverte directement (adresse avec « / » final).
 - **Git** : `musee/` est maintenant enregistré dans le dépôt GitHub `enoludo/MMR` (même branche que la galerie spirale), sans les fichiers lourds ou régénérables ni la clé Vercel (voir `CLAUDE.md`). La copie locale de `~/MMR` a été mise à jour (13 enregistrements de la galerie spirale récupérés).
 - Zip à héberger avec ces corrections : `~/MMR/musee-site-a-heberger-2026-10-28-v2.zip` (6,9 Mo, contenu de `dist/` à la racine, `.htaccess` compris ; le zip de midi est conservé).
 
