@@ -84,6 +84,7 @@ Depuis Claude Code, lancer les scripts avec le Blender de l'application : `/Appl
 
 ## Points ouverts
 
+- **Prochaine étape :** à choisir avec Ludovic. Voir `PASSATION.md` (28/10, fin d'après-midi) : état du projet, mise en ligne, pièges, pistes.
 - **Transitions spirale ↔ salles (28/10), à voir avec Ludovic :** durées (zoom 1,4 / 1,4 s, fondus 1 / 0,5 s, `durees` dans `entree.ts`), raccords des voiles sombres (vignette, éclairage de la carte) et textes lettre par lettre (non vus sur mobile), amplitude de la parallaxe (limitée à 1,6 m de recul par le mur sud), effet sur mobile (le décentrage du premier écran en bas n'est pas pris en compte par la capture), temps d'attente une fois en ligne (le montage de la salle fige l'image ≈ 0,5 s en dev). Seule « Le seuil des proportions » a une capture ; les autres œuvres ont une photo sans rapport avec la salle provisoire. L'arrivée directe par une adresse garde l'écran de chargement complet, sans mouvement.
 - Chiffres du popup Maladie repris du Figma, à faire valider : « 1/2 000 000 » et « ACVR1 » ne correspondent pas à l'acromégalie (ACVR1 est le gène de la FOP). Lien « En savoir plus » (Orphanet) à confirmer.
 - Recadrer les points de vue Maladie (main) et Manifeste (visage) avec le popup ouvert à droite.

@@ -1,141 +1,90 @@
-# Passation — transitions entre la spirale et les salles
+# Passation — après les transitions spirale ↔ salles
 
-Rédigée le 28/10/2026 par Claude Code, à la fin de la session « salles » (couloirs, nouvelles vues, fluidité).
-À lire après `CLAUDE.md` (contexte, décisions de Ludovic, architecture) et le haut de `JOURNAL.md` (dernières sessions).
-Remplace la passation du 26/10, devenue obsolète (ancienne navigation `CameraControls`, salle de 24 m, socle).
+Rédigée le 28/10/2026 (fin d'après-midi) par Claude Code, à la fin de la session « transitions ».
+À lire après `CLAUDE.md` (contexte, décisions de Ludovic, architecture détaillée) et le haut de `JOURNAL.md`.
+Remplace la passation du 28/10 au matin, qui préparait les transitions (elles sont faites).
 
-**Prochaine étape demandée par Ludovic :** les transitions entre la page d'accueil (galerie spirale) et les salles, dans les deux sens.
-
-> **Mise à jour (28/10, soir) :** ces transitions sont faites (zoom de la carte ↔ salle, retour sur l'œuvre quittée, préchargement), statut [à voir]. Voir `JOURNAL.md` et `CLAUDE.md` (Architecture, « Transitions spirale ↔ salle »).
+**Prochaine étape :** pas encore choisie par Ludovic. Lui demander en début de session (pistes en section 6).
 
 ---
 
-## 1. Où en est-on (28/10)
+## 1. Où en est-on
 
-Tout ce qui suit est fait et vérifié dans le navigateur. Statut **[à voir]** : Ludovic l'a testé en local au fil de l'eau, sans validation formelle. Rien n'est encore mis en ligne depuis ces changements.
+Tout est fait, vérifié dans le navigateur (en développement et sur le site compilé), statut **[à voir]** : Ludovic a testé et réagi au fil de l'eau (« Super », « Top ! »), sans validation formelle.
 
-**Salles (toutes, une seule salle provisoire pour l'instant) :**
-- Salle de 30 × 30 m, 20 m sous plafond.
-- Deux portes de 4 m jusqu'au plafond : l'entrée au sud, la sortie au nord, chacune au bord droit de son mur.
-- Œuvre de 10 m (modèle de 8 m agrandi de 1,25).
-- Lumière précalculée à 768 échantillons : plafond propre.
-- Texture de pierre précalculée dans une texture de bruit 32³ : la scène se dessine environ 2 fois plus vite.
+**Les transitions entre la spirale (accueil) et les salles marchent dans les deux sens :**
+- **Entrée** (« Découvrir ») : la spirale recentre la carte, le titre part lettre par lettre, la salle se prépare cachée dessous, puis la carte grandit jusqu'au plein écran avec toute la spirale. L'image s'ouvre dans son masque (×2 → ×1) et l'on avance déjà dedans (parallaxe calculée avec la profondeur d'une capture de la salle). L'image se fond ensuite dans la vraie 3D, qui poursuit le même mouvement jusqu'à la vue initiale. Le titre et les liens de la salle montent lettre par lettre.
+- **Retour** (croix du titre, logo, menu « La collection ») : les textes de la salle repartent, la caméra rejoint la vue initiale, la salle est photographiée, la photo se réduit dans la carte de la spirale (recentrée sur l'œuvre quittée) en se fondant dans son image, puis le titre de la carte remonte lettre par lettre.
+- **Raccords soignés aujourd'hui :** la vignette sombre de la salle et l'éclairage plus sombre des cartes de la spirale sont repris dans l'image de transition (plus de voile qui saute) ; la photo de la salle suit exactement le mouvement de l'image (plus de dédoublement) ; le retour démarre sans temps mort (≈ 0,07 s après la photo, contre 0,4 à 1,9 s).
+- Seule « Le seuil des proportions » a une capture de sa salle (`public/assets/captures/`). Les autres œuvres font un zoom simple sur leur photo.
 
-**Passage d'une salle à l'autre** (« Œuvre précédente / suivante ») :
-- On traverse un couloir de 14 m à fentes de lumière, en 8 s au plus.
-- On arrive sur la vue initiale de la salle suivante. L'adresse change sans rechargement.
+**Ce qui est en ligne :**
+- **Fluidbook Toolbox, labo `mmr-lab`** : https://mmr-lab.labs.cubedesigners.com/ (dernière version). Mot de passe HTTP dans la fiche du labo ; filtre IP désactivé à la demande de Ludovic, noindex gardé.
+- **Zip à héberger** : `~/MMR/musee-site-a-heberger-2026-10-28-v2.zip` (dernière version, `.htaccess` compris).
+- **Vercel** (projet `mmr`) : **pas** mis à jour depuis le 27/10.
 
-**Navigation dans une salle** (`src/scene/Navigation.tsx`) : trois anneaux à 1,70 m.
-- **Vue initiale :** à 13 m, face à l'avant de l'œuvre, avec rotation automatique. C'est la vue au chargement et à l'arrivée par la porte.
-- **Cercle de visite (9 m) :** on y passe au premier scroll.
-- **Cercle réduit (5,5 m) :** un clic sur l'œuvre y mène, un autre clic en ramène.
-- **Popups :** Maladie (vue de face vers la main) et Manifeste (vue levée vers le visage). Ils se ferment par la croix, un clic à côté ou Échap, et on revient sur le cercle de 9 m.
+**Git :** `musee/` est suivi depuis aujourd'hui dans `enoludo/MMR` (racine `~/MMR`, branche `claude/spirale-interactive-gallery-b4mzwd`). Envoyé sur GitHub jusqu'au commit `a4dfe4e`. Les deux derniers commits (notes de mise en ligne, `ec0b4e2` et `2567c7f`) **et cette passation** sont seulement en local : les envoyer avec l'accord de Ludovic (`git push` depuis `~/MMR`).
 
-**Interface de salle** (Figma 445:275 « SeuilHome », 447:602, 448:911) :
-- Le premier écran, à gauche, reste affiché sur les trois anneaux.
-- Les popups s'affichent à droite (composant réutilisable `src/ui/Popup.tsx`).
-- Œuvre précédente / suivante sont en bas.
+## 2. Où est le code des transitions
 
-## 2. Ce qui relie aujourd'hui la spirale et les salles
-
-**Routes** (`src/main.tsx`) :
-- `/` : `Accueil` (la spirale).
-- `/oeuvre/:id` : `PageOeuvre`, chargée à la demande (`lazy`, morceau de 313 Ko).
-- `/a-propos` : page « À propos ».
-
-**De la spirale vers une salle :**
-1. Le bouton « Découvrir » de la carte centrée (`.accueil__cta`, lien posé par `src/accueil/gallery/Overlay.js`) appelle `naviguer('/oeuvre/<id>')`.
-2. `Accueil` est démonté : son `useEffect` arrête l'animation et libère la galerie (`galerie.dispose()`, `scroll.dispose()`, `overlay.dispose()`, `teinte.dispose()`). Le canvas Three.js de la spirale disparaît.
-3. `PageOeuvre` est chargée, puis monte `Experience`, c'est-à-dire le canvas React Three Fiber de la salle.
-4. `PageOeuvre` pose `store.salle`, et la salle se charge.
-5. Pendant ce temps, l'écran `Chargement` (logo et barre, dans `InterfaceSalle.tsx`, via `useProgress` de drei) couvre tout.
-6. Une fois la salle chargée, on est sur la vue initiale (anneau `loin`, `angleDepart`).
-
-**Ce que charge une salle :**
-
-| Fichier | Taille |
+| Fichier | Rôle |
 |---|---|
-| `salle.glb` | 10 Ko |
-| Deux lightmaps webp | 2,6 Mo chacune |
-| `sculpture.glb` | 0,7 Mo |
+| `src/transition.ts` | `entrer()`, `sortir()`, préchargement d'une œuvre (`prechargerOeuvre`) |
+| `src/store.ts` | `transition` : sens, phase, cadre de la carte, photo |
+| `src/ui/Transition.tsx` | déroulé phase par phase, durées (touche M, « Transitions »), la spirale suit la boîte |
+| `src/ui/ToileTransition.ts` | canvas plein écran et son shader : masque, parallaxe (`surface()`), photo, vignette, éclairage |
+| `src/entree.ts` | mouvement d'entrée commun à l'image et à la 3D (`avancee()`, `poseEntree`), `RECUL`, `ZOOM_CARTE` |
+| `src/ui/apparition.ts` | textes de la salle lettre par lettre (`useApparition`) |
+| `src/accueil/gallery/Overlay.js` | titre de la spirale : `cacher()` / `montrer()` |
+| `src/accueil/Accueil.tsx` | recentrage, poignée de main du retour, spirale préparée cachée |
+| `src/main.tsx` | spirale et salle rendues hors des routes, pour survivre au changement d'adresse |
+| `src/outils/capture.ts` | (dev) capture d'une salle pour une nouvelle œuvre : `await __visite.capturer('<id>')` |
 
-`useGLTF.preload` (dans `Salle.tsx`) ne s'exécute qu'une fois le morceau `PageOeuvre` chargé. **Rien n'est préchargé depuis la spirale.**
+Phases : entrée `preparation` → `zoom` → `attente` → `fondu` ; retour `retour` → `photo` → `attente` → `zoom` → `fondu`. Le détail est dans `CLAUDE.md`, « Transitions spirale ↔ salle ».
 
-**D'une salle vers la spirale :**
-1. La pastille titre du header (`Link to="/"`, croix) ramène à `/`.
-2. `PageOeuvre` est démontée, ce qui remet `store.salle` et `store.passage` à `null`. Le canvas R3F disparaît.
-3. `Accueil` remonte une spirale neuve. **Elle repart de sa première carte**, pas de celle de l'œuvre qu'on quitte : la position de la spirale n'est pas mémorisée.
+## 3. Mettre en ligne
 
-**Deux canvas séparés :** la spirale (Three.js pur, `src/accueil/gallery/`) et la salle (R3F). C'est un écart assumé par rapport à la note de setup (« un seul canvas persistant »). Les transitions sont l'occasion de rediscuter ce choix avec Ludovic.
+- **Labo `mmr-lab`** (outil `lab_upload_zip`, mode miroir `clean: true`, versionné) :
+  1. `npm run build` ;
+  2. copier `dist/` sans le `.htaccess` (refusé sur un labo « static ») ;
+  3. y ajouter une copie de `index.html` dans `oeuvre/<id>/` pour chaque œuvre et dans `a-propos/` (sinon une adresse ouverte directement renvoie une erreur) ;
+  4. zipper, demander l'URL d'envoi (`lab_upload_zip` sans contenu), envoyer avec `curl -F file=@…`.
+- **Zip à héberger (Apache)** : contenu de `dist/` à la racine du zip, `.htaccess` compris, à servir à la racine d'un domaine.
+- **Vercel** : `npx vercel --prod --yes` depuis `musee/`, ou `Mettre en ligne.command`.
 
-## 3. Points d'attention pour les transitions
+## 4. Mettre au point
 
-**Rien n'existe encore.** Aujourd'hui, on passe d'une page à l'autre sans animation, avec l'écran de chargement entre les deux.
+- `npm run dev` → http://localhost:5173. Avant d'annoncer : `npx tsc --noEmit`, `npm run build`, coup d'œil au navigateur.
+- **Ralentir ou figer une transition** (console, dev) : importer gsap depuis l'URL exacte de `performance.getEntriesByType('resource')` (elle peut porter un `?t=` après un rechargement à chaud), puis `gsap.globalTimeline.timeScale(0)` pour figer, `1` pour reprendre. S'abonner à `store` (même méthode d'import) pour figer à une phase précise.
+- **Isoler l'image ou la photo** pendant le retour : remplacer `obtenirToile().dessiner` par une version qui force `melange` (0 = image seule, 1 = photo seule).
+- **Mesurer la fluidité comme en ligne** : `npm run build`, `npx vite preview`, mesurer les écarts entre images (`requestAnimationFrame`) et profiler (`new Profiler(...)`, autorisé par l'en-tête de `vite.config.ts`). Le navigateur intégré tourne à 30 images/s même au repos : raisonner en relatif.
 
-Pistes techniques, à proposer à Ludovic avant de coder :
-- **Précharger la salle depuis la spirale :**
-  - importer `PageOeuvre` au survol ou au centrage d'une carte (`import('./pages/PageOeuvre')`) ;
-  - précharger `useGLTF.preload` et les lightmaps de la salle de l'œuvre centrée.
-  - Les salles réelles auront leurs propres modèles, et environ 6 Mo par salle à charger.
-- **Garder la spirale affichée pendant le chargement de la salle,** puis fondre de l'une à l'autre. Par exemple :
-  - monter `PageOeuvre` par-dessus `Accueil` le temps de la transition, et ne démonter la spirale qu'à la fin ;
-  - ou faire un zoom de la carte centrée (son image : `oeuvres.ts`, champ `image`) qui remplit l'écran puis laisse place à la salle.
-  - À savoir : deux contextes WebGL actifs en même temps coûtent de la mémoire. C'est acceptable le temps d'un fondu, à surveiller sur mobile.
-- **Retour vers la spirale :** ramener la spirale sur la carte de l'œuvre qu'on quitte.
-  - Le scroll virtuel a `stepToAdjacentCard`. Il faudra une méthode « aller à la carte n » dans `VirtualScroll.js`, ou mémoriser `scroll.tick()` dans le store.
-  - Attention : les cartes sont dans l'ordre de `cartesSpirale`, décalé de 1 par rapport à `oeuvres` (`src/oeuvres.ts`).
-- **Entrée dans la salle :** la vue initiale (13 m, rotation automatique) se prête bien à un « fondu au noir » ou à une arrivée en travelling. On peut démarrer la caméra plus loin, ou plus haut, et la laisser glisser jusqu'à la vue initiale. Tout l'état de la caméra est dans `n.current` de `Navigation.tsx`.
-- **L'écran de chargement actuel** est à intégrer dans la transition, ou à supprimer si le préchargement suffit.
-- **Maquettes Figma utiles** (fichier `BV6AsWeLSbWpCA7AarJGdr`) :
-  - Spirale `240:1671`, Grille `58:207`, Intro `118:1180`, composants `58:316` ;
-  - la salle : `445:275` (SeuilHome).
-  - Regarder s'il existe une maquette de transition, ou demander à Ludovic.
+## 5. Pièges rencontrés aujourd'hui
 
-**Questions à poser à Ludovic au démarrage :**
-1. Quel effet pour l'entrée dans une salle ? Fondu au noir, zoom de la carte, travelling d'arrivée, autre ? A-t-il des références ?
-2. Au retour, la spirale doit-elle revenir sur la carte de l'œuvre quittée ?
-3. Durée souhaitée des transitions, et doit-on pouvoir les interrompre (clic, scroll) ?
-4. Le préchargement depuis la spirale est-il souhaité, avec ce qu'il coûte en données mobiles ?
-5. L'écran d'intro (Figma `118:1180`) est-il lié à cette étape ?
+- **Une phase change une image avant l'adresse** (le store est synchrone, la navigation non) : tout ce qui dépend des deux à la fois doit tolérer cet état intermédiaire, sinon un composant est démonté puis recréé (c'était la cause du temps mort au retour).
+- **Ne jamais démonter la salle ou créer un moteur de rendu pendant un mouvement** : perdre un contexte WebGL bloque ≈ 0,1 s, en créer un ≈ 0,2 s, compiler les shaders de la spirale ≈ 0,3 s (d'où `compileAsync`, le moteur de la spirale gardé, la salle démontée 1,5 s après le retour).
+- **Toute modification de la salle, de sa lumière ou de la vue initiale** oblige à refaire la capture de « Le seuil » (sinon image et 3D ne se superposent plus).
+- **Si l'éclairage de la spirale ou la vignette de la salle changent**, mettre à jour leur copie dans le shader de transition (`cardLighting`, fonction `vignette`).
+- **SplitText et React** : un élément découpé en lettres doit être rendu vide par React et rempli en JavaScript (`apparition.ts`), sinon React et SplitText se disputent son contenu.
+- Les erreurs de la console s'accumulent d'un rechargement à chaud à l'autre : recharger la page avant de conclure.
+- Les labos Fluidbook ont un **filtre IP** (403 hors réseau Cubedesigners) et un mot de passe HTTP : la Toolbox voit le site répondre alors que Ludovic reçoit un 403.
 
-## 4. Vérifier son travail
+## 6. Points ouverts et pistes pour la suite
 
-**Lancer et vérifier :**
-- `npm run dev`, puis http://localhost:5173. Le serveur tourne souvent déjà.
-- Avant d'annoncer : `npx tsc --noEmit`, `npm run build` et un coup d'œil au navigateur.
+**À faire valider par Ludovic (transitions) :** durées, force de la parallaxe, rendu sur mobile (rien n'a été essayé sur téléphone), délai entre le clic et le départ du zoom (≈ 1 s dans le navigateur intégré, le temps que la salle se prépare).
 
-**Accès de mise au point (développement uniquement) :**
-- **`window.__visite`** :
-  - `camera`, `scene`, `gl`, `etat` (l'état de la navigation : `mode`, `anneau`, `rayon`, `angle`, `t`, `duree`…) ;
-  - `aller(i)` va à une étape, `retour()` revient, `avancer(rad)` fait tourner, `cliquer(x, y)` simule un clic, `surLOeuvre(x, y)` teste si un point de l'écran est sur l'œuvre.
-- **`window.__spirale`** : `galerie`, `scroll`.
-- **Figer un passage :** `__visite.etat.duree = 1e7`, puis régler `__visite.etat.t` entre 0 et 1.
-- **Placer la caméra où l'on veut :** ajouter une étape provisoire, par exemple `__visite.config.etapes.push({id:'dbg', …, position, cible})`, puis `__visite.aller(n)` avec `__visite.etat.duree = 0.01`.
-- **Mesurer le coût d'une image :** dans la console, `gl.render(scene, camera)` puis `readPixels` d'un pixel, sur 30 images. Comparer avec la scène vide pour retirer le coût fixe de la mesure. Les chiffres du navigateur intégré sont approximatifs, il faut raisonner en relatif.
+**Repris de `CLAUDE.md` :**
+- chiffres du popup Maladie (« ACVR1 » ne correspond pas à l'acromégalie), lien Orphanet ;
+- recadrage des vues Maladie (main) et Manifeste (visage) avec le popup ouvert ;
+- réglages du couloir à fentes, bancs et rayons dans la salle agrandie ;
+- mobile : le premier écran pousse l'œuvre vers le haut, le popup Maladie défile ;
+- une seule salle provisoire pour toutes les œuvres ;
+- ménage de `~/MMR/_to_delete/` et `musee/_a_supprimer/`.
 
-## 5. Pièges rencontrés (à ne pas refaire)
-
-- **Lumières :** ne jamais faire varier le nombre de lumières de la scène, sinon l'œuvre change de lumière d'un coup et tout est recompilé. Il y a un seul `Eclairage` dans `Salle.tsx`, avec deux soleils permanents et une ambiance.
-- **Sculptures et reflet :** chaque passe de reflet masque les sculptures des autres salles. À garder en tête si la spirale et une salle cohabitent.
-- **Rechargement à chaud :** il garde l'ancien état des `useRef` et des réglages Leva. Après un changement de valeur par défaut ou d'état, **recharger la page** pour juger.
-- **Ludovic utilise parfois le navigateur intégré en même temps :**
-  - l'état peut changer sous vos pieds (clics, scroll) ;
-  - les erreurs de la console s'accumulent d'un rechargement à l'autre : regarder l'horodatage (`?t=`) avant de conclure.
-- **Précalcul de lumière depuis Claude Code :**
-  - lancer les scripts avec `/Applications/Blender.app/Contents/MacOS/Blender -b --python-use-system-env -P script.py -- arguments` ;
-  - `lightmap.py` a besoin de Pillow (voir `CLAUDE.md`, « Chaîne 3D ») ;
-  - `salle.py 2048 768 256` prend environ 40 minutes : à lancer en arrière-plan.
-- **Mise en ligne :** `npx vercel --prod --yes` **depuis `musee/`** (jamais depuis `~/MMR`), ou `Mettre en ligne.command`.
-
-## 6. Points ouverts (repris de `CLAUDE.md`)
-
-- **À faire valider par Ludovic :**
-  - réglages du couloir ;
-  - bancs et rayons des cercles dans la salle agrandie ;
-  - cadrages main et visage avec popup ouvert.
-- **Chiffres du popup Maladie** à valider : « ACVR1 » ne correspond pas à l'acromégalie.
-- **Une seule salle et une seule sculpture** pour toutes les œuvres : le passage vers une salle réellement différente n'a pas été essayé, et son préchargement est à prévoir.
-- **Mobile :** le premier écran pousse l'œuvre vers le haut, et le popup Maladie défile.
-- **Reste à faire :** vue Grille, écran d'intro, son ; découper le code principal (`index` de 1,3 Mo).
-- **Git :** `musee/` n'est pas suivi par Git (dépôt à la racine de `~/MMR`). À organiser avec Ludovic avant de gros chantiers.
-- **Ménage :** `~/MMR/_to_delete/` et `musee/_a_supprimer/`.
+**Pistes de prochaine étape à proposer :**
+1. Captures de salle pour les autres œuvres (la transition avec parallaxe ne vaut aujourd'hui que pour « Le seuil »).
+2. Vue Grille (Figma `58:207`) et écran d'intro (`118:1180`), encore à faire.
+3. Passage sur mobile : transitions, premier écran, popups.
+4. Son.
+5. Découper le code principal (`index` de 1,3 Mo) pour un premier affichage plus rapide.
+6. Mettre Vercel à jour, ou décider si le labo `mmr-lab` le remplace.
