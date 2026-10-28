@@ -1,0 +1,372 @@
+@font-face {
+  font-family: 'Marquez';
+  src: url('/fonts/Marquez.otf') format('opentype');
+  font-display: swap;
+}
+
+/*
+ * Valeurs de la maquette Figma « MMR » (écrans de la salle 445:275, 447:602, 448:911,
+ * header 365:1320), dessinée en 1680 × 1050.
+ */
+:root {
+  --encre: #fff;
+  --fond: #181410;
+  --verre: rgba(255, 255, 255, 0.2);
+  --verre-leger: rgba(255, 255, 255, 0.1);
+  --verre-sombre: rgba(0, 0, 0, 0.2);
+  --flou: blur(15px);
+  --rayon: 24px;
+  --haut: 48px; /* hauteur des boutons */
+  --marge: 24px; /* marge du header et du pied de page */
+  --titre: 'Marquez', Georgia, serif;
+  /* Google Sans de la maquette = Google Sans Flex, sa version libre (OFL) */
+  --texte: 'Google Sans Flex Variable', 'Google Sans', system-ui, sans-serif;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { margin: 0; height: 100%; overflow: hidden; background: var(--fond); }
+body { color: var(--encre); font-family: var(--texte); -webkit-font-smoothing: antialiased; }
+a { color: inherit; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+/* --- Éléments communs ------------------------------------------------- */
+
+/* Bouton rond (son, menu, fermeture des popups) : « BurgerMenu » de la maquette */
+.bouton-rond {
+  appearance: none; border: 0; cursor: pointer;
+  display: grid; place-items: center; flex: none;
+  width: var(--haut); height: var(--haut); border-radius: var(--rayon);
+  background: var(--verre); backdrop-filter: var(--flou); -webkit-backdrop-filter: var(--flou);
+  transition: background-color 0.2s ease;
+}
+.bouton-rond--discret { background: var(--verre-leger); }
+.bouton-rond:hover { background: rgba(255, 255, 255, 0.3); }
+
+/* Bouton pilule (retour, précédente, suivante, partager) */
+.pilule {
+  appearance: none; border: 0; cursor: pointer; text-decoration: none; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 10px;
+  height: var(--haut); padding: 0 24px 0 22px; border-radius: var(--rayon);
+  background: var(--verre); backdrop-filter: var(--flou); -webkit-backdrop-filter: var(--flou);
+  font-size: 14px; line-height: 1;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+.pilule:hover { background: rgba(255, 255, 255, 0.3); }
+.pilule svg { flex: none; }
+.pilule--sombre { background: var(--verre-sombre); padding: 0 32px; }
+.pilule--sombre:hover { background: rgba(0, 0, 0, 0.35); }
+/* Titre de l'œuvre + croix, au centre du header : retour à la collection */
+.pilule--titre { gap: 0; padding: 0 12px 0 25px; }
+.pilule__icone { display: grid; place-items: center; width: 38px; height: 32px; }
+
+/* Onglets (Spirale / Grille ; Info / Maladie / Manifeste) : « TabContainer » */
+.onglets {
+  display: flex; height: var(--haut); padding: 4px; border-radius: var(--rayon);
+  background: var(--verre); backdrop-filter: var(--flou); -webkit-backdrop-filter: var(--flou);
+}
+.onglets__onglet {
+  appearance: none; border: 0; cursor: pointer; background: transparent;
+  height: 40px; padding: 0 16px; border-radius: 20px; font-size: 14px;
+  transition: background-color 0.25s ease;
+}
+.onglets__onglet:hover { background: var(--verre-leger); }
+.onglets__onglet.actif { background: #000; }
+
+/* --- Header ----------------------------------------------------------- */
+.entete {
+  position: fixed; top: var(--marge); left: var(--marge); right: var(--marge); z-index: 30;
+  display: flex; justify-content: space-between; align-items: flex-start;
+  pointer-events: none;
+}
+.entete > * { pointer-events: auto; }
+.entete__logo { display: block; height: var(--haut); }
+.entete__logo img { display: block; height: 100%; width: auto; }
+.entete__centre { position: absolute; left: 50%; top: 0; transform: translateX(-50%); }
+.entete__actions { display: flex; gap: 8px; }
+
+.menu {
+  position: fixed; z-index: 29; top: calc(var(--marge) + var(--haut) + 8px); right: var(--marge);
+  display: flex; flex-direction: column; min-width: 220px; padding: 8px;
+  border-radius: var(--rayon); background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: var(--flou); -webkit-backdrop-filter: var(--flou);
+  opacity: 0; transform: translateY(-8px); pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.menu--ouvert { opacity: 1; transform: none; pointer-events: auto; }
+.menu a { padding: 12px 16px; border-radius: 16px; text-decoration: none; font-size: 14px; }
+.menu a:hover { background: var(--verre-leger); }
+
+/* --- Accueil : galerie spirale (repris de la galerie spirale, ~/MMR/src) --- */
+/* En absolu, pas en fixe : pas de contexte d'empilement, le header et le titre passent au-dessus
+   de l'image des transitions (z-index 5), comme dans les salles */
+.accueil { position: absolute; inset: 0; background: var(--fond); }
+.accueil__toile { position: fixed; inset: 0; touch-action: none; cursor: grab; }
+.accueil__toile:active { cursor: grabbing; }
+/* Flèches précédente / suivante (bloc Figma « SliderControls ») */
+.accueil__fleches {
+  position: fixed; z-index: 20; left: 50%; bottom: var(--marge); transform: translateX(-50%);
+  display: flex; gap: 8px;
+}
+.accueil__toile canvas { display: block; width: 100% !important; height: 100% !important; }
+
+.accueil__carte {
+  position: fixed; inset: 0; z-index: 10; padding: 0 1.5rem;
+  display: flex; align-items: center; justify-content: center; pointer-events: none;
+}
+.accueil__info {
+  display: flex; flex-direction: column; align-items: center; gap: 1rem;
+  text-align: center; max-width: min(1400px, 92vw);
+}
+.accueil__titre {
+  margin: 0; font-family: var(--titre); font-weight: 400;
+  font-size: clamp(1.8rem, 7vw, 6rem); line-height: 0.8;
+  text-transform: uppercase; text-wrap: balance; max-width: 60vw;
+}
+/* Masques de lettres (SplitText) : de la marge pour les accents, compensée (voir README de la galerie) */
+.accueil__titre .char-mask, .salle-accueil__titre .char-mask { padding-block: 0.25em 0.15em; margin-block: -0.25em -0.15em; }
+/* Un mot ne se coupe jamais entre deux lettres (il dépasse plutôt, comme le texte non découpé) */
+.accueil__titre .word, .salle-accueil__titre .word { white-space: nowrap; }
+.accueil__cta {
+  display: inline-flex; align-items: center; justify-content: center;
+  height: var(--haut); padding: 0 1.5rem; border-radius: var(--rayon);
+  pointer-events: auto; text-decoration: none;
+  background: #fff; color: #000; font-weight: 500; font-size: 14px;
+  transition: background-color 0.25s ease;
+  opacity: 0; /* affiché par Overlay.js, une fois son texte posé */
+}
+.accueil__cta:hover { background: #ececec; }
+
+/* Transitions vers les salles (ui/Transition.tsx) : la spirale, figée, grandit avec la carte ;
+   le titre part et revient lettre par lettre (Overlay.js), le centre du header s'efface */
+.accueil__fleches { transition: opacity 0.3s ease; }
+.accueil--transition .accueil__fleches { opacity: 0; pointer-events: none; }
+/* Retour d'une salle : la spirale se prépare, cachée, sous la salle (main.tsx) */
+.accueil--cachee { visibility: hidden; }
+.accueil--transition .accueil__cta { pointer-events: none; }
+.entete__centre { transition: opacity 0.45s ease, visibility 0.45s; }
+.accueil--transition .entete__centre, .salle-ui--transition .entete__centre { opacity: 0; visibility: hidden; }
+
+/* --- Transition spirale ↔ salle : canvas plein écran (ui/ToileTransition.ts) -- */
+/* Au-dessus des canvas, sous le texte de la spirale et l'interface de la salle (z-index 10) */
+.transition { position: fixed; inset: 0; z-index: 5; }
+.transition[hidden] { display: none; }
+.transition__toile { display: block; width: 100%; height: 100%; }
+
+/* --- Salle ------------------------------------------------------------ */
+.scene { position: fixed; inset: 0; }
+/* Salle en préparation sous la spirale, pendant le zoom d'entrée (ui/Transition.tsx) */
+.page-oeuvre--cachee { visibility: hidden; }
+.canvas3d { touch-action: none; }
+
+/* Vignette sombre de la maquette (dégradé radial en « produit », 50 %) */
+.salle-ui__vignette {
+  position: fixed; inset: 0; z-index: 1; pointer-events: none; mix-blend-mode: multiply; opacity: 0.5;
+  background: radial-gradient(ellipse farthest-corner at 50% 50%,
+    rgba(66, 45, 19, 0) 0%, rgba(33, 23, 10, 0.5) 50%, rgba(17, 11, 5, 0.75) 75%, #000 100%);
+}
+
+/*
+ * Premier écran, à gauche (maquette 445:275) : grille de 3 colonnes (marges 24),
+ * il occupe la première (544 px en 1680), avec 96 px de marge intérieure et sans fond.
+ * Marges et titres se resserrent en dessous de 1680 px.
+ */
+.salle-accueil {
+  --p: clamp(32px, calc(9.6vw - 65px), 96px); /* 96 px en 1680, 50 px en 1200 */
+  position: fixed; z-index: 10; top: 50%; transform: translateY(-50%);
+  max-height: calc(100% - 2 * (var(--marge) + var(--haut) + 16px));
+  padding: var(--p); overflow: hidden auto;
+  transition: opacity 0.45s ease, visibility 0.45s, transform 0.6s cubic-bezier(.2,.7,.2,1);
+  left: var(--marge); width: clamp(380px, calc((100vw - 48px) / 3), 560px);
+  display: flex; flex-direction: column; justify-content: safe center; gap: clamp(48px, 5.7vw, 96px);
+  pointer-events: none; /* les zones vides laissent passer le regard et le scroll */
+}
+.salle-accueil > * { pointer-events: auto; }
+.salle-accueil--cache { opacity: 0; visibility: hidden; transform: translate(-24px, -50%); }
+
+.salle-accueil__haut { display: flex; flex-direction: column; gap: 24px; }
+.salle-accueil__titre {
+  margin: 0; font-family: var(--titre); font-weight: 400; text-transform: uppercase;
+  font-size: clamp(40px, 3.57vw, 60px); line-height: 1;
+}
+.salle-accueil__liens { display: flex; flex-direction: column; }
+
+/* Liens Maladie et Manifeste, qui ouvrent les popups */
+.lien-popup {
+  appearance: none; background: none; border: 0; border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+  cursor: pointer; text-align: left; width: 100%;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
+  padding: 24px 6px; transition: border-color 0.2s ease;
+}
+.lien-popup--maladie { padding-bottom: 36px; }
+.lien-popup:hover { border-bottom-color: #fff; }
+.lien-popup__libelle { font-weight: 700; font-size: 16px; line-height: 25px; text-transform: uppercase; }
+.lien-popup__maladie { font-size: clamp(24px, 1.9vw, 32px); line-height: 25px; }
+.lien-popup__libelle, .lien-popup__maladie { display: inline-flex; align-items: center; gap: 12px; }
+.lien-popup svg { flex: none; transition: transform 0.25s ease; }
+.lien-popup:hover svg { transform: translateX(4px); }
+
+.salle-accueil__bas { display: flex; flex-direction: column; align-items: flex-start; gap: 24px; }
+.soutien { display: flex; flex-direction: column; gap: 12px; padding: 24px 0; }
+.soutien__libelle { margin: 0; font-size: 16px; line-height: 30px; }
+.soutien__logo { display: block; width: 162px; height: 24px; }
+.soutien__nom { margin: 0; font-weight: 700; font-size: 20px; letter-spacing: 0.02em; text-transform: uppercase; line-height: 24px; }
+.pilule--partage { gap: 8px; padding: 0 32px 0 24px; }
+
+/*
+ * Popup (src/ui/Popup.tsx ; maquettes 447:602 et 448:911, dessinées en 1680 × 1050).
+ * Grille de la maquette : 5 colonnes de 288 px entre deux marges de 120 px, sans
+ * gouttière. Le popup occupe les deux dernières colonnes (576 px), centré
+ * verticalement, avec 96 px de marge intérieure : le texte tient sur 384 px.
+ * Plus petit que 1680 px, la grille rétrécit avec la fenêtre ; le texte garde ses
+ * 384 px tant que possible (mêmes retours à la ligne) et c'est la marge qui diminue.
+ * Sur un écran peu haut, la marge haute et basse diminue, puis le contenu défile.
+ */
+.popup {
+  --grille-marge: min(120px, 7.143vw);
+  --largeur: max(400px, calc((100vw - 2 * var(--grille-marge)) * 2 / 5));
+  --marge-x: clamp(40px, calc((var(--largeur) - 384px) / 2), 96px);
+  --marge-y: clamp(48px, calc(20vh - 114px), 96px); /* 96 px dès 1050 px de haut */
+  position: fixed; z-index: 10; top: 50%; right: var(--grille-marge); width: var(--largeur);
+  max-height: calc(100% - 2 * (var(--marge) + var(--haut) + 12px)); /* entre le header et le pied */
+  display: flex; flex-direction: column; border-radius: var(--rayon);
+  background: var(--verre-sombre); backdrop-filter: var(--flou); -webkit-backdrop-filter: var(--flou);
+  opacity: 0; visibility: hidden; transform: translate(24px, -50%);
+  transition: opacity 0.45s ease, visibility 0.45s, transform 0.6s cubic-bezier(.2,.7,.2,1);
+}
+.popup--ouvert {
+  opacity: 1; visibility: visible; transform: translateY(-50%);
+  transition-duration: 0.45s, 0s, 0.6s; /* visible tout de suite : la croix peut prendre le focus */
+}
+/* Croix : bouton de 48 px à 12 px du coin, sans fond */
+.popup__fermer { position: absolute; z-index: 1; top: 12px; right: 12px; background: transparent; }
+.popup__fermer:hover { background: var(--verre-leger); }
+.popup__defilement { overflow: hidden auto; overscroll-behavior: contain; padding: var(--marge-y) var(--marge-x); }
+/* Blocs espacés de 24 px */
+.popup__contenu { display: flex; flex-direction: column; gap: 24px; }
+
+.popup__entete { display: flex; flex-direction: column; gap: 12px; }
+.popup__entete--titre { margin-bottom: 11px; } /* le texte commence 35 px sous le grand titre */
+.popup__surtitre { margin: 0; font-weight: 700; font-size: 16px; line-height: 25px; text-transform: uppercase; }
+.popup__titre {
+  margin: 0; font-family: var(--titre); font-weight: 400; text-transform: uppercase;
+  font-size: 48px; line-height: 48px;
+}
+.popup__texte p { margin: 0 0 24px; font-size: 16px; line-height: 24px; white-space: pre-line; }
+.popup__texte p:last-child { margin-bottom: 0; }
+/* Sous le grand titre, la maquette resserre le texte à 366 px (retours à la ligne identiques) */
+.popup__entete--titre + .popup__texte { max-width: 95.45%; }
+
+.popup__chiffres { margin: 0; }
+.popup__chiffre {
+  display: flex; flex-direction: column; padding: 24px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+  font-weight: 700; line-height: 25px; text-transform: uppercase;
+}
+.popup__chiffre dt { font-size: 14px; }
+.popup__chiffre dd { margin: 0; font-size: 24px; }
+.popup__lien { align-self: flex-start; }
+
+/* Écrans peu hauts (portables) : premier écran resserré pour que tout tienne sans défiler */
+@media (max-height: 900px) and (min-width: 761px) {
+  .salle-accueil { padding-block: 32px; gap: 32px; }
+  .soutien { padding: 0; }
+  .lien-popup { padding-block: 16px; }
+  .lien-popup--maladie { padding-bottom: 24px; }
+}
+
+.pied {
+  position: fixed; z-index: 10; left: var(--marge); right: var(--marge); bottom: 36px;
+  display: flex; justify-content: space-between; align-items: center; pointer-events: none;
+}
+.pied > * { pointer-events: auto; }
+.pied__suivante { padding: 0 22px 0 24px; }
+/* Pendant le passage par le couloir, l'interface s'efface (elle revient avec la nouvelle œuvre) */
+.salle-ui--passage .salle-accueil, .salle-ui--passage .aide { opacity: 0; visibility: hidden; }
+.pied .pilule:disabled { cursor: default; opacity: 0.5; }
+
+.aide {
+  position: fixed; z-index: 10; left: 50%; bottom: calc(36px + var(--haut) / 2); transform: translate(-50%, 50%);
+  margin: 0; max-width: calc(100vw - 32px); padding: 8px 16px; border-radius: var(--rayon);
+  background: var(--verre-sombre); backdrop-filter: var(--flou); -webkit-backdrop-filter: var(--flou);
+  font-size: 13px; text-align: center; cursor: pointer; animation: apparition 0.6s 1.2s both;
+}
+
+/* --- Chargement d'une salle ------------------------------------------- */
+.chargement {
+  position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 28px; background: var(--fond);
+  transition: opacity 0.6s ease;
+}
+.chargement--fin { opacity: 0; pointer-events: none; }
+/* En entrant depuis la spirale : la barre seule, en bas, sur l'image de la carte */
+/* Transition avec la spirale : l'interface de la salle s'efface (voir InterfaceSalle) ; le
+   premier écran, lui, part et revient lettre par lettre (ui/apparition.ts) */
+.salle-ui--transition .aide, .salle-ui--transition .pied { opacity: 0; visibility: hidden; }
+.pied { transition: opacity 0.45s ease, visibility 0.45s; }
+.chargement--discret { background: transparent; justify-content: flex-end; padding-bottom: 48px; pointer-events: none; }
+.chargement__logo { height: 64px; width: auto; }
+.chargement__barre { width: 180px; height: 2px; background: rgba(255, 255, 255, 0.15); }
+.chargement__barre span { display: block; height: 100%; background: #fff; transition: width 0.3s; }
+
+/* --- Pages classiques ------------------------------------------------- */
+.page-classique { position: fixed; inset: 0; overflow-y: auto; }
+.page {
+  position: relative; max-width: 680px; margin: 140px auto 80px; padding: 0 24px;
+  animation: apparition 0.7s cubic-bezier(.2,.7,.2,1) both;
+}
+.page h1 { font-family: var(--titre); font-weight: normal; font-size: clamp(36px, 6vw, 64px); margin: 0 0 24px; text-transform: uppercase; line-height: 1; }
+.page p { font-size: 18px; line-height: 1.65; opacity: 0.92; }
+.page__chapo { font-size: 22px !important; }
+
+@keyframes apparition { from { opacity: 0; transform: translateY(16px); } }
+
+/* --- Mobile ------------------------------------------------------------ */
+@media (max-width: 760px) {
+  :root { --marge: 12px; --haut: 40px; }
+  .entete__logo { height: 24px; margin-top: 8px; }
+  .entete__centre .pilule__texte { display: none; }
+  .entete__centre .pilule { padding: 0 1px; }
+  .onglets__onglet { height: 32px; padding: 0 12px; font-size: 13px; }
+  .bouton-rond { border-radius: 20px; }
+
+  /* Premier écran et popup : en bas, au-dessus des boutons précédente / suivante */
+  .salle-accueil, .popup {
+    left: 12px; right: 12px; width: auto; top: auto; bottom: calc(12px + var(--haut) + 12px);
+    max-height: 52%; border-radius: var(--rayon);
+  }
+  .salle-accueil {
+    --p: 24px;
+    justify-content: flex-start; gap: 16px; transform: none;
+    background: var(--verre-sombre); backdrop-filter: var(--flou); -webkit-backdrop-filter: var(--flou);
+  }
+  .salle-accueil--cache { transform: translateY(24px); }
+  .popup { --marge-x: 24px; --marge-y: 24px; max-height: 60%; transform: translateY(24px); }
+  .popup--ouvert { transform: none; }
+  .salle-accueil__haut { gap: 8px; }
+  .salle-accueil__titre { font-size: 28px; }
+  .lien-popup, .lien-popup--maladie { padding: 12px 4px; gap: 4px; }
+  .lien-popup__maladie { font-size: 20px; }
+  .salle-accueil__bas { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+  .soutien { padding: 0; gap: 4px; }
+  .soutien__libelle { font-size: 13px; line-height: 18px; }
+  .soutien__logo { width: 108px; height: 16px; }
+  .popup__fermer { top: 4px; right: 4px; }
+  .popup__entete { padding-right: 32px; }
+  .popup__titre { font-size: 32px; line-height: 32px; }
+  .popup__texte p { font-size: 15px; line-height: 22px; }
+  .popup__entete--titre + .popup__texte { max-width: none; }
+  .popup__chiffre { padding: 16px 4px; }
+  .popup__chiffre dd { font-size: 20px; }
+
+  .pied { bottom: 12px; }
+  .pied .pilule { width: var(--haut); padding: 0; justify-content: center; }
+  .pied .pilule span { display: none; }
+  .aide { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page, .aide { animation: none; }
+  .salle-accueil, .popup { transition: opacity 0.3s ease, visibility 0.3s; }
+}

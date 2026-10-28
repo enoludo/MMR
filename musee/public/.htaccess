@@ -1,0 +1,6 @@
+# Serveur Apache : toutes les adresses du site (/oeuvre/..., /a-propos) renvoient vers index.html,
+# sauf les fichiers qui existent vraiment (images, modèles 3D, scripts).
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.html [L]

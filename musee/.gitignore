@@ -1,0 +1,17 @@
+# Réinstallés ou refaits : npm install, npm run build
+node_modules
+dist
+*.tsbuildinfo
+
+# Clé d'accès Vercel : jamais sur GitHub
+.env*
+.vercel
+
+# Blender : copies de sauvegarde, calculs de lumière bruts (48 à 64 Mo chacun, recalculables
+# avec salle.py ; les lightmaps finales sont dans public/models)
+*.blend1
+blender/salle/*.exr
+
+# Fichiers temporaires
+_a_supprimer
+.DS_Store

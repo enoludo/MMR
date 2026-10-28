@@ -1,0 +1,10 @@
+# Fichiers non nécessaires à la mise en ligne (Vercel reconstruit le site à partir des sources)
+node_modules
+dist
+blender
+references
+_a_supprimer
+*.blend
+*.blend1
+*.exr
+Mettre en ligne.command
