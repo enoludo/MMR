@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { resolutionMax } from '../resolution'
 import { FORMAT_CAPTURE, entree, type ReglagesTransition } from '../entree'
 import type { ReglagesCapture } from '../ui/ToileTransition'
 
@@ -80,8 +81,9 @@ export async function capturer({
   await images(4)
   try {
     // Image : telle qu'à l'écran, en double résolution
+    // (à partir de la résolution pleine : la résolution adaptative a pu la baisser)
     const ratio = gl.getPixelRatio()
-    gl.setPixelRatio(ratio * 2)
+    gl.setPixelRatio(resolutionMax() * 2)
     gl.render(scene, camera)
     const image = document.createElement('canvas')
     image.width = gl.domElement.width

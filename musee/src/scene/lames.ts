@@ -47,3 +47,48 @@ export const GLSL_LAMES = /* glsl */ `
     return clamp(l, 0.0, 1.0);
   }
 `
+
+/** Taille de la table des lames (largeur du faisceau × hauteur) */
+const TABLE_LARGEUR = 2048
+const TABLE_HAUTEUR = 64
+
+const lisse = (a: number, b: number, x: number) => {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)))
+  return t * t * (3 - 2 * t)
+}
+
+/**
+ * `lames(q)` précalculée une fois pour toutes, sur la largeur du faisceau (x de −demiX à demiX)
+ * et sa hauteur (y de 0 à haut) : le faisceau la lit au lieu de la recalculer à chaque pas de
+ * sa marche (12 pas × 6 lames par pixel, le plus gros de son coût). Même calcul que GLSL_LAMES ;
+ * la lumière ne varie que lentement en hauteur, 64 rangées suffisent (lecture interpolée).
+ */
+export function tableLames(soleil: SalleConfig['soleil'], demiX: number, haut: number) {
+  const u = uniformsLames(soleil)
+  const vides = u.uVides.value.slice(0, u.uNbVides.value)
+  const donnees = new Uint16Array(TABLE_LARGEUR * TABLE_HAUTEUR)
+  for (let j = 0; j < TABLE_HAUTEUR; j++) {
+    const y = ((j + 0.5) / TABLE_HAUTEUR) * haut
+    const flou = 0.04 + u.uFlouLames.value * Math.max(u.uHautLames.value - y, 0)
+    for (let i = 0; i < TABLE_LARGEUR; i++) {
+      const x = ((i + 0.5) / TABLE_LARGEUR - 0.5) * 2 * demiX
+      let l = vides.length ? 0 : 1
+      for (const v of vides) l += lisse(v.x - flou, v.x + flou, x) * (1 - lisse(v.y - flou, v.y + flou, x))
+      donnees[j * TABLE_LARGEUR + i] = THREE.DataUtils.toHalfFloat(Math.min(1, Math.max(0, l)))
+    }
+  }
+  const texture = new THREE.DataTexture(donnees, TABLE_LARGEUR, TABLE_HAUTEUR, THREE.RedFormat, THREE.HalfFloatType)
+  texture.minFilter = texture.magFilter = THREE.LinearFilter
+  texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping
+  texture.needsUpdate = true
+  return { uTableLames: { value: texture }, uTableEchelle: { value: new THREE.Vector2(demiX, haut) } }
+}
+
+/** `float lamesTable(vec3 q)` : lecture de tableLames, q dans le repère du faisceau */
+export const GLSL_TABLE_LAMES = /* glsl */ `
+  uniform sampler2D uTableLames;
+  uniform vec2 uTableEchelle;
+  float lamesTable(vec3 q) {
+    return texture2D(uTableLames, vec2(q.x / (2.0 * uTableEchelle.x) + 0.5, q.y / uTableEchelle.y)).r;
+  }
+`

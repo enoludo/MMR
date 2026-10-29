@@ -1,6 +1,5 @@
-import { Suspense, useEffect, useRef, type ReactNode } from 'react'
+import { Suspense, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { AdaptiveDpr, PerformanceMonitor } from '@react-three/drei'
 import { useControls } from 'leva'
 import { useLocation } from 'react-router-dom'
 import * as THREE from 'three'
@@ -14,6 +13,7 @@ import { store, useEtat, type SalleVisitee } from '../store'
 import type { Porte } from '../salles/types'
 import { oeuvres } from '../oeuvres'
 import { captureSalle } from '../transition'
+import { ResolutionAdaptative, qualite, resolutionMax } from '../resolution'
 
 const salleDe = (v: SalleVisitee) => (oeuvres.find((o) => o.id === v.oeuvre) ?? oeuvres[0]).salle
 /** Salle au bout d'un couloir : celle de l'œuvre suivante par la sortie, précédente par l'entrée (comme InterfaceSalle) ; aucune pour une impasse */
@@ -44,7 +44,9 @@ export function Experience() {
   const rendu = useControls('Rendu', {
     exposition: { value: 3.4, min: 0.5, max: 15, step: 0.1 },
     focale: { value: 55, min: 30, max: 90, step: 1, label: 'champ de vision (°)' },
+    plancher: { value: qualite.plancher, min: 1, max: 2, step: 0.25, label: 'résolution minimale' },
   })
+  qualite.plancher = rendu.plancher
   if (!visitee) return null
   const salle = salleDe(visitee)
   const arrivee = passage && { visite: passage, config: salleDe(passage) }
@@ -57,7 +59,7 @@ export function Experience() {
       shadows="percentage"
       frameloop={enPreparation || quittee ? 'never' : 'always'}
       className="canvas3d"
-      dpr={[1, 2]}
+      dpr={resolutionMax()}
       camera={{ fov: rendu.focale, near: 0.05, far: 150, position: [0, 0, 0] }}
       gl={{ antialias: true, powerPreference: 'high-performance' }}
       onCreated={({ gl }) => {
@@ -70,9 +72,7 @@ export function Experience() {
       <ReglagesRendu exposition={rendu.exposition} />
       <Capture />
       <color attach="background" args={['#0d0b0a']} />
-      {/* Baisse automatiquement la résolution si la machine peine */}
-      <PerformanceMonitor />
-      <AdaptiveDpr pixelated={false} />
+      <Resolution />
       {/* Chaque salle a son propre chargement : la salle d'arrivée ne suspend pas l'autre */}
       <SalleEnPlace key={visitee.cle} cle={visitee.cle} placement={ORIGINE}>
         <Salle config={salle} />
@@ -188,6 +188,17 @@ function Preparation({ cle }: { cle: number }) {
       fini = true
     }
   }, [gl, scene, camera, advance, cle])
+  return null
+}
+
+/** Baisse la résolution si la machine peine, la remonte quand elle suit (voir resolution.ts) */
+function Resolution() {
+  const setDpr = useThree((s) => s.setDpr)
+  const resolution = useMemo(() => new ResolutionAdaptative(setDpr), [setDpr])
+  useFrame((_, dt) => {
+    const { transition, salleAffichee, salle } = store.get()
+    resolution.image(dt, !!transition || !salle || salle.cle !== salleAffichee)
+  })
   return null
 }
 

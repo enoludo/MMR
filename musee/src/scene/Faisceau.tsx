@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useControls } from 'leva'
 import * as THREE from 'three'
 import type { SalleConfig } from '../salles/types'
-import { GLSL_LAMES, uniformsLames } from './lames'
+import { GLSL_TABLE_LAMES, tableLames } from './lames'
 
 /**
  * Faisceau de soleil visible dans l'air (lumière volumétrique simplifiée).
@@ -13,7 +13,8 @@ import { GLSL_LAMES, uniformsLames } from './lames'
  * traverse de « lumière », plus le pixel s'éclaire. On obtient un faisceau
  * aux bords naturellement adoucis, quel que soit le point de vue, y compris
  * quand on se tient dedans. Coût : un seul prisme, un calcul analytique.
- * Les lames du puits le découpent en bandes (lames.ts).
+ * Les lames du puits le découpent en bandes (lames.ts), lues dans une table précalculée :
+ * les recalculer à chaque pas doublait le coût du faisceau.
  */
 export function Faisceau({ config }: { config: SalleConfig }) {
   const f = useControls('Faisceau', {
@@ -46,7 +47,8 @@ export function Faisceau({ config }: { config: SalleConfig }) {
       uHaut: { value: haut },
       uPente: { value: pente },
       uDemi: { value: new THREE.Vector2(ouverture[0] / 2, ouverture[1] / 2) },
-      ...uniformsLames(config.soleil),
+      // Lames précalculées (lames.ts) ; même demi-largeur que le pavé élargi du shader (demiExt)
+      ...tableLames(config.soleil, (ouverture[0] / 2) * 1.25, haut.y),
     }
     return { geometrie: g, uniforms }
   }, [config.soleil])
@@ -72,7 +74,7 @@ export function Faisceau({ config }: { config: SalleConfig }) {
           uniform vec2 uDemi;
           varying vec3 vMonde;
           varying vec3 vCamera;
-          ${GLSL_LAMES}
+          ${GLSL_TABLE_LAMES}
 
           // Passage dans le repère du faisceau : le prisme oblique y devient un pavé droit
           vec3 versFaisceau(vec3 p) {
@@ -104,7 +106,7 @@ export function Faisceau({ config }: { config: SalleConfig }) {
             for (int i = 0; i < N; i++) {
               vec3 q = a + d * (entree + (float(i) + 0.5) * pas);
               float bord = max(abs(q.x) / uDemi.x, abs(q.z) / uDemi.y); // 1 = bord du puits
-              float coeur = (1.0 - smoothstep(0.6, 1.22, bord)) * lames(q); // bords flous, bandes des lames
+              float coeur = (1.0 - smoothstep(0.6, 1.22, bord)) * lamesTable(q); // bords flous, bandes des lames
               float h = q.y / uHaut.y;
               // plus dense vers le bas, et s'efface juste sous le plafond
               float hauteur = smoothstep(0.0, 0.15, h) * mix(1.0, 0.5, h) * (1.0 - smoothstep(0.9, 1.0, h));

@@ -10,6 +10,7 @@ import { EnTete } from '../ui/EnTete'
 import { store, useEtat } from '../store'
 import { carteVivante, entrer, prechargerOeuvre } from '../transition'
 import { imagePrete } from '../ui/ToileTransition'
+import { ResolutionAdaptative } from '../resolution'
 
 /** Une carte restée centrée ce temps-là (ms) : on précharge sa salle */
 const DELAI_PRECHARGEMENT = 1000
@@ -81,9 +82,15 @@ export function Accueil() {
           .catch(() => {})
           .then(() => (prete = true)),
       )
+    // Baisse la résolution si la machine peine, la remonte quand elle suit (voir resolution.ts)
+    const resolution = new ResolutionAdaptative((r) => galerie.renderer.setPixelRatio(r))
+    let avant = performance.now()
     const animer = () => {
       raf = requestAnimationFrame(animer)
       const transition = store.get().transition
+      const maintenant = performance.now()
+      resolution.image((maintenant - avant) / 1000, !!transition || !prete)
+      avant = maintenant
       const versSalle = transition?.sens === 'entree' && (transition.phase === 'preparation' || transition.phase === 'zoom')
       // Entrée : la carte cliquée vient se placer exactement au centre (la même position qu'au retour),
       // l'image de la transition la suit ; sinon, figée pendant une transition
