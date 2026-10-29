@@ -5,7 +5,7 @@ import * as THREE from 'three'
 import type { SalleConfig, Vec3 } from '../salles/types'
 import { store, useEtat, type Sens } from '../store'
 import { CALQUE_REFLET } from './Reflet'
-import { REGARD_ENTREE, avancee, champEntree, entree, poseEntree } from '../entree'
+import { avancee, champEntree, entree, poseEntree, reglagesTransition } from '../entree'
 import { LONGUEUR_COULOIR, groupesSalles, matricePlacement, placementArrivee, portesDuPassage } from './passage'
 
 /**
@@ -80,25 +80,19 @@ export function Navigation({
   const canvas = useThree((s) => s.gl.domElement)
   const scene = useThree((s) => s.scene)
   const gl = useThree((s) => s.gl)
-  const p = config.parcours
-  const [cx, cz] = p.centre
-
-  const reglages = useControls('Navigation', {
-    rayon: { value: p.rayon, min: 4.5, max: 14, step: 0.1, label: 'rayon du cercle (m)' },
-    rayonLointain: { value: p.rayonLointain, min: 6, max: 14, step: 0.1, label: 'rayon de la vue d’arrivée (m)' },
-    rayonProche: { value: p.rayonProche, min: 3, max: 9, step: 0.1, label: 'rayon du cercle réduit (m)' },
-    vitesse: { value: 1, min: 0.2, max: 3, step: 0.05, label: 'vitesse du scroll' },
-    amorti: { value: 3, min: 0.5, max: 12, step: 0.1, label: 'réactivité du déplacement' },
-    regardBas: { value: p.regard.bas, min: 0, max: 6, step: 0.1, label: 'regard le plus bas, souris en bas (m)' },
-    regardHaut: { value: p.regard.haut, min: 3, max: 14, step: 0.1, label: 'regard le plus haut, souris en haut (m)' },
-    regardAmorti: { value: 2.5, min: 0.5, max: 12, step: 0.1, label: 'réactivité du regard' },
-    ecart: { value: 0.6, min: 0, max: 3, step: 0.05, label: 'écart horizontal du regard (m)' },
-    auto: { value: 1, min: 0, max: 6, step: 0.1, label: 'déplacement auto (°/s)' },
-    duree: { value: 2.8, min: 0.5, max: 6, step: 0.1, label: 'durée des transitions (s)' },
-    dureePassage: { value: 8, min: 1, max: 15, step: 0.1, label: 'durée du passage par le couloir (s)' },
-  }, [config.id]) // chaque salle a son parcours (une œuvre de 3 m n'est pas vue comme une œuvre de 10 m)
-  const r = useRef(reglages)
-  r.current = reglages
+  // Salle où l'on est : celle de la page, ou déjà celle d'arrivée dès la fin d'un passage
+  // (arriver(), avant que la page ne suive). Tout se lit ici, jamais dans une valeur gardée
+  // d'un rendu précédent : sinon, à l'arrivée, on reprend un instant le parcours de la salle quittée
+  const salle = useRef(config)
+  const configPrecedente = useRef(config)
+  if (configPrecedente.current !== config) {
+    configPrecedente.current = config
+    salle.current = config
+  }
+  const P = () => salle.current.parcours
+  /** Réglages de navigation de la salle où l'on est (chaque salle a les siens) */
+  const r = { get current() { return reglagesNavigation(salle.current) } }
+  const p = config.parcours // valeurs de départ seulement
 
   // État de la navigation (mutable : rien ne doit provoquer de rendu React)
   const n = useRef({
@@ -167,24 +161,29 @@ export function Navigation({
 
   /** La vue initiale (vue d'arrivée, regard sans la souris), point d'arrivée de l'entrée depuis la spirale */
   const vueInitiale = () => ({
-    centre: p.centre,
-    angle: p.angleDepart,
+    centre: P().centre,
+    angle: P().angleDepart,
     rayon: r.current.rayonLointain,
-    hauteurYeux: p.hauteurYeux,
-    regard: lerp(r.current.regardBas, r.current.regardHaut, REGARD_ENTREE),
+    hauteurYeux: P().hauteurYeux,
+    regard: lerp(r.current.regardBas, r.current.regardHaut, reglagesTransition(salle.current).regard),
+    recul: reglagesTransition(salle.current).recul,
   })
 
   const versCyl = (v: THREE.Vector3 | Vec3): Cyl => {
+    const [cx, cz] = P().centre
     const [x, y, z] = Array.isArray(v) ? v : [v.x, v.y, v.z]
     return { angle: Math.atan2(x - cx, z - cz), rayon: Math.hypot(x - cx, z - cz), y }
   }
-  const depuisCyl = (c: Cyl, out: THREE.Vector3) =>
-    out.set(cx + c.rayon * Math.sin(c.angle), c.y, cz + c.rayon * Math.cos(c.angle))
+  const depuisCyl = (c: Cyl, out: THREE.Vector3) => {
+    const [cx, cz] = P().centre
+    return out.set(cx + c.rayon * Math.sin(c.angle), c.y, cz + c.rayon * Math.cos(c.angle))
+  }
 
   /** Point regardé depuis le cercle, selon la souris */
   const cibleCercle = (angle: number, out: THREE.Vector3) => {
     const s = n.current
     const { regardBas, regardHaut, ecart } = r.current
+    const [cx, cz] = P().centre
     const lateral = s.sourisXLisse * ecart // vers la droite de l'écran
     return out.set(cx + Math.cos(angle) * lateral, lerp(regardBas, regardHaut, s.sourisLisse), cz - Math.sin(angle) * lateral)
   }
@@ -203,7 +202,7 @@ export function Navigation({
   }
 
   function allerEtape(i: number) {
-    const e = config.etapes[i]
+    const e = salle.current.etapes[i]
     const s = n.current
     if (!e || s.mode === 'passage' || s.mode === 'sortie') return
     if (s.mode === 'cercle' || s.mode === 'retour') s.angleMemoire = s.angle // position exacte sur l'anneau
@@ -219,7 +218,7 @@ export function Navigation({
     s.mode = 'retour'
     s.anneau = 'cercle' // on revient toujours sur le cercle de la visite
     s.angle = s.angleCible = s.angleMemoire
-    demarrerTransition({ angle: s.angleMemoire, rayon: r.current.rayon, y: p.hauteurYeux })
+    demarrerTransition({ angle: s.angleMemoire, rayon: r.current.rayon, y: P().hauteurYeux })
     store.set({ etape: null, arrive: false })
   }
 
@@ -268,8 +267,9 @@ export function Navigation({
   function demarrerPassage(cle: number, arrivee: SalleConfig, sens: Sens) {
     const s = n.current
     const g = r.current
-    const y = p.hauteurYeux
-    const { porte, porteArrivee } = portesDuPassage(config, arrivee, sens)
+    const y = P().hauteurYeux
+    const [cx, cz] = P().centre
+    const { porte, porteArrivee } = portesDuPassage(salle.current, arrivee, sens)
     matricePlacement(placementArrivee(porte, porteArrivee), s.arrivee3d)
 
     const seuil = new THREE.Vector3(...porte.position)
@@ -291,8 +291,8 @@ export function Navigation({
     // l'œuvre sur l'anneau de la vue d'arrivée quand on entre par l'autre côté
     const pa = arrivee.parcours
     const [ax, az] = pa.centre
-    // Rayon de la vue d'arrivée : celui de la salle d'arrivée (le réglage en cours vaut pour celle-ci)
-    const rl = pa === p ? g.rayonLointain : pa.rayonLointain
+    // Rayon de la vue d'arrivée : celui de la salle d'arrivée
+    const rl = reglagesNavigation(arrivee).rayonLointain
     const degagement = new THREE.Vector3(...porteArrivee.position)
       .addScaledVector(new THREE.Vector3(...porteArrivee.direction).normalize(), -APPROCHE)
       .setY(pa.hauteurYeux)
@@ -328,9 +328,7 @@ export function Navigation({
   function cibleArrivee(arrivee: SalleConfig, out: THREE.Vector3) {
     const s = n.current
     const { ecart } = r.current
-    const autre = arrivee.parcours !== p
-    const regardBas = autre ? arrivee.parcours.regard.bas : r.current.regardBas
-    const regardHaut = autre ? arrivee.parcours.regard.haut : r.current.regardHaut
+    const { regardBas, regardHaut } = reglagesNavigation(arrivee)
     const [ax, az] = arrivee.parcours.centre
     const lateral = s.sourisXLisse * ecart
     const a = s.angleArrivee
@@ -345,17 +343,19 @@ export function Navigation({
    */
   function arriver(pos: THREE.Vector3, cible: THREE.Vector3) {
     const s = n.current
+    // On est désormais dans la salle d'arrivée : son parcours et ses réglages valent dès cette image
+    if (configArrivee) salle.current = configArrivee
     tmp.inverse.copy(s.arrivee3d).invert()
     pos.applyMatrix4(tmp.inverse)
     cible.applyMatrix4(tmp.inverse)
-    const { salle, passage } = store.get()
+    const { salle: visitee, passage } = store.get()
     const groupe = groupesSalles.get(s.cleArrivee)
     if (groupe) {
       groupe.position.set(0, 0, 0)
       groupe.rotation.set(0, 0, 0)
       groupe.updateMatrixWorld(true)
     }
-    const depart = salle && groupesSalles.get(salle.cle)
+    const depart = visitee && groupesSalles.get(visitee.cle)
     if (depart && depart !== groupe) depart.visible = false
     s.mode = 'cercle'
     s.anneau = 'loin'
@@ -488,7 +488,7 @@ export function Navigation({
     if (transition?.sens === 'sortie' && transition.phase === 'retour' && s.mode !== 'sortie' && s.mode !== 'passage') {
       s.mode = 'sortie'
       s.enEntree = false
-      demarrerTransition({ angle: p.angleDepart, rayon: g.rayonLointain, y: p.hauteurYeux })
+      demarrerTransition({ angle: P().angleDepart, rayon: g.rayonLointain, y: P().hauteurYeux })
       const distance = depuisCyl(s.arrivee, tmp.pos).distanceTo(camera.position)
       // 0,6 s au moins : le temps que le titre et les liens partent, lettre par lettre (ui/apparition.ts)
       s.duree = reduitMouvement() ? 0 : borner(distance / 10, 0.6, 2)
@@ -519,7 +519,7 @@ export function Navigation({
     s.rayon = instant || s.mode !== 'cercle' ? rayonDe(s.anneau) : amortir(s.rayon, rayonDe(s.anneau), 1.4, dt)
 
     if (s.mode === 'cercle') {
-      depuisCyl({ angle: s.angle, rayon: s.rayon, y: p.hauteurYeux }, pos)
+      depuisCyl({ angle: s.angle, rayon: s.rayon, y: P().hauteurYeux }, pos)
       cibleCercle(s.angle, cible)
       if (s.enEntree) {
         poseEntree(vueInitiale(), u, tmp.posEntree, tmp.cibleEntree)
@@ -527,7 +527,7 @@ export function Navigation({
         const k = lisseEntre(0.85, 1, u)
         pos.lerpVectors(tmp.posEntree, pos, k)
         cible.lerpVectors(tmp.cibleEntree, cible, k)
-        fov = lerp(champEntree(u, focale, camera.aspect), focale, k)
+        fov = lerp(champEntree(u, focale, camera.aspect, reglagesTransition(salle.current).champEnPlus), focale, k)
       }
     } else if (s.mode === 'passage' && s.courbe && configArrivee) {
       s.t = s.duree > 0 ? Math.min(1, s.t + dt / s.duree) : 1
@@ -542,7 +542,7 @@ export function Navigation({
       const uDevant = u + REGARD_DEVANT / longueur
       if (uDevant <= 1) s.courbe.getPointAt(uDevant, tmp.devant)
       else s.courbe.getPointAt(1, tmp.devant).add(s.courbe.getTangentAt(1, tmp.cible).multiplyScalar((uDevant - 1) * longueur))
-      tmp.devant.setY(p.hauteurYeux)
+      tmp.devant.setY(P().hauteurYeux)
       s.devant.x = amortir(s.devant.x, tmp.devant.x, 1.6, dt)
       s.devant.y = amortir(s.devant.y, tmp.devant.y, 1.6, dt)
       s.devant.z = amortir(s.devant.z, tmp.devant.z, 1.6, dt)
@@ -552,7 +552,7 @@ export function Navigation({
       fov = lerp(s.departFov, focale, lisseEntre(0, 0.3, s.t))
       if (s.t >= 1) arriver(pos, cible)
     } else if (s.mode === 'etape') {
-      const e = config.etapes[s.etape]
+      const e = salle.current.etapes[s.etape]
       pos.set(...e.position)
       cible.set(...e.cible)
       fov = e.focale ?? focale
@@ -569,7 +569,7 @@ export function Navigation({
       let cibleFin: THREE.Vector3
       let fovFin = focale
       if (s.mode === 'aller') {
-        const e = config.etapes[s.etape]
+        const e = salle.current.etapes[s.etape]
         cibleFin = tmp.cibleCercle.set(...e.cible)
         fovFin = e.focale ?? focale
       } else if (s.mode === 'sortie') {
@@ -612,7 +612,9 @@ export function Navigation({
       camera,
       scene,
       gl,
-      config,
+      get config() {
+        return salle.current
+      },
       etat: n.current,
       aller: allerEtape,
       retour: revenirAuCercle,
@@ -622,10 +624,76 @@ export function Navigation({
       rayonClic,
       /** Capture de la vue d'entrée (image et profondeur), voir outils/capture.ts */
       capturer: (nom: string) =>
-        import('../outils/capture').then((m) => m.capturer({ gl, scene, camera, etat: n.current, nom, focale })),
+        import('../outils/capture').then((m) => m.capturer({ gl, scene, camera, etat: n.current, nom, focale, transition: reglagesTransition(salle.current) })),
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [camera])
 
+  return <ReglagesNavigationSalle key={config.id} config={config} />
+}
+
+/** Réglages de navigation d'une salle (touche M, « Navigation · <salle> ») */
+export type ReglagesNavigation = {
+  rayon: number
+  rayonLointain: number
+  rayonProche: number
+  vitesse: number
+  amorti: number
+  regardBas: number
+  regardHaut: number
+  regardAmorti: number
+  ecart: number
+  auto: number
+  duree: number
+  dureePassage: number
+}
+
+const navigationParSalle = new Map<string, ReglagesNavigation>()
+/**
+ * Les réglages de navigation d'une salle : son parcours, que la touche M modifie. Un seul objet
+ * par salle, lu à chaque image : jamais ceux d'une autre salle, même quand deux salles sont
+ * montées en même temps (passage, retour vers la spirale).
+ */
+export function reglagesNavigation(config: SalleConfig): ReglagesNavigation {
+  let g = navigationParSalle.get(config.id)
+  if (!g) {
+    const p = config.parcours
+    g = {
+      rayon: p.rayon,
+      rayonLointain: p.rayonLointain,
+      rayonProche: p.rayonProche,
+      vitesse: 1,
+      amorti: 3,
+      regardBas: p.regard.bas,
+      regardHaut: p.regard.haut,
+      regardAmorti: 2.5,
+      ecart: 0.6,
+      auto: 1,
+      duree: 2.8,
+      dureePassage: 8,
+    }
+    navigationParSalle.set(config.id, g)
+  }
+  return g
+}
+
+/** Touche M : un dossier par salle (chaque salle a son parcours : une œuvre de 3 m n'est pas vue comme une œuvre de 10 m) */
+function ReglagesNavigationSalle({ config }: { config: SalleConfig }) {
+  const g = reglagesNavigation(config)
+  const reglages = useControls(`Navigation · ${config.titre}`, {
+    rayon: { value: g.rayon, min: 3, max: 14, step: 0.1, label: 'rayon du cercle (m)' },
+    rayonLointain: { value: g.rayonLointain, min: 3, max: 14, step: 0.1, label: 'rayon de la vue d’arrivée (m)' },
+    rayonProche: { value: g.rayonProche, min: 2, max: 9, step: 0.1, label: 'rayon du cercle réduit (m)' },
+    vitesse: { value: g.vitesse, min: 0.2, max: 3, step: 0.05, label: 'vitesse du scroll' },
+    amorti: { value: g.amorti, min: 0.5, max: 12, step: 0.1, label: 'réactivité du déplacement' },
+    regardBas: { value: g.regardBas, min: 0, max: 6, step: 0.1, label: 'regard le plus bas, souris en bas (m)' },
+    regardHaut: { value: g.regardHaut, min: 1, max: 14, step: 0.1, label: 'regard le plus haut, souris en haut (m)' },
+    regardAmorti: { value: g.regardAmorti, min: 0.5, max: 12, step: 0.1, label: 'réactivité du regard' },
+    ecart: { value: g.ecart, min: 0, max: 3, step: 0.05, label: 'écart horizontal du regard (m)' },
+    auto: { value: g.auto, min: 0, max: 6, step: 0.1, label: 'déplacement auto (°/s)' },
+    duree: { value: g.duree, min: 0.5, max: 6, step: 0.1, label: 'durée des transitions (s)' },
+    dureePassage: { value: g.dureePassage, min: 1, max: 15, step: 0.1, label: 'durée du passage par le couloir (s)' },
+  })
+  Object.assign(g, reglages)
   return null
 }

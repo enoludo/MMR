@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import type { SalleConfig } from './salles/types'
 
 /**
  * Entrée dans une salle depuis la spirale : un seul mouvement de caméra, en ligne droite,
@@ -11,32 +12,57 @@ import * as THREE from 'three'
  * partir de l'heure : l'image et la salle restent superposées pendant le fondu.
  */
 
-/** Recul de la vue d'entrée dans l'axe du regard (m) : 1,65 m au plus, le mur sud est 2 m derrière */
-export const RECUL = 1.6
-/** Champ de vision en plus à la vue d'entrée (°) */
-export const CHAMP_EN_PLUS = 10
 /** Format des captures (largeur / hauteur) */
 export const FORMAT_CAPTURE = 16 / 9
-/**
- * Agrandissement de la capture dans sa carte, sur la spirale : pendant le zoom, le masque
- * s'ouvre jusqu'au plein écran pendant que l'image revient à 1 (on découvre la salle autour)
- */
-export const ZOOM_CARTE = 2
-/** Point regardé : comme la souris aux 55 % de la hauteur de la fenêtre, au centre */
-export const REGARD_ENTREE = 0.55
 
 /**
- * Durées des transitions (s), réglables avec la touche M (« Transitions », ui/Transition.tsx).
+ * Réglages des allers-retours entre la spirale et une salle. Chaque salle a les siens : ceux
+ * par défaut, remplacés par le champ `transition` de sa config, puis par la touche M
+ * (« Transitions · <salle> », ui/Transition.tsx). Recul, champ et regard fixent la vue d'entrée :
+ * après les avoir changés, refaire la capture de la salle (outils/capture.ts).
  * Mouvement d'entrée tant que l'image est seule : u = PART_IMAGE · (1 − exp(−(t/monteeImage)²)),
  * démarrage en douceur ; puis `finSalle` secondes de freinage dans la salle, après le relais.
  */
-export const durees = {
+export type ReglagesTransition = {
+  /** Recul de la vue d'entrée dans l'axe du regard (m) */
+  recul: number
+  /** Champ de vision en plus à la vue d'entrée (°) */
+  champEnPlus: number
+  /**
+   * Agrandissement de la capture dans sa carte, sur la spirale : pendant le zoom, le masque
+   * s'ouvre jusqu'au plein écran pendant que l'image revient à 1 (on découvre la salle autour)
+   */
+  zoomCarte: number
+  /** Point regardé, entre le regard bas et le regard haut du parcours (0,55 : la souris aux 55 % de la hauteur) */
+  regard: number
+  /** Durées (s) */
+  zoomEntree: number
+  fonduEntree: number
+  zoomSortie: number
+  fonduSortie: number
+  monteeImage: number
+  finSalle: number
+}
+
+export const TRANSITION_DEFAUT: ReglagesTransition = {
+  recul: 1.6, // 1,65 m au plus dans la salle du « Seuil » : le mur sud est 2 m derrière
+  champEnPlus: 10,
+  zoomCarte: 2,
+  regard: 0.55,
   zoomEntree: 1.4,
   fonduEntree: 1,
   zoomSortie: 1.4,
   fonduSortie: 0.5,
   monteeImage: 1.6,
   finSalle: 2.2,
+}
+
+const parSalle = new Map<string, ReglagesTransition>()
+/** Les réglages de transition d'une salle (un seul objet par salle : la touche M le modifie) */
+export function reglagesTransition(salle: SalleConfig): ReglagesTransition {
+  let r = parSalle.get(salle.id)
+  if (!r) parSalle.set(salle.id, (r = { ...TRANSITION_DEFAUT, ...salle.transition }))
+  return r
 }
 const PART_IMAGE = 0.6
 
@@ -49,6 +75,8 @@ export const entree = {
   fige: null as number | null,
   /** La salle se prépare : le mouvement n'a pas commencé */
   enAttente: false,
+  /** Réglages de la salle où l'on entre */
+  reglages: TRANSITION_DEFAUT,
 }
 
 /**
@@ -65,22 +93,22 @@ export function temps(maintenant = performance.now()) {
   return horloge.virtuel
 }
 
-const avanceeImage = (t: number) => PART_IMAGE * (1 - Math.exp(-((t / durees.monteeImage) ** 2)))
-const vitesseImage = (t: number) =>
-  ((PART_IMAGE * 2 * t) / durees.monteeImage ** 2) * Math.exp(-((t / durees.monteeImage) ** 2))
+const avanceeImage = (t: number, m: number) => PART_IMAGE * (1 - Math.exp(-((t / m) ** 2)))
+const vitesseImage = (t: number, m: number) => ((PART_IMAGE * 2 * t) / m ** 2) * Math.exp(-((t / m) ** 2))
 
 /** Avancée de l'entrée (0 → 1) ; 1 hors entrée. */
 export function avancee() {
   if (entree.fige !== null) return entree.fige
   if (entree.debut === null) return 1
   if (entree.enAttente) return 0
+  const { monteeImage, finSalle } = entree.reglages
   const t = (temps() - entree.debut) / 1000
-  if (entree.relais === null) return avanceeImage(t)
+  if (entree.relais === null) return avanceeImage(t, monteeImage)
   // Après le relais : on repart de l'avancée et de la vitesse de l'image, et l'on freine jusqu'à 1
   const tr = (entree.relais - entree.debut) / 1000
-  const p0 = avanceeImage(tr)
-  const m0 = Math.min(vitesseImage(tr) * durees.finSalle, 2.5 * (1 - p0))
-  const s = Math.min(1, Math.max(0, (t - tr) / durees.finSalle))
+  const p0 = avanceeImage(tr, monteeImage)
+  const m0 = Math.min(vitesseImage(tr, monteeImage) * finSalle, 2.5 * (1 - p0))
+  const s = Math.min(1, Math.max(0, (t - tr) / finSalle))
   // Courbe d'Hermite : (p0, vitesse m0) → (1, vitesse nulle)
   const s2 = s * s
   const s3 = s2 * s
@@ -95,14 +123,16 @@ export type VueInitiale = {
   hauteurYeux: number
   /** Hauteur du point regardé, sur l'axe de l'œuvre */
   regard: number
+  /** Recul de la vue d'entrée (m) */
+  recul: number
 }
 
-/** Position et point regardé à l'avancée `u` : la vue initiale, reculée de RECUL · (1 − u) dans l'axe du regard. */
+/** Position et point regardé à l'avancée `u` : la vue initiale, reculée de recul · (1 − u) dans l'axe du regard. */
 export function poseEntree(v: VueInitiale, u: number, pos: THREE.Vector3, cible: THREE.Vector3) {
   const [cx, cz] = v.centre
   pos.set(cx + v.rayon * Math.sin(v.angle), v.hauteurYeux, cz + v.rayon * Math.cos(v.angle))
   cible.set(cx, v.regard, cz)
-  const recul = RECUL * (1 - u)
+  const recul = v.recul * (1 - u)
   const d = cible.clone().sub(pos).normalize()
   pos.addScaledVector(d, -recul)
 }
@@ -114,8 +144,8 @@ export const partVisible = (formatEcran: number) => Math.min(1, FORMAT_CAPTURE /
  * Champ de vision vertical de la salle (°) à l'avancée `u`, pour un écran de format donné :
  * à u = 0, celui de la capture plein écran ; à u = 1, la focale de la salle.
  */
-export function champEntree(u: number, focale: number, formatEcran: number) {
+export function champEntree(u: number, focale: number, formatEcran: number, champEnPlus: number) {
   const rad = THREE.MathUtils.degToRad
-  const depart = 2 * Math.atan(Math.tan(rad(focale + CHAMP_EN_PLUS) / 2) * partVisible(formatEcran))
+  const depart = 2 * Math.atan(Math.tan(rad(focale + champEnPlus) / 2) * partVisible(formatEcran))
   return THREE.MathUtils.radToDeg(THREE.MathUtils.lerp(depart, rad(focale), u))
 }

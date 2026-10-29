@@ -6,14 +6,22 @@ import { useLocation } from 'react-router-dom'
 import * as THREE from 'three'
 import { Eclairage, Salle } from './Salle'
 import { Navigation } from './Navigation'
+import { ReglagesTransitionSalle } from '../ui/Transition'
 import { Decentrage } from './Decentrage'
 import { Couloir } from './Couloir'
 import { ORIGINE, groupesSalles, placementArrivee, portesDuPassage, type Placement } from './passage'
 import { store, useEtat, type SalleVisitee } from '../store'
+import type { Porte } from '../salles/types'
 import { oeuvres } from '../oeuvres'
 import { captureSalle } from '../transition'
 
 const salleDe = (v: SalleVisitee) => (oeuvres.find((o) => o.id === v.oeuvre) ?? oeuvres[0]).salle
+/** Salle au bout d'un couloir : celle de l'œuvre suivante par la sortie, précédente par l'entrée (comme InterfaceSalle) ; aucune pour une impasse */
+const salleVoisine = (v: SalleVisitee, porte: Porte) => {
+  const i = oeuvres.findIndex((o) => o.id === v.oeuvre)
+  if (i < 0 || (porte.id !== 'sortie' && porte.id !== 'entree')) return undefined
+  return oeuvres[(i + (porte.id === 'sortie' ? 1 : -1) + oeuvres.length) % oeuvres.length].salle
+}
 
 /**
  * Le canvas 3D des salles. Il reste monté tant qu'on navigue d'œuvre en œuvre ;
@@ -69,7 +77,7 @@ export function Experience() {
       <SalleEnPlace key={visitee.cle} cle={visitee.cle} placement={ORIGINE}>
         <Salle config={salle} />
         {salle.portes.map((p) => (
-          <Couloir key={p.id} config={salle} porte={p} traverse={p === portes?.porte} />
+          <Couloir key={p.id} config={salle} porte={p} traverse={p === portes?.porte} voisine={salleVoisine(visitee, p)} />
         ))}
       </SalleEnPlace>
       {arrivee && portes && (
@@ -82,12 +90,13 @@ export function Experience() {
           {arrivee.config.portes
             .filter((p) => p !== portes.porteArrivee)
             .map((p) => (
-              <Couloir key={p.id} config={arrivee.config} porte={p} traverse={false} />
+              <Couloir key={p.id} config={arrivee.config} porte={p} traverse={false} voisine={salleVoisine(arrivee.visite, p)} />
             ))}
         </SalleEnPlace>
       )}
-      <Eclairage config={salle} configArrivee={arrivee?.config} />
+      <Eclairage config={salle} />
       <Navigation config={salle} configArrivee={arrivee?.config ?? null} focale={rendu.focale} />
+      <ReglagesTransitionSalle key={salle.id} config={salle} />
       <Decentrage />
     </Canvas>
   )

@@ -1,3 +1,4 @@
+import type { ReglagesTransition } from '../entree'
 export type Vec3 = [number, number, number]
 
 /** Étape de la visite : un point de vue particulier, hors du cercle, avec un texte. */
@@ -83,6 +84,8 @@ export interface SalleConfig {
     /** Lueur au pied du socle : rayon du pied en retrait (m, voir GORGE_R dans blender/salle.py) et couleur */
     lueur?: { rayon: number; couleur: string }
   }
+  /** Allers-retours avec la spirale : réglages propres à la salle (sinon ceux par défaut, voir entree.ts) */
+  transition?: Partial<ReglagesTransition>
   /**
    * Portes de la salle : une entrée et une sortie. « Œuvre suivante » part par la sortie et
    * arrive par l'entrée de la salle suivante ; « Œuvre précédente », l'inverse.

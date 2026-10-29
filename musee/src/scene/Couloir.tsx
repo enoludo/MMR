@@ -35,7 +35,22 @@ import { LONGUEUR_COULOIR, matricePlacement, placementCouloir } from './passage'
 /** Fente zénithale du couloir : largeur et profondeur (FENTE, FENTE_P dans blender/salle.py) */
 const FENTE_ZENITHALE: [number, number] = [0.9, 3]
 
-export function Couloir({ config, porte, traverse }: { config: SalleConfig; porte: Porte; traverse: boolean }) {
+export function Couloir({
+  config,
+  porte,
+  traverse,
+  voisine,
+}: {
+  config: SalleConfig
+  porte: Porte
+  traverse: boolean
+  /**
+   * Salle au bout du couloir (œuvre suivante par la sortie, précédente par l'entrée ; aucune pour
+   * une impasse) : les couleurs (pierre, lumière diffuse, soleil des fentes) passent de celles de la
+   * salle à celles de la voisine le long du couloir
+   */
+  voisine?: SalleConfig
+}) {
   const c = useControls('Couloir', {
     soleil: { value: 1.2, min: 0, max: 4, step: 0.01 },
     hauteurSoleil: { value: 32, min: 5, max: 75, step: 1, label: 'hauteur du soleil (°)' },
@@ -56,7 +71,11 @@ export function Couloir({ config, porte, traverse }: { config: SalleConfig; port
     pas: { value: 2, min: 0.6, max: 4, step: 0.05, label: 'écart des fentes (m)' },
     epaisseur: { value: 0.5, min: 0.1, max: 2, step: 0.05, label: 'épaisseur de la paroi (m)' },
     hauteurFente: { value: 14, min: 1, max: 20, step: 0.1, label: 'hauteur des fentes (m)' },
+    // Passage d'une ambiance de couleur à l'autre, entre ces deux distances au seuil (m)
+    debutAmbiance: { value: 2, min: 0, max: 14, step: 0.1, label: 'ambiance de la salle voisine : début (m)' },
+    finAmbiance: { value: 12, min: 0, max: 14, step: 0.1, label: 'ambiance de la salle voisine : fin (m)' },
   })
+  const autre = voisine ?? config
 
   const L = LONGUEUR_COULOIR
   const W = porte.largeur
@@ -126,6 +145,14 @@ export function Couloir({ config, porte, traverse }: { config: SalleConfig; port
       uTeinteDiffus: { value: new THREE.Color(config.ambiance?.couloir ?? new THREE.Color(1, 0.88, 0.76)) },
       uCouleurMur: { value: new THREE.Color(config.matieres.Mur?.couleur ?? '#c4bcb1') },
       uCouleurPlafond: { value: new THREE.Color(config.matieres.Plafond?.couleur ?? '#bcb6af') },
+      // Les mêmes, pour la salle voisine (au bout du couloir)
+      uCouleurSol2: { value: new THREE.Color(autre.matieres.Sol?.couleur ?? '#a29b95') },
+      uTeinteDiffus2: { value: new THREE.Color(autre.ambiance?.couloir ?? new THREE.Color(1, 0.88, 0.76)) },
+      uCouleurMur2: { value: new THREE.Color(autre.matieres.Mur?.couleur ?? '#c4bcb1') },
+      uCouleurPlafond2: { value: new THREE.Color(autre.matieres.Plafond?.couleur ?? '#bcb6af') },
+      uSoleil2: { value: new THREE.Color() },
+      uZenithSoleil2: { value: new THREE.Color() },
+      uFonduAmbiance: { value: new THREE.Vector2(2, 12) },
       uPlacement: { value: matricePlacement(placementCouloir(porte)) },
       uLightmapSalle: { value: lightmap },
       uEchelleSalle: { value: atlas.echelle },
@@ -136,7 +163,7 @@ export function Couloir({ config, porte, traverse }: { config: SalleConfig; port
       uCoteMur: { value: raccords.coteMur || 1 },
       uFonduRaccord: { value: 4 },
     }),
-    [L, W, H, config.matieres, config.soleil, porte, atlas, lightmap, raccords, versCouloir, zenith, zenithale],
+    [L, W, H, config.matieres, config.soleil, autre, porte, atlas, lightmap, raccords, versCouloir, zenith, zenithale],
   )
 
   useEffect(() => {
@@ -149,6 +176,9 @@ export function Couloir({ config, porte, traverse }: { config: SalleConfig; port
       .normalize()
     uniforms.uSoleil.value.set(config.soleil.couleur).multiplyScalar(c.soleil)
     uniforms.uZenithSoleil.value.set(config.soleil.couleur).multiplyScalar(c.zenithal)
+    uniforms.uSoleil2.value.set(autre.soleil.couleur).multiplyScalar(c.soleil)
+    uniforms.uZenithSoleil2.value.set(autre.soleil.couleur).multiplyScalar(c.zenithal)
+    uniforms.uFonduAmbiance.value.set(c.debutAmbiance, Math.max(c.finAmbiance, c.debutAmbiance + 0.01))
     uniforms.uDouceur.value = c.douceur
     uniforms.uAmbiance.value = c.ambiance
     uniforms.uRebond.value = c.rebond * c.soleil
@@ -162,7 +192,7 @@ export function Couloir({ config, porte, traverse }: { config: SalleConfig; port
     uniforms.uFente.value = c.fente
     uniforms.uPremiere.value = fentes.premiere
     uniforms.uNombre.value = fentes.nombre
-  }, [uniforms, c, fentes, H, versCouloir, config.soleil.couleur, azimut])
+  }, [uniforms, c, fentes, H, versCouloir, config.soleil.couleur, autre.soleil.couleur, azimut])
 
   // Parois, sol et plafond : des pavés fusionnés en une seule géométrie
   const geometrie = useMemo(() => {
@@ -263,10 +293,10 @@ export function Couloir({ config, porte, traverse }: { config: SalleConfig; port
         )
         .replace(
           'vec3 outgoingLight = reflectedLight.indirectDiffuse;',
-          'vec3 outgoingLight = couleurCouloir(normalize(vNormLocal)) * pierre(vPosPierre, vNormPierre) * eclairageCouloir(vLocal, normalize(vNormLocal));',
+          'vec3 outgoingLight = couleurCouloir(normalize(vNormLocal), ambianceVoisine(vLocal)) * pierre(vPosPierre, vNormPierre) * eclairageCouloir(vLocal, normalize(vNormLocal));',
         )
     }
-    m.customProgramCacheKey = () => 'couloir-v6'
+    m.customProgramCacheKey = () => 'couloir-v7'
     return m
   }, [uniforms])
 
@@ -285,6 +315,9 @@ export function Couloir({ config, porte, traverse }: { config: SalleConfig; port
         fragmentShader: /* glsl */ `
           ${GLSL_FENTES}
           uniform vec3 uSoleil;
+          uniform vec3 uSoleil2;
+          uniform vec3 uZenithSoleil;
+          uniform vec3 uZenithSoleil2;
           uniform float uBrume;
           uniform float uLongueur;
           varying vec3 vLocal;
@@ -309,18 +342,28 @@ export function Couloir({ config, porte, traverse }: { config: SalleConfig; port
             float decalage = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
             float somme = 0.0;
             float sommeZ = 0.0;
+            // Couleur du soleil le long du rayon (celle de la salle, puis de la voisine)
+            vec3 teinte = vec3(0.0);
+            vec3 teinteZ = vec3(0.0);
             for (int i = 0; i < N; i++) {
               vec3 q = vCamera + d * (entree + (float(i) + decalage) * pas);
-              somme += soleilFentes(q, 0.0);
-              sommeZ += soleilZenith(q, 0.0);
+              float f = ambianceVoisine(q);
+              float s = soleilFentes(q, 0.0);
+              float sz = soleilZenith(q, 0.0);
+              somme += s;
+              sommeZ += sz;
+              teinte += s * mix(uSoleil, uSoleil2, f);
+              teinteZ += sz * mix(uZenithSoleil, uZenithSoleil2, f);
             }
+            teinte /= max(somme, 1e-4);
+            teinteZ /= max(sommeZ, 1e-4);
             float longueur = somme * pas * length(d);
             // Plus lumineux quand on regarde vers le soleil (diffusion vers l'avant)
             float face = pow(max(dot(normalize(d), -uSoleilDir), 0.0), 3.0);
             float lum = (1.0 - exp(-longueur * uBrume)) * (0.5 + 1.5 * face);
             float faceZ = pow(max(dot(normalize(d), -uZenithDir), 0.0), 3.0);
             float lumZ = (1.0 - exp(-sommeZ * pas * length(d) * uBrume)) * (0.5 + 1.5 * faceZ);
-            gl_FragColor = vec4(uSoleil * lum + uZenithSoleil * lumZ, 1.0);
+            gl_FragColor = vec4(teinte * lum + teinteZ * lumZ, 1.0);
           }`,
         transparent: true,
         depthWrite: false,
@@ -383,6 +426,12 @@ uniform float uZenithLargeur;
 uniform float uZenithProfondeur;
 uniform float uZenithFlou;
 uniform float uHauteur;
+uniform vec2 uFonduAmbiance;
+
+// Part de l'ambiance de la salle voisine (0 au seuil → 1 vers le bout du couloir)
+float ambianceVoisine(vec3 p) {
+  return smoothstep(uFonduAmbiance.x, uFonduAmbiance.y, -p.z);
+}
 
 // flouPixel : taille d'un pixel à l'écran (m), pour adoucir les bords trop fins, qui scintilleraient
 float soleilFentes(vec3 p, float flouPixel) {
@@ -435,9 +484,16 @@ uniform vec3 uCouleurSol;
 uniform vec3 uTeinteDiffus;
 uniform vec3 uCouleurMur;
 uniform vec3 uCouleurPlafond;
+uniform vec3 uCouleurSol2;
+uniform vec3 uTeinteDiffus2;
+uniform vec3 uCouleurMur2;
+uniform vec3 uCouleurPlafond2;
+uniform vec3 uSoleil2;
+uniform vec3 uZenithSoleil2;
 
-vec3 couleurCouloir(vec3 n) {
-  return n.y > 0.5 ? uCouleurSol : (n.y < -0.5 ? uCouleurPlafond : uCouleurMur);
+vec3 couleurCouloir(vec3 n, float f) {
+  return n.y > 0.5 ? mix(uCouleurSol, uCouleurSol2, f)
+    : (n.y < -0.5 ? mix(uCouleurPlafond, uCouleurPlafond2, f) : mix(uCouleurMur, uCouleurMur2, f));
 }
 
 uniform sampler2D uLightmapSalle;
@@ -465,14 +521,15 @@ float occlusionCouloir(vec3 p, vec3 n) {
 
 vec3 eclairageCouloir(vec3 p, vec3 n) {
   float flouPixel = length(fwidth(p)) * 0.7;
+  float f = ambianceVoisine(p);
   float direct = max(dot(n, -uSoleilDir), 0.0) * soleilFentes(p, flouPixel);
-  vec3 zenith = uZenithSoleil * max(dot(n, -uZenithDir), 0.0) * soleilZenith(p, flouPixel);
+  vec3 zenith = mix(uZenithSoleil, uZenithSoleil2, f) * max(dot(n, -uZenithDir), 0.0) * soleilZenith(p, flouPixel);
   // La lumière des salles entre par les deux portes et s'éteint vite
   float portes = exp(-max(-p.z, 0.0) / uFonduPorte) + exp(-max(p.z + uLongueur, 0.0) / uFonduPorte);
   // Rebonds : un peu de la lumière des taches de soleil, plus vers le bas
   float rebond = uRebond * (0.55 + 0.45 * n.y) * (0.7 + 0.3 * smoothstep(4.0, 0.0, p.y));
   // Lumière diffuse un peu chaude (rebonds sur la pierre), atténuée dans les coins
-  vec3 diffus = uTeinteDiffus * (uAmbiance + uLumierePorte * portes + rebond) * occlusionCouloir(p, n);
+  vec3 diffus = mix(uTeinteDiffus, uTeinteDiffus2, f) * (uAmbiance + uLumierePorte * portes + rebond) * occlusionCouloir(p, n);
   // Surfaces qui prolongent celles de la salle : au seuil, la lumière précalculée de la salle
   // le long de la ligne de raccord (segment A → B de sa lightmap), fondue avec la profondeur
   bool sol = n.y > 0.5, plafond = n.y < -0.5, mur = !sol && !plafond && n.x * uCoteMur < -0.5;
@@ -487,7 +544,7 @@ vec3 eclairageCouloir(vec3 p, vec3 n) {
     // couloir arrive en fondu, sinon elle s'ajoute au seuil (marche de luminosité)
     zenith *= fondu;
   }
-  return diffus + uSoleil * direct + zenith;
+  return diffus + mix(uSoleil, uSoleil2, f) * direct + zenith;
 }
 `
 

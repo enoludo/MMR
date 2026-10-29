@@ -5,7 +5,8 @@ import { useControls } from 'leva'
 import { lienOeuvre, oeuvres } from '../oeuvres'
 import { store, useEtat, type Cadre, type Transition as EtatTransition } from '../store'
 import { captureSalle, carteVivante } from '../transition'
-import { RECUL, ZOOM_CARTE, avancee, champEntree, durees, entree, partVisible, temps } from '../entree'
+import { avancee, champEntree, entree, partVisible, reglagesTransition, temps } from '../entree'
+import type { SalleConfig } from '../salles/types'
 import { obtenirToile, reglagesCapture } from './ToileTransition'
 
 /** Au-delà, on montre la salle même si elle n'a pas signalé être prête (ms) */
@@ -61,16 +62,6 @@ export function Transition() {
   const naviguerVers = useNavigate()
   const naviguer = useRef(naviguerVers)
   naviguer.current = naviguerVers
-  // Durées (touche M) : la carte remplit l'écran ou s'y réduit, l'image s'efface, mouvement d'entrée
-  const reglages = useControls('Transitions', {
-    zoomEntree: { value: durees.zoomEntree, min: 0.3, max: 4, step: 0.05, label: 'entrée : zoom de la carte (s)' },
-    fonduEntree: { value: durees.fonduEntree, min: 0.2, max: 3, step: 0.05, label: 'entrée : fondu sur la salle (s)' },
-    monteeImage: { value: durees.monteeImage, min: 0.5, max: 4, step: 0.05, label: 'entrée : avancée dans l’image (s)' },
-    finSalle: { value: durees.finSalle, min: 0.5, max: 5, step: 0.05, label: 'entrée : fin dans la salle (s)' },
-    zoomSortie: { value: durees.zoomSortie, min: 0.3, max: 4, step: 0.05, label: 'retour : réduction (s)' },
-    fonduSortie: { value: durees.fonduSortie, min: 0.1, max: 2, step: 0.05, label: 'retour : fondu sur la carte (s)' },
-  })
-  Object.assign(durees, reglages)
   const conteneur = useRef<HTMLDivElement>(null)
   /** Valeurs animées par GSAP, lues à chaque image : avancement du zoom (adouci) et opacité */
   const anim = useRef({ zoom: 0, opacite: 1 })
@@ -96,6 +87,8 @@ export function Transition() {
   useLayoutEffect(() => {
     const t = store.get().transition
     if (!t || !oeuvre) return
+    // Réglages de la salle de l'œuvre (chaque salle a les siens)
+    const rt = reglagesTransition(oeuvre.salle)
     const vite = reduitMouvement() ? 0 : 1
     const a = anim.current
     const suite = (partiel: Partial<EtatTransition> | null) => {
@@ -111,6 +104,7 @@ export function Transition() {
       entree.debut = vite ? temps() : null
       entree.relais = null
       entree.enAttente = true
+      entree.reglages = rt
       naviguer.current(lienOeuvre(oeuvre))
       let fait = false
       const lancer = () => {
@@ -140,7 +134,7 @@ export function Transition() {
       }
       const tween = gsap.to(a, {
         zoom: 1,
-        duration: (t.sens === 'entree' ? durees.zoomEntree : durees.zoomSortie) * vite,
+        duration: (t.sens === 'entree' ? rt.zoomEntree : rt.zoomSortie) * vite,
         // Au retour, la réduction démarre plus franchement : la caméra vient de s'arrêter à la vue initiale
         ease: t.sens === 'entree' ? 'power3.inOut' : 'power2.inOut',
         onComplete: () => suite({ phase: t.sens === 'entree' ? 'attente' : 'fondu' }),
@@ -198,7 +192,7 @@ export function Transition() {
     if (t.phase === 'fondu') {
       const tween = gsap.to(a, {
         opacite: 0,
-        duration: (t.sens === 'entree' ? durees.fonduEntree : durees.fonduSortie) * vite,
+        duration: (t.sens === 'entree' ? rt.fonduEntree : rt.fonduSortie) * vite,
         ease: 'power1.inOut',
         onComplete: () => suite(null),
       })
@@ -228,6 +222,7 @@ export function Transition() {
       const boite = !carte ? plein : t.sens === 'entree' ? entre(carte, plein, a.zoom) : entre(plein, carte, a.zoom)
 
       const r = reglagesCapture(o.vueEntree)
+      const rt = reglagesTransition(o.salle)
       spirale = document.querySelector<HTMLElement>('.accueil__toile')
       if (spirale && carte) suivreSpirale(spirale, carte, boite, r.format)
 
@@ -236,16 +231,17 @@ export function Transition() {
       const u = t.sens === 'entree' ? avancee() : 1 - a.zoom
       // Champ du contenu : celui de la salle à la même avancée, ramené à l'image entière
       const format = plein.largeur / plein.hauteur
-      const champSalle = (champEntree(u, r.focale, format) * Math.PI) / 180
+      const champSalle = (champEntree(u, r.focale, format, rt.champEnPlus) * Math.PI) / 180
       const champ = ((2 * Math.atan(Math.tan(champSalle / 2) / partVisible(format))) * 180) / Math.PI
       t0.dessiner({
         boite,
         image: o.image,
         vueEntree: o.vueEntree,
-        avance: RECUL * u,
+        avance: rt.recul * u,
+        recul: rt.recul,
         champ,
         // Effet de masque : la capture, agrandie dans sa carte, revient à 1 quand la boîte occupe l'écran
-        zoom: o.vueEntree ? 1 + (ZOOM_CARTE - 1) * (t.sens === 'entree' ? 1 - a.zoom : a.zoom) : 1,
+        zoom: o.vueEntree ? 1 + (rt.zoomCarte - 1) * (t.sens === 'entree' ? 1 - a.zoom : a.zoom) : 1,
         photo: t.sens === 'sortie' ? t.image : null,
         // Sortie : la photo de la salle se fond dans l'image de l'œuvre pendant qu'elle se réduit
         melange: t.sens === 'sortie' ? 1 - lisse(0.15, 0.75, a.zoom) : 0,
@@ -283,4 +279,27 @@ export function Transition() {
   }, [active])
 
   return <div className="transition" ref={conteneur} hidden={!transition} aria-hidden />
+}
+
+/**
+ * Réglages des allers-retours avec la spirale de la salle affichée (touche M, « Transitions · <salle> ») :
+ * chaque salle a les siens (entree.ts, `reglagesTransition`). Recul, champ et regard changent la vue
+ * d'entrée : refaire la capture de la salle ensuite.
+ */
+export function ReglagesTransitionSalle({ config }: { config: SalleConfig }) {
+  const rt = reglagesTransition(config)
+  const reglages = useControls(`Transitions · ${config.titre}`, {
+    zoomEntree: { value: rt.zoomEntree, min: 0.3, max: 4, step: 0.05, label: 'entrée : zoom de la carte (s)' },
+    fonduEntree: { value: rt.fonduEntree, min: 0.2, max: 3, step: 0.05, label: 'entrée : fondu sur la salle (s)' },
+    monteeImage: { value: rt.monteeImage, min: 0.5, max: 4, step: 0.05, label: 'entrée : avancée dans l’image (s)' },
+    finSalle: { value: rt.finSalle, min: 0.5, max: 5, step: 0.05, label: 'entrée : fin dans la salle (s)' },
+    zoomSortie: { value: rt.zoomSortie, min: 0.3, max: 4, step: 0.05, label: 'retour : réduction (s)' },
+    fonduSortie: { value: rt.fonduSortie, min: 0.1, max: 2, step: 0.05, label: 'retour : fondu sur la carte (s)' },
+    recul: { value: rt.recul, min: 0, max: 6, step: 0.05, label: 'recul de la vue d’entrée (m, refaire la capture)' },
+    champEnPlus: { value: rt.champEnPlus, min: 0, max: 30, step: 0.5, label: 'champ en plus à l’entrée (°, refaire la capture)' },
+    regard: { value: rt.regard, min: 0, max: 1, step: 0.01, label: 'regard de la vue initiale (0 bas → 1 haut)' },
+    zoomCarte: { value: rt.zoomCarte, min: 1, max: 3, step: 0.05, label: 'agrandissement dans la carte (au rechargement)' },
+  })
+  Object.assign(rt, reglages)
+  return null
 }

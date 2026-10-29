@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import type { Cadre } from '../store'
-import { CHAMP_EN_PLUS, FORMAT_CAPTURE, RECUL } from '../entree'
+import { FORMAT_CAPTURE, TRANSITION_DEFAUT } from '../entree'
 
 /**
  * Canvas plein écran des transitions spirale ↔ salle (piloté par ui/Transition.tsx) : il
@@ -33,6 +33,8 @@ export type Dessin = {
   vueEntree?: string
   /** Avancée de la caméra dans l'image (m) et champ du contenu (°) */
   avance: number
+  /** Recul de la vue d'entrée de la salle (m) : la photo du retour est prise à cette avancée */
+  recul: number
   champ: number
   /** Agrandissement de l'image dans la boîte (effet de masque ; 1 = elle la couvre juste) */
   zoom: number
@@ -270,7 +272,7 @@ export const imagePrete = (url: string) => pretes.has('i' + url)
 /** Réglages de la capture de l'œuvre s'ils sont chargés, sinon ceux par défaut (image sans profondeur) */
 export function reglagesCapture(vueEntree?: string): ReglagesCapture {
   const r = vueEntree && (pretes.get('r' + vueEntree) as ReglagesCapture | undefined)
-  return r || { champ: 55 + CHAMP_EN_PLUS, focale: 55, format: FORMAT_CAPTURE, zProche: 1, zLoin: 60 }
+  return r || { champ: 55 + TRANSITION_DEFAUT.champEnPlus, focale: 55, format: FORMAT_CAPTURE, zProche: 1, zLoin: 60 }
 }
 
 let toile: ToileTransition | null = null
@@ -319,7 +321,7 @@ export class ToileTransition {
         uOpacite: { value: 1 },
         uVignette: { value: 0 },
         uEclairage: { value: 1 },
-        uAvancePhoto: { value: RECUL },
+        uAvancePhoto: { value: TRANSITION_DEFAUT.recul },
         uTanPhoto: { value: 1 },
       },
     })
@@ -386,7 +388,8 @@ export class ToileTransition {
     u.uOpacite.value = d.opacite
     u.uVignette.value = d.vignette
     u.uEclairage.value = d.eclairage
-    // La photo est prise à la vue initiale (avancée RECUL), avec la focale de la salle
+    // La photo est prise à la vue initiale (avancée du recul de la salle), avec la focale de la salle
+    u.uAvancePhoto.value = d.recul
     u.uTanPhoto.value = Math.tan(THREE.MathUtils.degToRad(r.focale) / 2)
     this.rendu.render(this.scene, this.camera)
   }

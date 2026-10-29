@@ -1,6 +1,6 @@
 import type { SalleConfig } from './salles/types'
 import { salleProvisoire, salleProvisoireBleue } from './salles/provisoire/config'
-import { ZOOM_CARTE } from './entree'
+import { reglagesTransition } from './entree'
 
 /**
  * Ce qu'affiche la salle (maquette Figma, écrans 445:275, 447:602, 448:911) :
@@ -85,7 +85,9 @@ export const oeuvres: Oeuvre[] = [
     id: 'la-maladie-de-huntington',
     titre: 'La maladie de Huntington',
     maladie: 'Maladie de Huntington',
-    image: '/assets/images/la-maladie-de-huntington.webp',
+    // Capture de sa salle (vue d'entrée, outils/capture.ts) ; l'ancien visuel : /assets/images/la-maladie-de-huntington.webp
+    image: '/assets/captures/la-maladie-de-huntington.webp',
+    vueEntree: '/assets/captures/la-maladie-de-huntington',
     maladieTexte: maladieAVenir('Maladie de Huntington'),
     manifeste: A_VENIR,
     salle: salleProvisoireBleue, // ambiance bleutée, comme sa vignette
@@ -145,6 +147,6 @@ export const cartesSpirale = [...oeuvres.slice(1), oeuvres[0]].map((o) => ({
   title: o.titre,
   cta: 'Découvrir',
   link: lienOeuvre(o),
-  /** Une capture de salle est montrée agrandie (×2) dans sa carte (effet de masque des transitions) */
-  zoom: o.vueEntree ? ZOOM_CARTE : 1,
+  /** Une capture de salle est montrée agrandie (×2 par défaut) dans sa carte (effet de masque des transitions) */
+  zoom: o.vueEntree ? reglagesTransition(o.salle).zoomCarte : 1,
 }))

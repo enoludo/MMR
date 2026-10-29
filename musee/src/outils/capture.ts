@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { CHAMP_EN_PLUS, FORMAT_CAPTURE, RECUL, entree } from '../entree'
+import { FORMAT_CAPTURE, entree, type ReglagesTransition } from '../entree'
 import type { ReglagesCapture } from '../ui/ToileTransition'
 
 /**
@@ -59,6 +59,7 @@ export async function capturer({
   etat,
   nom,
   focale,
+  transition,
 }: {
   gl: THREE.WebGLRenderer
   scene: THREE.Scene
@@ -67,6 +68,8 @@ export async function capturer({
   etat: { enEntree: boolean }
   nom: string
   focale: number
+  /** Réglages de transition de la salle (recul et champ de la vue d'entrée) */
+  transition: ReglagesTransition
 }) {
   const { width, height } = gl.domElement
   if (Math.abs(width / height - FORMAT_CAPTURE) > 0.01) throw new Error(`le canvas doit être en 16:9 (${width} × ${height})`)
@@ -121,9 +124,9 @@ export async function capturer({
       format: FORMAT_CAPTURE,
       zProche: Z_PROCHE,
       zLoin: Z_LOIN,
-      recul: RECUL,
+      recul: transition.recul,
     }
-    if (Math.abs(camera.fov - (focale + CHAMP_EN_PLUS)) > 0.01) console.warn('champ inattendu', camera.fov)
+    if (Math.abs(camera.fov - (focale + transition.champEnPlus)) > 0.01) console.warn('champ inattendu', camera.fov)
     await envoyer(`${nom}.webp`, await enBlob(image, 'image/webp', 0.92))
     await envoyer(`${nom}-profondeur.png`, await enBlob(prof, 'image/png'))
     await envoyer(`${nom}.json`, JSON.stringify(reglages, null, 2))

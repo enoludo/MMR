@@ -7,7 +7,8 @@ import type { SalleConfig } from '../salles/types'
 import { Faisceau } from './Faisceau'
 import { Poussiere } from './Poussiere'
 import { MAX_PORTES, appliquerPierre, creerUniformsSalle, reglerPierre } from './pierre'
-import { store } from '../store'
+import { store, type SalleVisitee } from '../store'
+import { oeuvres } from '../oeuvres'
 import { groupesSalles } from './passage'
 import { prechargerLightmaps, useLightmaps } from './lightmaps'
 import { CALQUE_REFLET, PasseReflet, creerUniformsReflet, preparerSculpture, type UniformsSculpture } from './Reflet'
@@ -126,7 +127,7 @@ export function Salle({ config }: { config: SalleConfig }) {
  * perd dans la tache du puits (et elle est écrêtée, voir lightmap.py) : ruban et halo la font lire.
  */
 function Lueur({ config, lueur }: { config: SalleConfig; lueur: { rayon: number; couleur: string } }) {
-  const l = useControls('Lueur du socle', {
+  const l = useControls(`Lueur du socle · ${config.titre}`, {
     ruban: { value: 6, min: 0, max: 20, step: 0.1 },
     halo: { value: 0.3, min: 0, max: 3, step: 0.01 },
     etendue: { value: 0.1, min: 0.02, max: 1, step: 0.01, label: 'étendue du halo (m)' },
@@ -223,14 +224,14 @@ function Sculpture({
     return copie
   }, [gltf.scene])
 
-  const s = useControls('Sculpture', {
+  const s = useControls(`Sculpture · ${config.titre}`, {
     orientation: { value: config.sculpture.rotationY, min: -180, max: 180, step: 0.5, label: 'orientation (°)' },
     teinte: { value: '#ddd8d2' },
     rugosite: { value: 0.85, min: 0, max: 1, step: 0.01, label: 'rugosité' },
     relief: { value: 1, min: 0, max: 3, step: 0.05 },
     occlusion: { value: 0.9, min: 0, max: 1, step: 0.01, label: 'occlusion (creux, pieds)' },
     occlusionDirecte: { value: 0.35, min: 0, max: 1, step: 0.01, label: 'occlusion sur le soleil' },
-  }, [config.id])
+  }, [config.id]) // un dossier par salle
 
   const uSculpture = useMemo<UniformsSculpture>(
     () => ({
@@ -294,7 +295,7 @@ function Sculpture({
  * d'arrivée recevait aussi l'ambiance de la salle de départ, qui s'éteignait d'un coup à
  * l'arrivée (et toutes les matières étaient recompilées).
  */
-export function Eclairage({ config, configArrivee }: { config: SalleConfig; configArrivee?: SalleConfig | null }) {
+export function Eclairage({ config }: { config: SalleConfig }) {
   const l = useControls('Lumière sculpture', {
     soleil: { value: 0.55, min: 0, max: 3, step: 0.01 },
     ambiance: { value: 0.65, min: 0, max: 2, step: 0.01 },
@@ -304,25 +305,30 @@ export function Eclairage({ config, configArrivee }: { config: SalleConfig; conf
   const hemi = useRef<THREE.HemisphereLight>(null)
   const camera = useThree((e) => e.camera)
   const tmp = useMemo(() => ({ a: new THREE.Color(), b: new THREE.Color() }), [])
+  // Les salles se lisent dans l'état à chaque image, pas dans les propriétés : à la fin d'un passage,
+  // la salle d'arrivée devient la salle actuelle dans l'image même (Navigation.arriver), avant que
+  // la page ne suive ; sinon l'œuvre reprenait un instant la lumière de la salle quittée
   useFrame(() => {
     const h = hemi.current
     if (!h) return
+    const ca = configActuelle() ?? config
+    const cb = configArriveeLue()
     const ga = salleActuelle()
     const gb = salleArrivee()
     let w = 0
-    if (ga && gb && configArrivee) {
+    if (ga && gb && cb) {
       const da = camera.position.distanceTo(ga.position)
       const db = camera.position.distanceTo(gb.position)
       w = THREE.MathUtils.smoothstep((da - db) / 30 + 0.5, 0, 1)
     }
     const amb = (c: SalleConfig | null | undefined) => c?.ambiance ?? AMBIANCE_CHAUDE
-    h.color.copy(tmp.a.set(amb(config).ciel)).lerp(tmp.b.set(amb(configArrivee).ciel), w)
-    h.groundColor.copy(tmp.a.set(amb(config).sol)).lerp(tmp.b.set(amb(configArrivee).sol), w)
+    h.color.copy(tmp.a.set(amb(ca).ciel)).lerp(tmp.b.set(amb(cb).ciel), w)
+    h.groundColor.copy(tmp.a.set(amb(ca).sol)).lerp(tmp.b.set(amb(cb).sol), w)
   })
   return (
     <>
-      <Soleil config={config} force={l.soleil} suivre={salleActuelle} />
-      <Soleil config={config} force={l.soleil} suivre={salleArrivee} couleur={configArrivee?.soleil.couleur} />
+      <Soleil config={config} force={l.soleil} suivre={salleActuelle} lire={configActuelle} />
+      <Soleil config={config} force={l.soleil} suivre={salleArrivee} lire={configArriveeLue} />
       {/* Ambiance froide en haut, chaude en bas (ciel + rebonds sur la pierre), selon la salle où l'on est */}
       <hemisphereLight
         ref={hemi}
@@ -344,6 +350,10 @@ const salleArrivee = () => {
   const v = store.get().passage
   return v ? groupesSalles.get(v.cle) : undefined
 }
+const configDe = (v: SalleVisitee | null) => (v ? (oeuvres.find((o) => o.id === v.oeuvre) ?? oeuvres[0]).salle : undefined)
+/** Config de la salle où l'on est et de la salle d'arrivée, lues dans l'état (à jour dans l'image même de l'arrivée) */
+const configActuelle = () => configDe(store.get().salle)
+const configArriveeLue = () => configDe(store.get().passage)
 
 /**
  * Le soleil du puits, pour la sculpture : un spot lointain dans l'axe du soleil, à découpe
@@ -354,13 +364,14 @@ function Soleil({
   config,
   force,
   suivre,
-  couleur,
+  lire,
 }: {
+  /** Géométrie du soleil (puits, direction, lames) : la même pour toutes les salles */
   config: SalleConfig
   force: number
   suivre: () => THREE.Group | undefined
-  /** Couleur de la salle suivie, si elle diffère de celle de config (ambiance propre à la salle) */
-  couleur?: string
+  /** Config de la salle suivie, lue à chaque image : force et couleur de son soleil (ambiance propre à la salle) */
+  lire: () => SalleConfig | undefined
 }) {
   const groupe = useRef<THREE.Group>(null)
   const { spot, cible, distance } = useMemo(() => {
@@ -392,7 +403,10 @@ function Soleil({
     spot.shadow.camera.up.set(0, 0, 1)
     spot.layers.enable(CALQUE_REFLET) // éclaire aussi la sculpture dans la passe de reflet
     return { spot, cible, distance }
-  }, [config.soleil])
+    // Géométrie seulement : une salle qui ne change que la couleur du soleil garde le même spot (pas
+    // de nouvelle ombre ni de découpe recalculée au moment de l'arrivée)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config.soleil.direction, config.soleil.puits, config.soleil.ouverture, config.soleil.lames])
 
   useFrame(() => {
     const g = suivre()
@@ -401,8 +415,9 @@ function Soleil({
       groupe.current.rotation.copy(g.rotation)
     }
     // Même éclairement que le soleil de Blender : I = E × d² ; éteint (et non retiré) sans salle
-    spot.intensity = g ? config.soleil.force * distance * distance * force : 0
-    spot.color.set(couleur ?? config.soleil.couleur)
+    const c = lire() ?? config
+    spot.intensity = g ? c.soleil.force * distance * distance * force : 0
+    spot.color.set(c.soleil.couleur)
   }, -1.8) // après le recalage de l'arrivée (navigation), avant la passe de reflet
 
   return (

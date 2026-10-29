@@ -153,7 +153,7 @@ export const salleProvisoire: SalleConfig = {
 export const salleProvisoireBleue: SalleConfig = {
   ...salleProvisoire,
   id: 'provisoire-bleue',
-  titre: 'Salle 1 — ambiance bleutée',
+  titre: 'Salle 2 — Huntington', // nom des dossiers de la touche M (« Navigation · Salle 2 — Huntington »)
   modele: '/models/huntington-salle.glb',
   lightmaps: {
     salle: { image: '/models/huntington-salle-lightmap.webp', ...lightmapHuntington },
@@ -166,6 +166,9 @@ export const salleProvisoireBleue: SalleConfig = {
     reflet: false,
     lueur: { rayon: 1.1, couleur: '#e8f0ff' }, // ruban lumineux dans la gorge du socle (1,2 m de rayon)
   },
+  // Vue d'arrivée deux fois plus proche que dans la salle du « Seuil » : recul deux fois plus court,
+  // pour la même parallaxe (sinon les éclats et le bord du socle s'étirent dans l'image de la transition)
+  transition: { recul: 0.8 },
   parcours: {
     centre: [0, 0],
     rayon: 4.5,
