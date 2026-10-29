@@ -63,9 +63,15 @@ const lisse = (a: number, b: number, x: number) => {
  * sa marche (12 pas × 6 lames par pixel, le plus gros de son coût). Même calcul que GLSL_LAMES ;
  * la lumière ne varie que lentement en hauteur, 64 rangées suffisent (lecture interpolée).
  */
+const tables = new Map<string, THREE.DataTexture>()
+
 export function tableLames(soleil: SalleConfig['soleil'], demiX: number, haut: number) {
   const u = uniformsLames(soleil)
   const vides = u.uVides.value.slice(0, u.uNbVides.value)
+  // Une table par jeu de lames (≈ 35 ms à calculer) : les salles qui ont les mêmes la partagent
+  const cle = JSON.stringify([vides, u.uHautLames.value, u.uFlouLames.value, demiX, haut])
+  const dejaLa = tables.get(cle)
+  if (dejaLa) return { uTableLames: { value: dejaLa }, uTableEchelle: { value: new THREE.Vector2(demiX, haut) } }
   const donnees = new Uint16Array(TABLE_LARGEUR * TABLE_HAUTEUR)
   for (let j = 0; j < TABLE_HAUTEUR; j++) {
     const y = ((j + 0.5) / TABLE_HAUTEUR) * haut
@@ -81,6 +87,7 @@ export function tableLames(soleil: SalleConfig['soleil'], demiX: number, haut: n
   texture.minFilter = texture.magFilter = THREE.LinearFilter
   texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping
   texture.needsUpdate = true
+  tables.set(cle, texture)
   return { uTableLames: { value: texture }, uTableEchelle: { value: new THREE.Vector2(demiX, haut) } }
 }
 

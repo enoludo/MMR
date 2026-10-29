@@ -40,6 +40,13 @@ Une entrée par session, la plus récente en haut. Le détail technique est dans
   - **[validé]** **Résolution adaptative** (spirale et salles, `src/resolution.ts`) : sous 50 images/s, l'image 3D est dessinée avec moins de pixels, par pas de 0,25, jusqu'à un plancher de **1,5** (réglable touche M, « Rendu › résolution minimale ») ; elle remonte quand l'image tient 60 images/s pendant 4 s. L'interface n'est pas touchée. Comparaison : `plans/comparaisons/resolution-2-contre-1-5.png` (pierre et poussière un peu plus douces à 1,5).
   - **[validé]** **Faisceau deux fois moins coûteux, image identique** : l'ombre des lames est précalculée dans une table (`tableLames`, `lames.ts`) au lieu d'être recalculée à chaque pas. Salle à pleine résolution : 14 → 23 images/s dans le navigateur intégré. Écart mesuré sur toute l'image : au plus 1 niveau sur 255, sur 0,7 % des pixels (arrondi).
   - Enregistré dans Git (`092a094`, en local) et mis en ligne sur le labo `mmr-lab`.
+  - **[validé]** **Passages entre salles sans attente** :
+    - les fichiers d'une salle partent tous en même temps (avant : l'un après l'autre) ;
+    - pendant la visite, les salles des œuvres précédente et suivante se téléchargent 1,5 s après l'affichage (`PrechargementVoisines`, `Experience.tsx`) : plus rien à télécharger au départ d'un passage (avant : 6 Mo, ≈ 2 s) ;
+    - la salle d'arrivée est préparée cachée (textures envoyées une par image, matières compilées sans bloquer : `PreparationPassage`), puis apparaît au bout du couloir ;
+    - corrigé : chaque nouveau rendu de la scène remettait la résolution au maximum (tout le canvas réalloué, ≈ 0,25 s figée au départ d'un passage) ;
+    - la table des lames du faisceau est partagée entre salles et calculée au préchargement.
+    Pire image pendant un passage : 0,4 s → 0,13 s. Restent deux à-coups de 65 ms (envoi des lightmaps à la carte graphique, que le format KTX2 supprimerait) et le premier dessin de la salle d'arrivée (0,13 s). Image inchangée. Coût restant pendant la traversée : les rayons dans l'air du couloir, qui couvrent tout l'écran (32 points par pixel) ; les alléger toucherait leur rendu.
 
 - **[à voir]** **Ambiance de couleur par salle** : la salle de « La maladie de Huntington » (l'œuvre suivante) est **bleutée** comme sa vignette (gris bleus, lumière blanche froide), sans nouveau calcul de lumière : pierre plus bleue, soleil de l'œuvre, faisceau et poussière plus froids, ambiance de l'œuvre et des couloirs (`salleProvisoireBleue`, champ `ambiance` de la config). Pendant le passage, l'ambiance de l'œuvre glisse d'une salle à l'autre.
 

@@ -4,14 +4,13 @@ import { useGLTF } from '@react-three/drei'
 import { useControls } from 'leva'
 import * as THREE from 'three'
 import type { SalleConfig } from '../salles/types'
-import { Faisceau } from './Faisceau'
+import { Faisceau, tableFaisceau } from './Faisceau'
 import { Poussiere } from './Poussiere'
 import { MAX_PORTES, appliquerPierre, creerUniformsSalle, reglerPierre } from './pierre'
 import { store, type SalleVisitee } from '../store'
 import { oeuvres } from '../oeuvres'
 import { groupesSalles } from './passage'
 import { prechargerLightmaps, useLightmaps } from './lightmaps'
-import { versionne } from '../version'
 import { CALQUE_REFLET, PasseReflet, creerUniformsReflet, preparerSculpture, type UniformsSculpture } from './Reflet'
 
 /** Matières du sol : elles reçoivent le reflet de la sculpture */
@@ -30,6 +29,8 @@ const SOLS = ['Sol', 'SolCentre']
  * la position est calculé dans son repère à elle (voir pierre.ts, Faisceau, Poussière).
  */
 export function Salle({ config }: { config: SalleConfig }) {
+  // Tout part en même temps : sinon chaque fichier n'est demandé qu'une fois le précédent arrivé
+  prechargerSalle(config)
   const gltf = useGLTF(config.modele)
   const scene = useMemo(() => gltf.scene.clone(), [gltf.scene])
   const racine = useRef<THREE.Group>(null)
@@ -465,12 +466,17 @@ function decoupe(soleil: SalleConfig['soleil'], demi: number) {
   return tex
 }
 
-useGLTF.preload(versionne('/models/salle.glb'))
-useGLTF.preload(versionne('/models/sculpture.glb'))
+const prechargees = new Set<string>()
 
-/** Télécharge (et décode) à l'avance tout ce que charge une salle (depuis la spirale, voir transition.ts). */
+/**
+ * Télécharge (et décode) à l'avance tout ce que charge une salle, en parallèle : depuis la spirale
+ * (transition.ts), pour les salles voisines pendant la visite (Experience), et au montage de la salle.
+ */
 export function prechargerSalle(config: SalleConfig) {
+  if (prechargees.has(config.id)) return
+  prechargees.add(config.id)
   useGLTF.preload(config.modele)
   useGLTF.preload(config.sculpture.modele)
+  tableFaisceau(config.soleil)
   prechargerLightmaps(Object.keys(config.lightmaps).map((n) => config.lightmaps[n].image))
 }

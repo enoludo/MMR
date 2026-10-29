@@ -16,6 +16,10 @@ import { GLSL_TABLE_LAMES, tableLames } from './lames'
  * Les lames du puits le découpent en bandes (lames.ts), lues dans une table précalculée :
  * les recalculer à chaque pas doublait le coût du faisceau.
  */
+/** Ombre des lames précalculée (lames.ts) ; même demi-largeur que le pavé élargi du shader (demiExt) */
+export const tableFaisceau = (soleil: SalleConfig['soleil']) =>
+  tableLames(soleil, (soleil.ouverture[0] / 2) * 1.25, soleil.puits[1])
+
 export function Faisceau({ config }: { config: SalleConfig }) {
   const f = useControls('Faisceau', {
     intensite: { value: 0.009, min: 0, max: 0.06, step: 0.001, label: 'intensité' },
@@ -47,8 +51,7 @@ export function Faisceau({ config }: { config: SalleConfig }) {
       uHaut: { value: haut },
       uPente: { value: pente },
       uDemi: { value: new THREE.Vector2(ouverture[0] / 2, ouverture[1] / 2) },
-      // Lames précalculées (lames.ts) ; même demi-largeur que le pavé élargi du shader (demiExt)
-      ...tableLames(config.soleil, (ouverture[0] / 2) * 1.25, haut.y),
+      ...tableFaisceau(config.soleil),
     }
     return { geometrie: g, uniforms }
   }, [config.soleil])

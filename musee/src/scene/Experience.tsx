@@ -1,9 +1,9 @@
-import { Suspense, useEffect, useMemo, useRef, type ReactNode } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useControls } from 'leva'
 import { useLocation } from 'react-router-dom'
 import * as THREE from 'three'
-import { Eclairage, Salle } from './Salle'
+import { Eclairage, Salle, prechargerSalle } from './Salle'
 import { Navigation } from './Navigation'
 import { ReglagesTransitionSalle } from '../ui/Transition'
 import { Decentrage } from './Decentrage'
@@ -13,7 +13,7 @@ import { store, useEtat, type SalleVisitee } from '../store'
 import type { Porte } from '../salles/types'
 import { oeuvres } from '../oeuvres'
 import { captureSalle } from '../transition'
-import { ResolutionAdaptative, qualite, resolutionMax } from '../resolution'
+import { ResolutionAdaptative, qualite } from '../resolution'
 
 const salleDe = (v: SalleVisitee) => (oeuvres.find((o) => o.id === v.oeuvre) ?? oeuvres[0]).salle
 /** Salle au bout d'un couloir : celle de l'œuvre suivante par la sortie, précédente par l'entrée (comme InterfaceSalle) ; aucune pour une impasse */
@@ -47,6 +47,9 @@ export function Experience() {
     plancher: { value: qualite.plancher, min: 1, max: 2, step: 0.25, label: 'résolution minimale' },
   })
   qualite.plancher = rendu.plancher
+  // Le Canvas reçoit la résolution en cours : avec la résolution pleine, chaque rendu (début d'un
+  // passage…) la remettait au maximum et réallouait tout le canvas (≈ 0,25 s figée)
+  const resolution = useMemo(() => new ResolutionAdaptative(() => {}), [])
   if (!visitee) return null
   const salle = salleDe(visitee)
   const arrivee = passage && { visite: passage, config: salleDe(passage) }
@@ -59,7 +62,7 @@ export function Experience() {
       shadows="percentage"
       frameloop={enPreparation || quittee ? 'never' : 'always'}
       className="canvas3d"
-      dpr={resolutionMax()}
+      dpr={resolution.ratio}
       camera={{ fov: rendu.focale, near: 0.05, far: 150, position: [0, 0, 0] }}
       gl={{ antialias: true, powerPreference: 'high-performance' }}
       onCreated={({ gl }) => {
@@ -72,7 +75,8 @@ export function Experience() {
       <ReglagesRendu exposition={rendu.exposition} />
       <Capture />
       <color attach="background" args={['#0d0b0a']} />
-      <Resolution />
+      <Resolution resolution={resolution} />
+      <PrechargementVoisines />
       {/* Chaque salle a son propre chargement : la salle d'arrivée ne suspend pas l'autre */}
       <SalleEnPlace key={visitee.cle} cle={visitee.cle} placement={ORIGINE}>
         <Salle config={salle} />
@@ -112,7 +116,7 @@ function SalleEnPlace({ cle, placement, children }: { cle: number; placement: Pl
   return (
     <group ref={groupe} position={placement.position} rotation-y={placement.rotationY}>
       <Suspense fallback={null}>
-        {children}
+        <PreparationPassage cle={cle}>{children}</PreparationPassage>
         <Enregistrer cle={cle} groupe={groupe} />
         <Affichee cle={cle} />
         <Preparation cle={cle} />
@@ -191,10 +195,85 @@ function Preparation({ cle }: { cle: number }) {
   return null
 }
 
+/**
+ * Passage d'une salle à l'autre : la salle d'arrivée, montée au bout du couloir, reste cachée le
+ * temps d'envoyer ses textures à la carte graphique (une par image) et de compiler ses matières
+ * sans bloquer. Dessinée d'un coup, elle figeait l'image ≈ 0,3 s au départ du passage ; on ne la
+ * voit de toute façon qu'au bout du couloir.
+ */
+function PreparationPassage({ cle, children }: { cle: number; children: ReactNode }) {
+  const { gl, scene, camera } = useThree()
+  const groupe = useRef<THREE.Group>(null)
+  // Cachée dès son premier rendu si elle arrive par un passage
+  const [prete, setPrete] = useState(() => store.get().passage?.cle !== cle)
+  useEffect(() => {
+    const g = groupe.current
+    if (prete || !g) return
+    let fini = false
+    ;(async () => {
+      const textures = new Set<THREE.Texture>()
+      const ajouter = (v: unknown) => {
+        if ((v as THREE.Texture)?.isTexture) textures.add(v as THREE.Texture)
+      }
+      g.traverse((o) => {
+        const m = (o as THREE.Mesh).material
+        for (const matiere of Array.isArray(m) ? m : m ? [m] : []) {
+          Object.values(matiere).forEach(ajouter)
+          const u = (matiere as THREE.ShaderMaterial).uniforms ?? matiere.userData.shader?.uniforms
+          if (u) Object.values(u).forEach((x) => ajouter((x as THREE.IUniform).value))
+        }
+      })
+      for (const t of textures) {
+        if (fini) return
+        gl.initTexture(t)
+        await imageSuivante()
+      }
+      // Matières de la salle cachée, avec les lumières de toute la scène
+      if (!fini) await gl.compileAsync(g, camera, scene)
+      if (!fini) setPrete(true)
+    })()
+    // Par sécurité : au plus tard 2 s après le départ, ou dès qu'on y est arrivé
+    const secours = setTimeout(() => setPrete(true), 2000)
+    const desabonner = store.subscribe(() => {
+      if (store.get().salle?.cle === cle) setPrete(true)
+    })
+    return () => {
+      fini = true
+      clearTimeout(secours)
+      desabonner()
+    }
+  }, [gl, scene, camera, prete, cle])
+  return (
+    <group ref={groupe} visible={prete}>
+      {children}
+    </group>
+  )
+}
+
+/** Délai après l'affichage d'une salle avant de télécharger ses voisines (ms) : elle passe d'abord */
+const DELAI_VOISINES = 1500
+
+/**
+ * Pendant la visite, les salles des œuvres précédente et suivante se téléchargent : le passage
+ * par le couloir ne les attend plus (elles n'étaient demandées qu'au départ, ≈ 2 s).
+ */
+function PrechargementVoisines() {
+  const salle = useEtat((e) => e.salle)
+  const affichee = useEtat((e) => e.salleAffichee)
+  useEffect(() => {
+    if (!salle || salle.cle !== affichee) return
+    const t = setTimeout(() => {
+      const i = oeuvres.findIndex((o) => o.id === salle.oeuvre)
+      for (const d of [1, -1]) prechargerSalle(oeuvres[(i + d + oeuvres.length) % oeuvres.length].salle)
+    }, DELAI_VOISINES)
+    return () => clearTimeout(t)
+  }, [salle, affichee])
+  return null
+}
+
 /** Baisse la résolution si la machine peine, la remonte quand elle suit (voir resolution.ts) */
-function Resolution() {
-  const setDpr = useThree((s) => s.setDpr)
-  const resolution = useMemo(() => new ResolutionAdaptative(setDpr), [setDpr])
+function Resolution({ resolution }: { resolution: ResolutionAdaptative }) {
+  resolution.appliquer = useThree((s) => s.setDpr)
   useFrame((_, dt) => {
     const { transition, salleAffichee, salle } = store.get()
     resolution.image(dt, !!transition || !salle || salle.cle !== salleAffichee)

@@ -31,7 +31,7 @@ export class ResolutionAdaptative {
   private remontee = false
   private essais = 0
 
-  constructor(private appliquer: (ratio: number) => void) {}
+  constructor(public appliquer: (ratio: number) => void) {}
 
   /** À chaque image, avec sa durée (s) ; `pause` pendant un chargement ou une transition */
   image(dt: number, pause = false) {
