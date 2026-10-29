@@ -1,6 +1,7 @@
 import type { SalleConfig } from './salles/types'
 import { salleProvisoire, salleProvisoireBleue } from './salles/provisoire/config'
 import { reglagesTransition } from './entree'
+import { versionne } from './version'
 
 /**
  * Ce qu'affiche la salle (maquette Figma, écrans 445:275, 447:602, 448:911) :
@@ -58,10 +59,10 @@ export const oeuvres: Oeuvre[] = [
     titre: 'Le seuil des proportions',
     maladie: 'Acromégalie',
     // Capture de sa salle (vue d'entrée, outils/capture.ts) ; l'ancien visuel : /assets/images/geant-de-marbre.webp
-    image: '/assets/captures/le-seuil-des-proportions.webp',
+    image: versionne('/assets/captures/le-seuil-des-proportions.webp'),
     vueEntree: '/assets/captures/le-seuil-des-proportions',
     mecene: { nom: 'Fondation Delorme-Vasseur' },
-    partenaire: { nom: 'Recordati', logo: '/assets/logos/recordati.svg' },
+    partenaire: { nom: 'Recordati', logo: versionne('/assets/logos/recordati.svg') },
     // Textes et chiffres de la maquette Figma (chiffres et lien à faire valider)
     maladieTexte: {
       titre: 'Acromégalie',
@@ -86,7 +87,7 @@ export const oeuvres: Oeuvre[] = [
     titre: 'La maladie de Huntington',
     maladie: 'Maladie de Huntington',
     // Capture de sa salle (vue d'entrée, outils/capture.ts) ; l'ancien visuel : /assets/images/la-maladie-de-huntington.webp
-    image: '/assets/captures/la-maladie-de-huntington.webp',
+    image: versionne('/assets/captures/la-maladie-de-huntington.webp'),
     vueEntree: '/assets/captures/la-maladie-de-huntington',
     maladieTexte: maladieAVenir('Maladie de Huntington'),
     manifeste: A_VENIR,
@@ -97,7 +98,7 @@ export const oeuvres: Oeuvre[] = [
     id: 'l-entre-deux',
     titre: "L'entre-deux",
     maladie: '',
-    image: '/assets/images/l-entre-deux.webp',
+    image: versionne('/assets/images/l-entre-deux.webp'),
     maladieTexte: maladieAVenir('À venir'),
     manifeste: A_VENIR,
     salle: salleProvisoire,
@@ -107,7 +108,7 @@ export const oeuvres: Oeuvre[] = [
     id: 'l-erosion-silencieuse',
     titre: "L'érosion silencieuse",
     maladie: '',
-    image: '/assets/images/boucles-sans-titre.webp',
+    image: versionne('/assets/images/boucles-sans-titre.webp'),
     maladieTexte: maladieAVenir('À venir'),
     manifeste: A_VENIR,
     salle: salleProvisoire,
@@ -117,7 +118,7 @@ export const oeuvres: Oeuvre[] = [
     id: 'le-filtre-imparfait',
     titre: 'Le filtre imparfait',
     maladie: '',
-    image: '/assets/images/le-filtre-imparfait.webp',
+    image: versionne('/assets/images/le-filtre-imparfait.webp'),
     maladieTexte: maladieAVenir('À venir'),
     manifeste: A_VENIR,
     salle: salleProvisoire,
@@ -127,7 +128,7 @@ export const oeuvres: Oeuvre[] = [
     id: 'souffle-d-eclats',
     titre: "Souffle d'éclats",
     maladie: '',
-    image: '/assets/images/souffle-declats.webp',
+    image: versionne('/assets/images/souffle-declats.webp'),
     maladieTexte: maladieAVenir('À venir'),
     manifeste: A_VENIR,
     salle: salleProvisoire,

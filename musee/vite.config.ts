@@ -1,7 +1,24 @@
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { mkdir, writeFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
+import { readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
+
+/** Empreinte du contenu de chaque fichier de public/models et public/assets, par adresse (voir src/version.ts) */
+function empreintes() {
+  const publicDir = path.resolve(__dirname, 'public')
+  const resultat: Record<string, string> = {}
+  for (const dossier of ['models', 'assets']) {
+    for (const f of readdirSync(path.join(publicDir, dossier), { recursive: true, withFileTypes: true })) {
+      if (!f.isFile() || f.name.startsWith('.')) continue
+      const chemin = path.join(f.parentPath, f.name)
+      const adresse = '/' + path.relative(publicDir, chemin).split(path.sep).join('/')
+      resultat[adresse] = createHash('sha1').update(readFileSync(chemin)).digest('hex').slice(0, 10)
+    }
+  }
+  return resultat
+}
 
 /**
  * En développement seulement : enregistre dans public/assets/captures les fichiers envoyés
@@ -31,6 +48,7 @@ function enregistrementCaptures(): Plugin {
 
 export default defineConfig({
   plugins: [react(), enregistrementCaptures()],
+  define: { __EMPREINTES__: JSON.stringify(empreintes()) },
   server: { open: true },
   // Mesures de performance sur le site compilé (npx vite preview) : profilage JavaScript autorisé
   preview: { headers: { 'Document-Policy': 'js-profiling' } },

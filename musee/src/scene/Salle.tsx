@@ -11,6 +11,7 @@ import { store, type SalleVisitee } from '../store'
 import { oeuvres } from '../oeuvres'
 import { groupesSalles } from './passage'
 import { prechargerLightmaps, useLightmaps } from './lightmaps'
+import { versionne } from '../version'
 import { CALQUE_REFLET, PasseReflet, creerUniformsReflet, preparerSculpture, type UniformsSculpture } from './Reflet'
 
 /** Matières du sol : elles reçoivent le reflet de la sculpture */
@@ -464,8 +465,8 @@ function decoupe(soleil: SalleConfig['soleil'], demi: number) {
   return tex
 }
 
-useGLTF.preload('/models/salle.glb')
-useGLTF.preload('/models/sculpture.glb')
+useGLTF.preload(versionne('/models/salle.glb'))
+useGLTF.preload(versionne('/models/sculpture.glb'))
 
 /** Télécharge (et décode) à l'avance tout ce que charge une salle (depuis la spirale, voir transition.ts). */
 export function prechargerSalle(config: SalleConfig) {

@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import type { Cadre } from '../store'
 import { FORMAT_CAPTURE, TRANSITION_DEFAUT } from '../entree'
+import { versionne } from '../version'
 
 /**
  * Canvas plein écran des transitions spirale ↔ salle (piloté par ui/Transition.tsx) : il
@@ -231,7 +232,7 @@ function chargerProfondeur(base: string) {
       garder(
         'p' + base,
         // Octets exacts (profondeur codée sur 16 bits) : ni conversion de couleur, ni prémultiplication
-        bitmap(`${base}-profondeur.png`)
+        bitmap(versionne(`${base}-profondeur.png`))
           .then((b) => {
             const t = new THREE.Texture(b)
             t.colorSpace = THREE.NoColorSpace
@@ -248,7 +249,7 @@ function chargerProfondeur(base: string) {
 }
 
 function chargerReglages(base: string) {
-  if (!reglages.has(base)) reglages.set(base, garder('r' + base, fetch(`${base}.json`).then((r) => r.json())))
+  if (!reglages.has(base)) reglages.set(base, garder('r' + base, fetch(versionne(`${base}.json`)).then((r) => r.json())))
   return reglages.get(base)!
 }
 

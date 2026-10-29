@@ -1,3 +1,4 @@
+import { versionne } from '../../version'
 import type { SalleConfig } from '../types'
 import lightmapSalle from './lightmap.json'
 import lightmapMobilier from './lightmap-mobilier.json'
@@ -23,10 +24,10 @@ import lightmapMobilierHuntington from './huntington-lightmap-mobilier.json'
 export const salleProvisoire: SalleConfig = {
   id: 'provisoire',
   titre: 'Salle 1 — Le géant',
-  modele: '/models/salle.glb',
+  modele: versionne('/models/salle.glb'),
   lightmaps: {
-    salle: { image: '/models/salle-lightmap.webp', ...lightmapSalle },
-    mobilier: { image: '/models/salle-lightmap-mobilier.webp', ...lightmapMobilier },
+    salle: { image: versionne('/models/salle-lightmap.webp'), ...lightmapSalle },
+    mobilier: { image: versionne('/models/salle-lightmap-mobilier.webp'), ...lightmapMobilier },
   },
   // Couleur de chaque matière = albédo utilisé dans Blender (même rendu des rebonds)
   matieres: {
@@ -38,7 +39,7 @@ export const salleProvisoire: SalleConfig = {
   },
 
   sculpture: {
-    modele: '/models/sculpture.glb',
+    modele: versionne('/models/sculpture.glb'),
     position: [0, -0.015, 0], // à même le sol, enfoncée de 1,5 cm (voir ENFONCE dans blender/salle.py)
     rotationY: 0,
     echelle: 1.25, // 8 m → 10 m (ECHELLE_OEUVRE dans blender/salle.py)
@@ -154,13 +155,13 @@ export const salleProvisoireBleue: SalleConfig = {
   ...salleProvisoire,
   id: 'provisoire-bleue',
   titre: 'Salle 2 — Huntington', // nom des dossiers de la touche M (« Navigation · Salle 2 — Huntington »)
-  modele: '/models/huntington-salle.glb',
+  modele: versionne('/models/huntington-salle.glb'),
   lightmaps: {
-    salle: { image: '/models/huntington-salle-lightmap.webp', ...lightmapHuntington },
-    mobilier: { image: '/models/huntington-salle-lightmap-mobilier.webp', ...lightmapMobilierHuntington },
+    salle: { image: versionne('/models/huntington-salle-lightmap.webp'), ...lightmapHuntington },
+    mobilier: { image: versionne('/models/huntington-salle-lightmap-mobilier.webp'), ...lightmapMobilierHuntington },
   },
   sculpture: {
-    modele: '/models/huntington.glb',
+    modele: versionne('/models/huntington.glb'),
     position: [0, 0.795, 0], // sur le socle de 80 cm, enfoncée de 5 mm
     rotationY: 0,
     reflet: false,
