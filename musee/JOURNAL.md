@@ -47,6 +47,7 @@ Une entrée par session, la plus récente en haut. Le détail technique est dans
     - corrigé : chaque nouveau rendu de la scène remettait la résolution au maximum (tout le canvas réalloué, ≈ 0,25 s figée au départ d'un passage) ;
     - la table des lames du faisceau est partagée entre salles et calculée au préchargement.
     Pire image pendant un passage : 0,4 s → 0,13 s. Restent deux à-coups de 65 ms (envoi des lightmaps à la carte graphique, que le format KTX2 supprimerait) et le premier dessin de la salle d'arrivée (0,13 s). Image inchangée. Coût restant pendant la traversée : les rayons dans l'air du couloir, qui couvrent tout l'écran (32 points par pixel) ; les alléger toucherait leur rendu.
+    Enregistré dans Git (`3941a86`, en local) et mis en ligne sur le labo `mmr-lab` : passage vérifié en ligne (salle suivante déjà téléchargée, pire image 0,1 s).
 
 - **[à voir]** **Ambiance de couleur par salle** : la salle de « La maladie de Huntington » (l'œuvre suivante) est **bleutée** comme sa vignette (gris bleus, lumière blanche froide), sans nouveau calcul de lumière : pierre plus bleue, soleil de l'œuvre, faisceau et poussière plus froids, ambiance de l'œuvre et des couloirs (`salleProvisoireBleue`, champ `ambiance` de la config). Pendant le passage, l'ambiance de l'œuvre glisse d'une salle à l'autre.
 
