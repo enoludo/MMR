@@ -38,7 +38,7 @@ button { font: inherit; color: inherit; }
   appearance: none; border: 0; cursor: pointer;
   display: grid; place-items: center; flex: none;
   width: var(--haut); height: var(--haut); border-radius: var(--rayon);
-  background: var(--verre); backdrop-filter: var(--flou); -webkit-backdrop-filter: var(--flou);
+  background: var(--verre); -webkit-backdrop-filter: var(--flou); backdrop-filter: var(--flou);
   transition: background-color 0.2s ease;
 }
 .bouton-rond--discret { background: var(--verre-leger); }
@@ -49,7 +49,7 @@ button { font: inherit; color: inherit; }
   appearance: none; border: 0; cursor: pointer; text-decoration: none; white-space: nowrap;
   display: inline-flex; align-items: center; gap: 10px;
   height: var(--haut); padding: 0 24px 0 22px; border-radius: var(--rayon);
-  background: var(--verre); backdrop-filter: var(--flou); -webkit-backdrop-filter: var(--flou);
+  background: var(--verre); -webkit-backdrop-filter: var(--flou); backdrop-filter: var(--flou);
   font-size: 14px; line-height: 1;
   transition: background-color 0.2s ease, border-color 0.2s ease;
 }
@@ -64,7 +64,7 @@ button { font: inherit; color: inherit; }
 /* Onglets (Spirale / Grille ; Info / Maladie / Manifeste) : « TabContainer » */
 .onglets {
   display: flex; height: var(--haut); padding: 4px; border-radius: var(--rayon);
-  background: var(--verre); backdrop-filter: var(--flou); -webkit-backdrop-filter: var(--flou);
+  background: var(--verre); -webkit-backdrop-filter: var(--flou); backdrop-filter: var(--flou);
 }
 .onglets__onglet {
   appearance: none; border: 0; cursor: pointer; background: transparent;
@@ -90,7 +90,7 @@ button { font: inherit; color: inherit; }
   position: fixed; z-index: 29; top: calc(var(--marge) + var(--haut) + 8px); right: var(--marge);
   display: flex; flex-direction: column; min-width: 220px; padding: 8px;
   border-radius: var(--rayon); background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: var(--flou); -webkit-backdrop-filter: var(--flou);
+  -webkit-backdrop-filter: var(--flou); backdrop-filter: var(--flou);
   opacity: 0; transform: translateY(-8px); pointer-events: none;
   transition: opacity 0.25s ease, transform 0.25s ease;
 }
@@ -231,7 +231,7 @@ button { font: inherit; color: inherit; }
   position: fixed; z-index: 10; top: 50%; right: var(--grille-marge); width: var(--largeur);
   max-height: calc(100% - 2 * (var(--marge) + var(--haut) + 12px)); /* entre le header et le pied */
   display: flex; flex-direction: column; border-radius: var(--rayon);
-  background: var(--verre-sombre); backdrop-filter: var(--flou); -webkit-backdrop-filter: var(--flou);
+  background: var(--verre-sombre); -webkit-backdrop-filter: var(--flou); backdrop-filter: var(--flou);
   opacity: 0; visibility: hidden; transform: translate(24px, -50%);
   transition: opacity 0.45s ease, visibility 0.45s, transform 0.6s cubic-bezier(.2,.7,.2,1);
 }
@@ -289,7 +289,7 @@ button { font: inherit; color: inherit; }
 .aide {
   position: fixed; z-index: 10; left: 50%; bottom: calc(36px + var(--haut) / 2); transform: translate(-50%, 50%);
   margin: 0; max-width: calc(100vw - 32px); padding: 8px 16px; border-radius: var(--rayon);
-  background: var(--verre-sombre); backdrop-filter: var(--flou); -webkit-backdrop-filter: var(--flou);
+  background: var(--verre-sombre); -webkit-backdrop-filter: var(--flou); backdrop-filter: var(--flou);
   font-size: 13px; text-align: center; cursor: pointer; animation: apparition 0.6s 1.2s both;
 }
 
@@ -339,7 +339,7 @@ button { font: inherit; color: inherit; }
   .salle-accueil {
     --p: 24px;
     justify-content: flex-start; gap: 16px; transform: none;
-    background: var(--verre-sombre); backdrop-filter: var(--flou); -webkit-backdrop-filter: var(--flou);
+    background: var(--verre-sombre); -webkit-backdrop-filter: var(--flou); backdrop-filter: var(--flou);
   }
   .salle-accueil--cache { transform: translateY(24px); }
   .popup { --marge-x: 24px; --marge-y: 24px; max-height: 60%; transform: translateY(24px); }
