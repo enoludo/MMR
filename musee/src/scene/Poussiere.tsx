@@ -5,7 +5,7 @@ import * as THREE from 'three'
 import type { SalleConfig } from '../salles/types'
 import { GLSL_LAMES, uniformsLames } from './lames'
 
-const MAX = 8000 // grains réservés ; le réglage « densité » n'en affiche qu'une partie
+const MAX = 16000 // grains réservés (8000 avant le 29/10) ; le réglage « densité » n’en affiche qu’une partie
 
 /**
  * Poussière qui flotte dans le faisceau du puits de lumière.

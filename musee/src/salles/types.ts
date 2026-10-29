@@ -41,7 +41,7 @@ export interface Parcours {
  */
 export interface Porte {
   /** Entrée (on arrive par elle en venant de l'œuvre précédente) ou sortie (vers l'œuvre suivante) */
-  id: 'entree' | 'sortie'
+  id: 'entree' | 'sortie' | 'impasse-ouest' | 'impasse-est'
   /** Milieu du seuil, au sol, dans le plan du mur */
   position: Vec3
   /** Direction horizontale vers l'extérieur de la salle (vers le couloir) */
@@ -52,7 +52,14 @@ export interface Porte {
    * Couloir derrière la porte : côté des fentes en partant de la salle (gauche par défaut), et
    * fente zénithale le long de la paroi opposée, entre deux distances au seuil (m).
    */
-  couloir?: { fentes?: 'gauche' | 'droite'; fenteZenithale?: [number, number] }
+  couloir?: {
+    fentes?: 'gauche' | 'droite'
+    fenteZenithale?: [number, number]
+    /** Impasse : fermé au bout, sans passage (il enrichit l'environnement : fentes, lumière) */
+    ferme?: boolean
+    /** Direction du soleil du couloir (°, depuis le nord, 90 = est), si elle diffère du réglage commun */
+    azimut?: number
+  }
 }
 
 /** Description complète d'une salle : ajouter une salle = ajouter un fichier de ce type. */
@@ -98,6 +105,11 @@ export interface SalleConfig {
     force: number
     couleur: string
   }
+  /**
+   * Ambiance de couleur, en plus des couleurs des matières et du soleil : lumière d'ambiance de
+   * l'œuvre (ciel en haut, rebonds en bas) et lumière diffuse des couloirs. Par défaut : chaude.
+   */
+  ambiance?: { ciel: string; sol: string; couloir: string }
   /** Ouvertures sur le ciel (vues depuis l'intérieur) : centre et taille [x, z] */
   ciel: { centre: Vec3; taille: [number, number] }[]
 }

@@ -11,6 +11,17 @@ Une entrée par session, la plus récente en haut. Le détail technique est dans
 
 ---
 
+## 29/10/2026 — Claude Code (salle de 40 m, d'après le plan de Ludovic)
+
+- **[à voir]** **Ambiance de couleur par salle** : la salle de « La maladie de Huntington » (l'œuvre suivante) est **bleutée** comme sa vignette (gris bleus, lumière blanche froide), sans nouveau calcul de lumière : pierre plus bleue, soleil de l'œuvre, faisceau et poussière plus froids, ambiance de l'œuvre et des couloirs (`salleProvisoireBleue`, champ `ambiance` de la config). Pendant le passage, l'ambiance de l'œuvre glisse d'une salle à l'autre.
+
+- **Plan de Ludovic** (`plans/plan salle.svg`, 1 m = 10 px) relevé et redessiné coté : `plans/salle-40.html` (`plans/generer-plan-40.py`). Ses réponses : fentes zénithales de 0,9 m, soleil au sol accepté par les fentes est et sud, couloirs est et ouest en impasse (« pour enrichir l'environnement visuellement »), fentes du couloir entre deux salles à l'est, puits décalé. **[validé]** (plan)
+- **[à voir]** **Salle de 40 × 40 m** dans la 3D : quatre portes en moulinet (sortie nord, entrée sud, impasses ouest et est fermées au bout), quatre colonnes de 4 × 4 m, quatre bancs en arc (10 à 11 m du centre), quatre fentes zénithales de 28 m (lueur sur les murs ouest et nord, bandes de soleil au sol à l'est et au sud), couloirs de 14 × 4 m à 6 fentes de 1 m tous les 2 m. Calcul de lumière définitif, passage vers la salle suivante vérifié, capture de transition refaite (`plans/captures/salle-40-vue-arrivee.png`).
+- Deux fois plus de grains de poussière (16 000). **[à voir]**
+- Salle de 30 m conservée sous l'étiquette Git `salle-30m`. Salle de 40 m enregistrée dans Git (en local, pas envoyée sur GitHub), rien en ligne.
+- À revoir avec Ludovic : vue d'arrivée (un banc passe au premier plan), points de vue Maladie/Manifeste et anneaux de la caméra dans la salle plus grande.
+- **Suite [à voir]** : colonnes passées à **3 × 3 m** (à 4 m des murs). Pas de fente zénithale dans les couloirs : la bande claire vue au plafond du couloir venait d'une lumière fausse au raccord. Cause corrigée : la soudure découpait les grandes faces en triangles très fins (dents de scie au précalcul). Le modèle est maintenant **une grille commune de rectangles** (sol, plafond, murs, colonnes, puits, sas) et la lightmap est **dépliée par plans** (sans couture). Surfaces cachées retirées (sol et plafond dans les colonnes, sol sous les bancs, percé exactement) : plus de taches sombres en haut des colonnes ni de frange au pied des bancs. Calcul définitif, capture refaite.
+
 ## 28-29/10/2026 — Claude Code (refonte de l'architecture de la salle)
 
 - **Plans cotés** (`plans/`, générés par `plans/generer-plan.py`) : `salle-provisoire.html` (la salle d'avant), `salle-refonte.html` (le projet, avec plan, coupes A–A, B–B, C–C, élévation des fentes, récapitulatif). **[vu]**

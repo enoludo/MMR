@@ -53,6 +53,7 @@ export function Couloir({ config, porte, traverse }: { config: SalleConfig; port
     dehors: { value: 1, min: 0, max: 3, step: 0.05, label: 'lumière du dehors' },
     fente: { value: 1, min: 0.05, max: 1.5, step: 0.01, label: 'largeur des fentes (m)' },
     nombre: { value: 6, min: 1, max: 12, step: 1, label: 'nombre de fentes' },
+    pas: { value: 2, min: 0.6, max: 4, step: 0.05, label: 'écart des fentes (m)' },
     epaisseur: { value: 0.5, min: 0.1, max: 2, step: 0.05, label: 'épaisseur de la paroi (m)' },
     hauteurFente: { value: 14, min: 1, max: 20, step: 0.1, label: 'hauteur des fentes (m)' },
   })
@@ -69,11 +70,13 @@ export function Couloir({ config, porte, traverse }: { config: SalleConfig; port
   const lightmap = useLightmap(atlas.image) // la même texture que la salle (lightmaps.ts)
   const raccords = useMemo(() => raccordsSalle(gltf.scene, config, nomAtlas, porte), [gltf.scene, config, nomAtlas, porte])
 
-  // Fentes réparties régulièrement : trumeaux tous égaux, aux deux bouts compris
-  const fentes = useMemo(() => {
-    const trumeau = Math.max((L - c.nombre * c.fente) / (c.nombre + 1), 0.05)
-    return { nombre: c.nombre, pas: trumeau + c.fente, premiere: -(trumeau + c.fente / 2) }
-  }, [L, c.nombre, c.fente])
+  // Fentes régulières, centrées dans la longueur (6 × 1 m tous les 2 m : 1,5 m plein aux bouts)
+  const fentes = useMemo(
+    () => ({ nombre: c.nombre, pas: c.pas, premiere: -(L - (c.nombre - 1) * c.pas) / 2 }),
+    [L, c.nombre, c.pas],
+  )
+  const ferme = !!porte.couloir?.ferme
+  const azimut = porte.couloir?.azimut ?? c.azimut
 
   // Fente zénithale le long de la paroi pleine (+x) : [début, fin] en z (vers l'extérieur, z < 0)
   const zenithale = porte.couloir?.fenteZenithale
@@ -120,6 +123,7 @@ export function Couloir({ config, porte, traverse }: { config: SalleConfig; port
       // Mêmes couleurs que les matières de la salle, et grain calculé dans le repère de la
       // salle : la pierre se prolonge sans raccord visible au passage de la porte
       uCouleurSol: { value: new THREE.Color(config.matieres.Sol?.couleur ?? '#a29b95') },
+      uTeinteDiffus: { value: new THREE.Color(config.ambiance?.couloir ?? new THREE.Color(1, 0.88, 0.76)) },
       uCouleurMur: { value: new THREE.Color(config.matieres.Mur?.couleur ?? '#c4bcb1') },
       uCouleurPlafond: { value: new THREE.Color(config.matieres.Plafond?.couleur ?? '#bcb6af') },
       uPlacement: { value: matricePlacement(placementCouloir(porte)) },
@@ -137,7 +141,7 @@ export function Couloir({ config, porte, traverse }: { config: SalleConfig; port
 
   useEffect(() => {
     const h = THREE.MathUtils.degToRad(c.hauteurSoleil)
-    const a = THREE.MathUtils.degToRad(c.azimut)
+    const a = THREE.MathUtils.degToRad(azimut)
     // Direction de propagation dans le repère de la salle (x = est, −z = nord), puis du couloir
     uniforms.uSoleilDir.value
       .set(-Math.sin(a) * Math.cos(h), -Math.sin(h), Math.cos(a) * Math.cos(h))
@@ -158,7 +162,7 @@ export function Couloir({ config, porte, traverse }: { config: SalleConfig; port
     uniforms.uFente.value = c.fente
     uniforms.uPremiere.value = fentes.premiere
     uniforms.uNombre.value = fentes.nombre
-  }, [uniforms, c, fentes, H, versCouloir, config.soleil.couleur])
+  }, [uniforms, c, fentes, H, versCouloir, config.soleil.couleur, azimut])
 
   // Parois, sol et plafond : des pavés fusionnés en une seule géométrie
   const geometrie = useMemo(() => {
@@ -183,7 +187,7 @@ export function Couloir({ config, porte, traverse }: { config: SalleConfig; port
     const RETRAIT = 0.01
     const COL = 0.3 // longueur des collerettes, côté salle
     const debut = (cote: number) => (cote === prolongeSeuil ? 0 : -RETRAIT) // au seuil (z = 0)
-    const fin = (cote: number) => (cote === -prolongeSeuil ? -L : -L + RETRAIT) // au bout (z = -L)
+    const fin = (cote: number) => (ferme || cote === -prolongeSeuil ? -L : -L + RETRAIT) // au bout (z = -L)
     const fenteAuSeuil = zenithale && zenith.y > -0.01
     const fenteAuBout = zenithale && zenith.x < -L + 0.01
 
@@ -225,12 +229,14 @@ export function Couloir({ config, porte, traverse }: { config: SalleConfig; port
     }
     if (prolongeSeuil) {
       collerettes(0, COL, prolongeSeuil, !!fenteAuSeuil)
-      collerettes(-L - COL, -L, -prolongeSeuil, !!fenteAuBout)
+      if (!ferme) collerettes(-L - COL, -L, -prolongeSeuil, !!fenteAuBout)
     }
+    // Impasse : fermée au bout par un mur plein
+    if (ferme) pave(x - e, W / 2 + 0.2, -0.2, H + 0.2, -L - 0.3, -L)
     const g = mergeGeometries(paves)
     paves.forEach((p) => p.dispose())
     return g
-  }, [W, H, L, c.epaisseur, c.fente, c.hauteurFente, fentes, zenithale, zenith, raccords.coteMur])
+  }, [W, H, L, c.epaisseur, c.fente, c.hauteurFente, fentes, zenithale, zenith, raccords.coteMur, ferme])
   useEffect(() => () => geometrie.dispose(), [geometrie])
 
   const pierre = useMemo(() => {
@@ -351,7 +357,7 @@ export function Couloir({ config, porte, traverse }: { config: SalleConfig; port
           <planeGeometry args={[FENTE_ZENITHALE[0] + 0.4, zenith.y - zenith.x + 0.4]} />
         </mesh>
       )}
-      <mesh material={lueur} position={[0, H / 2, -L]} visible={!traverse}>
+      <mesh material={lueur} position={[0, H / 2, -L]} visible={!traverse && !ferme}>
         <planeGeometry args={[W, H]} />
       </mesh>
       <mesh geometry={volume} material={rayons} renderOrder={5} frustumCulled={false} />
@@ -426,6 +432,7 @@ uniform float uLumierePorte;
 uniform float uFonduPorte;
 uniform float uLongueur;
 uniform vec3 uCouleurSol;
+uniform vec3 uTeinteDiffus;
 uniform vec3 uCouleurMur;
 uniform vec3 uCouleurPlafond;
 
@@ -465,7 +472,7 @@ vec3 eclairageCouloir(vec3 p, vec3 n) {
   // Rebonds : un peu de la lumière des taches de soleil, plus vers le bas
   float rebond = uRebond * (0.55 + 0.45 * n.y) * (0.7 + 0.3 * smoothstep(4.0, 0.0, p.y));
   // Lumière diffuse un peu chaude (rebonds sur la pierre), atténuée dans les coins
-  vec3 diffus = vec3(1.0, 0.88, 0.76) * (uAmbiance + uLumierePorte * portes + rebond) * occlusionCouloir(p, n);
+  vec3 diffus = uTeinteDiffus * (uAmbiance + uLumierePorte * portes + rebond) * occlusionCouloir(p, n);
   // Surfaces qui prolongent celles de la salle : au seuil, la lumière précalculée de la salle
   // le long de la ligne de raccord (segment A → B de sa lightmap), fondue avec la profondeur
   bool sol = n.y > 0.5, plafond = n.y < -0.5, mur = !sol && !plafond && n.x * uCoteMur < -0.5;

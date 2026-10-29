@@ -30,7 +30,8 @@ OUT = os.path.join(HERE, "salle")
 os.makedirs(OUT, exist_ok=True)
 
 # --- Paramètres ----------------------------------------------------------
-C, H = 30.0, 17.5                  # côté de la salle carrée, hauteur sous plafond (20 m avant la refonte du 28/10)
+C, H = 40.0, 17.5                  # côté de la salle carrée (30 m avant le 29/10), hauteur sous plafond
+# Plan de Ludovic du 29/10 (plans/plan salle.svg, plan coté : plans/salle-40.html)
 PUITS = 10.0                       # puits de lumière carré au-dessus de l'œuvre
 PUITS_P = 5.0                      # profondeur du puits (épaisseur de toiture)
 # Le soleil tombe en biais : le puits est décalé vers lui (vers le sud et un peu vers l'est) pour
@@ -40,20 +41,23 @@ PUITS_X, PUITS_Y = 2.1, -2.6
 # VIDES : largeurs des vides d'ouest en est, séparés par des lames de LAME_E × LAME_H
 LAME_E, LAME_H = 0.25, 1.5
 VIDES = [1.58, 0.85, 1.7, 0.97, 1.46, 0.73, 1.21]
-FENTE = (0.9, 30.0)                # fente zénithale le long du mur ouest (largeur, longueur : toute la salle ;
-                                   # elle se prolonge de 10 m dans le couloir d'entrée, construit par le site)
-FENTE_P = 3.0                      # profondeur de la fente
-FENTE_COULOIR = 10.0               # prolongement de la fente au-dessus du couloir d'entrée (sud)
-# Deux portes, jusqu'au plafond, sur deux murs opposés, chacune au bord droit de son mur
-# (vu de l'intérieur) : l'entrée au sud (x de -h à -h + PORTE_L), la sortie au nord
-# (x de h - PORTE_L à h). Le couloir est construit en direct par le site (Couloir.tsx).
+FENTE = (0.9, 28.0)                # fentes zénithales, une contre chaque mur, centrées (largeur, longueur)
+FENTE_P = 3.0                      # profondeur des fentes
+# Quatre portes jusqu'au plafond, chacune au bord droit de son mur vu de l'intérieur (plan « en
+# moulinet ») : sortie au nord (x de h - PORTE_L à h), entrée au sud (x de -h à -h + PORTE_L), et
+# deux impasses à l'ouest (y de h - PORTE_L à h) et à l'est (y de -h à -h + PORTE_L). Les couloirs
+# sont construits en direct par le site (Couloir.tsx).
 PORTE_L, PORTE_H = 4.0, H
 SAS = 1.0                          # amorce de couloir fermée : bloque le ciel (masquée dans le site)
 ECHELLE_OEUVRE = 1.25              # l'œuvre passe de 8 à 10 m (même échelle dans la config du site)
-SOL_FIN = 18.0                     # sol autour de l'œuvre, précalculé finement (côté, en m) : toute la tache
-                                   # du puits et son fondu doivent y tenir, sinon une marche apparaît à sa limite
+SOL_FIN = 24.0                     # sol autour de l'œuvre, précalculé finement (côté, en m) : toute la tache
+                                   # du puits et son fondu doivent y tenir (sinon une marche apparaît à sa
+                                   # limite), et les bancs aussi (ombre de contact)
 ENFONCE = 0.015                    # l'œuvre est posée à même le sol, légèrement enfoncée
-BANCS = [((0, -8.0), (4.5, 0.7, 0.45)), ((-7.5, 3.0), (0.7, 4.5, 0.45))]  # bancs : échelle humaine
+# Bancs en arc, en moulinet : de 10 à 11 m du centre, 45° chacun (angles depuis l'est, sens direct)
+BANC_R, BANC_P, BANC_H = 10.0, 1.0, 0.45
+BANCS = [(0, 45), (90, 135), (180, 225), (270, 315)]
+COLONNE, COLONNE_MUR = 3.0, 4.0    # colonnes carrées de 3 m dans les angles (4 m avant le 29/10), à 4 m des murs
 # Venant du sud (10° de la verticale) et de l'est (8°) : par la fente zénithale, il effleure le mur
 # ouest et y dessine une lueur qui s'éteint vers 9 m du sol. Avec un soleil voilé (SOLEIL_ANGLE), il
 # faut au moins 8° : à 4°, le bord du disque tombait presque à la verticale et éclairait le sol
@@ -107,23 +111,66 @@ def box(cx, cy, sx, sy, sz, mi):
     rect_v((x1, y0), (x1, y1), 0, sz, mi, (x1 + 1, cy, sz/2))
 
 centre = (0, 0, H / 2)
-p, fl, fL = PUITS / 2, FENTE[0], FENTE[1] / 2
+p, fl, fd = PUITS / 2, FENTE[0], FENTE[1] / 2
 px0, px1 = PUITS_X - p, PUITS_X + p            # bords ouest et est du puits
 py0, py1 = PUITS_Y - p, PUITS_Y + p            # bords sud et nord du puits
-fx = -h + fl                                   # bord intérieur de la fente
-
-# Sol, percé au centre : le carré autour de l'œuvre est dans l'atlas « Mobilier »
 c = SOL_FIN / 2
-for r in [(-h, -h, h, -c), (-h, c, h, h), (-h, -c, -c, c), (c, -c, h, c)]:
-    rect_h(*r, 0, SOL, centre)
-# Plafond, découpé autour de la fente (ouest) et du puits (centre)
-for r in [(-h, -h, fx, -fL), (-h, fL, fx, h), (fx, -h, h, py0), (fx, py1, h, h), (fx, py0, px0, py1), (px1, py0, h, py1)]:
-    if r[2] - r[0] > 1e-6 and r[3] - r[1] > 1e-6:
-        rect_h(*r, H, PLAF, centre)
+# Ouvertures du plafond : les quatre fentes (ouest, est, nord, sud) et le puits
+TROUS = [(-h, -fd, -h + fl, fd), (h - fl, -fd, h, fd), (-fd, h - fl, fd, h), (-fd, -h, fd, -h + fl),
+         (px0, py0, px1, py1)]
+# Grille commune à tout le modèle : sol, plafond, murs et colonnes sont découpés aux mêmes abscisses
+# (X) et ordonnées (Y). Les arêtes se rejoignent alors bout à bout, en rectangles seulement : ni
+# fissure, ni triangles très fins (une longue face recoupée par des sommets posés sur ses bords se
+# triangule en éventail, et le précalcul de lumière y fait des dents de scie)
+ca, cb = h - COLONNE_MUR - COLONNE, h - COLONNE_MUR
+COMMUNS = [h, c, fd, h - fl, h - PORTE_L, ca, cb]
+# (les bords des lames y figurent aussi : leur dessus touche le haut des parois du puits)
+BORDS_LAMES, x_ = [], px0
+for v in VIDES[:-1]:
+    x_ += v
+    BORDS_LAMES += [x_, x_ + LAME_E]
+    x_ += LAME_E
+X = sorted({s_ * v for v in COMMUNS for s_ in (-1, 1)} | {px0, px1} | set(BORDS_LAMES))
+Y = sorted({s_ * v for v in COMMUNS for s_ in (-1, 1)} | {py0, py1})
+entre = lambda L, a, b: [v for v in L if a - 1e-9 <= v <= b + 1e-9]
+
+def grille(x0, y0, x1, y1, z, mi, garder=lambda x, y: True):
+    """Surface horizontale découpée selon la grille commune, en gardant les cases voulues."""
+    xs, ys = sorted({x0, x1, *entre(X, x0, x1)}), sorted({y0, y1, *entre(Y, y0, y1)})
+    for a0, a1 in zip(xs, xs[1:]):
+        for b0, b1 in zip(ys, ys[1:]):
+            if garder((a0 + a1) / 2, (b0 + b1) / 2):
+                rect_h(a0, b0, a1, b1, z, mi, centre)
+
+def mur(a, b, z0, z1, mi, ref):
+    """Mur vertical de a à b (parallèle à x ou à y), découpé selon la grille commune."""
+    if abs(a[1] - b[1]) < 1e-9:  # parallèle à x
+        vs = sorted({a[0], b[0], *entre(X, min(a[0], b[0]), max(a[0], b[0]))}, reverse=a[0] > b[0])
+        pts = [(v, a[1]) for v in vs]
+    else:
+        vs = sorted({a[1], b[1], *entre(Y, min(a[1], b[1]), max(a[1], b[1]))}, reverse=a[1] > b[1])
+        pts = [(a[0], v) for v in vs]
+    for u, v in zip(pts, pts[1:]):
+        rect_v(u, v, z0, z1, mi, ref)
+
+dans = lambda x, y, r: r[0] < x < r[2] and r[1] < y < r[3]
+# Pas de sol ni de plafond dans les colonnes : cachées, ces surfaces resteraient noires au précalcul
+# et ce noir déborderait sur le plafond et le sol visibles autour (taches au pied et en haut)
+colonne = lambda x, y: ca < abs(x) < cb and ca < abs(y) < cb
+# Sol, percé au centre : le carré autour de l'œuvre est dans l'atlas « Mobilier »
+grille(-h, -h, h, h, 0, SOL, lambda x, y: not (abs(x) < c and abs(y) < c) and not colonne(x, y))
+# Plafond, percé des fentes et du puits
+grille(-h, -h, h, h, H, PLAF, lambda x, y: not any(dans(x, y, r) for r in TROUS) and not colonne(x, y))
+
+def parois(x0, y0, x1, y1, z0, z1, ref, mi=MUR):
+    """Les quatre parois verticales d'un rectangle, tournées vers ref (découpées selon la grille)."""
+    for a, b in [((x0, y0), (x1, y0)), ((x1, y0), (x1, y1)), ((x1, y1), (x0, y1)), ((x0, y1), (x0, y0))]:
+        mur(a, b, z0, z1, mi, ref)
+
 # Puits : 4 parois, ouvert en haut (le ciel et le soleil entrent)
-ap = (PUITS_X, PUITS_Y, H + PUITS_P / 2)
-for a, b in [((px0, py0), (px1, py0)), ((px1, py0), (px1, py1)), ((px1, py1), (px0, py1)), ((px0, py1), (px0, py0))]:
-    rect_v(a, b, H, H + PUITS_P, MUR, ap)
+# (en deux bandes, coupées au niveau du dessous des lames, dont les arêtes touchent les parois)
+for z0, z1 in ((H, H + PUITS_P - LAME_H), (H + PUITS_P - LAME_H, H + PUITS_P)):
+    parois(px0, py0, px1, py1, z0, z1, (PUITS_X, PUITS_Y, H + PUITS_P / 2))
 # Lames : pavés nord-sud d'une paroi à l'autre du puits, en haut
 x = px0
 for i, v in enumerate(VIDES[:-1]):
@@ -138,33 +185,42 @@ for i, v in enumerate(VIDES[:-1]):
         quad(pts, MUR, ref)
     x += LAME_E
 assert abs(x + VIDES[-1] - px1) < 1e-6, "lames et vides ne remplissent pas le puits"
-# Fente : prolongement du mur ouest + paroi intérieure + extrémités. Au sud, elle se poursuit sans
-# interruption au-dessus du couloir d'entrée : prolongée ici pour que la lumière qui y entre soit
-# juste (le site masque ce prolongement et dessine la fente du couloir), et fermée en dessous par
-# une surface sombre qui tient lieu du couloir, dans la pénombre (sans rebond ni lumière du sol)
-ys = -fL - FENTE_COULOIR
-af = (-h + fl / 2, 0, H + FENTE_P / 2)
-rect_v((-h, ys), (-h, fL), H, H + FENTE_P, MUR, af)
-rect_v((fx, ys), (fx, fL), H, H + FENTE_P, MUR, af)
-rect_v((-h, ys), (fx, ys), H, H + FENTE_P, MUR, af)
-rect_v((-h, fL), (fx, fL), H, H + FENTE_P, MUR, af)
-rect_h(-h, ys, fx, -h - SAS, H, OMBRE, (-h + fl / 2, ys / 2, H + 1))
-# Murs (le sud et le nord sont percés des portes, sur toute la hauteur)
-rect_v((-h + PORTE_L, -h), (h, -h), 0, H, MUR, centre)
-rect_v((h, -h), (h, h), 0, H, MUR, centre)
-rect_v((-h, h), (-h, -h), 0, H, MUR, centre)
-rect_v((h - PORTE_L, h), (-h, h), 0, H, MUR, centre)
+# Fentes zénithales : leurs quatre parois au-dessus du plafond (celle du côté du mur le prolonge)
+for r in TROUS[:4]:
+    parois(*r, H, H + FENTE_P, ((r[0] + r[2]) / 2, (r[1] + r[3]) / 2, H + FENTE_P / 2))
+# Murs, percés des portes sur toute la hauteur
+mur((-h + PORTE_L, -h), (h, -h), 0, H, MUR, centre)   # sud (entrée à l'ouest)
+mur((h, -h + PORTE_L), (h, h), 0, H, MUR, centre)     # est (impasse au sud)
+mur((h - PORTE_L, h), (-h, h), 0, H, MUR, centre)     # nord (sortie à l'est)
+mur((-h, h - PORTE_L), (-h, -h), 0, H, MUR, centre)   # ouest (impasse au nord)
+# Colonnes, du sol au plafond (sans dessus ni dessous : le plafond et le sol les ferment)
+for sx in (-1, 1):
+    for sy in (-1, 1):
+        x0, x1 = sorted((sx * ca, sx * cb))
+        y0, y1 = sorted((sy * ca, sy * cb))
+        cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+        for (ax, ay), (bx2, by2), ref in [((x0, y0), (x1, y0), (cx, y0 - 1)), ((x1, y0), (x1, y1), (x1 + 1, cy)),
+                                          ((x1, y1), (x0, y1), (cx, y1 + 1)), ((x0, y1), (x0, y0), (x0 - 1, cy))]:
+            mur((ax, ay), (bx2, by2), 0, H, MUR, (ref[0], ref[1], H / 2))
 # Sas derrière chaque porte, fermé et sans lumière propre : le couloir reste dans la pénombre
 def sas(x0, x1, y0, y1):
     a = ((x0 + x1) / 2, (y0 + y1) / 2, PORTE_H / 2)
-    rect_h(x0, y0, x1, y1, 0, SOL, a)
-    rect_h(x0, y0, x1, y1, PORTE_H, PLAF, a)
-    rect_v((x0, y0), (x0, y1), 0, PORTE_H, MUR, a)
-    rect_v((x1, y0), (x1, y1), 0, PORTE_H, MUR, a)
-    fond = y1 if y1 > h else y0
-    rect_v((x0, fond), (x1, fond), 0, PORTE_H, MUR, a)
-sas(h - PORTE_L, h, h, h + SAS)        # sortie (nord)
-sas(-h, -h + PORTE_L, -h - SAS, -h)    # entrée (sud)
+    grille(x0, y0, x1, y1, 0, SOL)
+    grille(x0, y0, x1, y1, PORTE_H, PLAF)
+    nord_sud = y1 > h or y0 < -h
+    cotes = [((x0, y0), (x0, y1)), ((x1, y0), (x1, y1))] if nord_sud else [((x0, y0), (x1, y0)), ((x0, y1), (x1, y1))]
+    if nord_sud:
+        fond = y1 if y1 > h else y0
+        cotes.append(((x0, fond), (x1, fond)))
+    else:
+        fond = x1 if x1 > h else x0
+        cotes.append(((fond, y0), (fond, y1)))
+    for u, v in cotes:
+        mur(u, v, 0, PORTE_H, MUR, a)
+sas(h - PORTE_L, h, h, h + SAS)          # sortie (nord)
+sas(-h, -h + PORTE_L, -h - SAS, -h)      # entrée (sud)
+sas(-h - SAS, -h, h - PORTE_L, h)        # impasse ouest
+sas(h, h + SAS, -h, -h + PORTE_L)        # impasse est
 def souder(bm):
     """
     Géométrie étanche : chaque face est construite avec ses propres sommets, et une arête longue
@@ -204,7 +260,10 @@ def objet(nom):
     for x in scn.objects: x.select_set(False)
     bpy.context.view_layer.objects.active = o; o.select_set(True)
     bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT")
-    bpy.ops.uv.lightmap_pack(PREF_CONTEXT="ALL_FACES", PREF_PACK_IN_ONE=True, PREF_MARGIN_DIV=0.25)
+    # Dépliage par plans : les rectangles d'un même plan (plafond, mur, face de colonne) restent
+    # d'un seul tenant dans la lightmap, sans couture entre eux ; marge de 8 pixels entre les plans
+    bpy.ops.uv.smart_project(angle_limit=math.radians(30), island_margin=8 / RES, area_weight=0.0,
+                             correct_aspect=True, scale_to_bounds=False)
     bpy.ops.object.mode_set(mode="OBJECT")
     return o
 
@@ -212,10 +271,56 @@ room = objet("Salle")
 
 # Mobilier (sol autour de l'œuvre, bancs) : maillage et lightmap à part, plus précise.
 # L'ombre de contact des pieds et l'occlusion au sol demandent des pixels de quelques mm.
+def brut(nom):
+    """Objet Blender provisoire à partir du maillage en cours (sans soudure ni UV)."""
+    me = bpy.data.meshes.new(nom); bm.to_mesh(me); bm.free()
+    o = bpy.data.objects.new(nom, me); scn.collection.objects.link(o)
+    return o
+
+# Sol fin, même grille que le sol autour (bords communs, sans fissure), percé sous les bancs : caché,
+# le sol sous un banc resterait noir au précalcul, et ce noir déborderait en frange crénelée à son pied
 bm = bmesh.new()
-rect_h(-c, -c, c, c, 0, SOL_C, centre)
-for (cx, cy), (sx, sy, sz) in BANCS:
-    box(cx, cy, sx, sy, sz, BANC)
+grille(-c, -c, c, c, 0, SOL_C)
+sol = brut("SolFin")
+bm = bmesh.new()
+for a0, a1 in BANCS:
+    n = max(2, round((a1 - a0) / 3))
+    ang = [math.radians(a0 + (a1 - a0) * k / n) for k in range(n + 1)]
+    trace = [(BANC_R + BANC_P) * Vector((math.cos(t), math.sin(t), 0)) for t in ang]
+    trace += [BANC_R * Vector((math.cos(t), math.sin(t), 0)) for t in reversed(ang)]
+    bas = [bm.verts.new(v + Vector((0, 0, -0.1))) for v in trace]
+    haut = [bm.verts.new(v + Vector((0, 0, 0.1))) for v in trace]
+    bm.faces.new(bas[::-1]); bm.faces.new(haut)
+    for i in range(len(trace)):
+        j = (i + 1) % len(trace)
+        bm.faces.new([bas[i], bas[j], haut[j], haut[i]])
+bm.normal_update()
+coupe = brut("Coupe")
+trou = sol.modifiers.new("trou", "BOOLEAN")
+trou.operation, trou.object, trou.solver, trou.use_hole_tolerant = "DIFFERENCE", coupe, "EXACT", True
+evalue = bpy.data.meshes.new_from_object(sol.evaluated_get(bpy.context.evaluated_depsgraph_get()))
+bpy.data.objects.remove(sol); bpy.data.objects.remove(coupe)
+bm = bmesh.new(); bm.from_mesh(evalue)
+# Le perçage peut laisser des morceaux de l'outil de découpe : on ne garde que le dessus du sol
+bm.normal_update()
+bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.normal.z < 0.5 or abs(f.calc_center_median().z) > 1e-4], context="FACES")
+for f in bm.faces:
+    f.material_index = SOL_C
+for a0, a1 in BANCS:
+    # Banc en arc : dessus, faces courbes (par tranches de 3°) et deux bouts
+    n = max(2, round((a1 - a0) / 3))
+    ang = [math.radians(a0 + (a1 - a0) * k / n) for k in range(n + 1)]
+    pt = lambda r, t, z: (r * math.cos(t), r * math.sin(t), z)
+    r0, r1, hb = BANC_R, BANC_R + BANC_P, BANC_H
+    for t0, t1 in zip(ang, ang[1:]):
+        tm = (t0 + t1) / 2
+        quad([pt(r0, t0, hb), pt(r1, t0, hb), pt(r1, t1, hb), pt(r0, t1, hb)], BANC, pt((r0 + r1) / 2, tm, hb + 1))
+        quad([pt(r1, t0, 0), pt(r1, t1, 0), pt(r1, t1, hb), pt(r1, t0, hb)], BANC, pt(r1 + 1, tm, hb / 2))
+        quad([pt(r0, t0, 0), pt(r0, t1, 0), pt(r0, t1, hb), pt(r0, t0, hb)], BANC, pt(r0 - 1, tm, hb / 2))
+    for t, d in ((ang[0], -1), (ang[-1], 1)):
+        rm = (r0 + r1) / 2
+        dehors = (rm * math.cos(t) - d * math.sin(t), rm * math.sin(t) + d * math.cos(t), hb / 2)
+        quad([pt(r0, t, 0), pt(r1, t, 0), pt(r1, t, hb), pt(r0, t, hb)], BANC, dehors)
 mobilier = objet("Mobilier")
 
 # Sculpture : porte son ombre dans le précalcul (elle-même est éclairée en temps réel)

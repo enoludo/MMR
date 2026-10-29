@@ -1,5 +1,5 @@
 import type { SalleConfig } from './salles/types'
-import { salleProvisoire } from './salles/provisoire/config'
+import { salleProvisoire, salleProvisoireBleue } from './salles/provisoire/config'
 import { ZOOM_CARTE } from './entree'
 
 /**
@@ -88,7 +88,7 @@ export const oeuvres: Oeuvre[] = [
     image: '/assets/images/la-maladie-de-huntington.webp',
     maladieTexte: maladieAVenir('Maladie de Huntington'),
     manifeste: A_VENIR,
-    salle: salleProvisoire,
+    salle: salleProvisoireBleue, // ambiance bleutée, comme sa vignette
     vues: VUES_PROVISOIRES,
   },
   {

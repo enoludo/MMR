@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import { useControls } from 'leva'
 import * as THREE from 'three'
@@ -236,23 +236,47 @@ function Sculpture({
  * d'arrivée recevait aussi l'ambiance de la salle de départ, qui s'éteignait d'un coup à
  * l'arrivée (et toutes les matières étaient recompilées).
  */
-export function Eclairage({ config }: { config: SalleConfig }) {
+export function Eclairage({ config, configArrivee }: { config: SalleConfig; configArrivee?: SalleConfig | null }) {
   const l = useControls('Lumière sculpture', {
     soleil: { value: 0.55, min: 0, max: 3, step: 0.01 },
     ambiance: { value: 0.65, min: 0, max: 2, step: 0.01 },
   })
+  // Ambiance de l'œuvre : pendant un passage, elle glisse de celle de la salle quittée à celle de la
+  // salle d'arrivée selon la distance de la caméra à chacune (sinon elle basculerait d'un coup)
+  const hemi = useRef<THREE.HemisphereLight>(null)
+  const camera = useThree((e) => e.camera)
+  const tmp = useMemo(() => ({ a: new THREE.Color(), b: new THREE.Color() }), [])
+  useFrame(() => {
+    const h = hemi.current
+    if (!h) return
+    const ga = salleActuelle()
+    const gb = salleArrivee()
+    let w = 0
+    if (ga && gb && configArrivee) {
+      const da = camera.position.distanceTo(ga.position)
+      const db = camera.position.distanceTo(gb.position)
+      w = THREE.MathUtils.smoothstep((da - db) / 30 + 0.5, 0, 1)
+    }
+    const amb = (c: SalleConfig | null | undefined) => c?.ambiance ?? AMBIANCE_CHAUDE
+    h.color.copy(tmp.a.set(amb(config).ciel)).lerp(tmp.b.set(amb(configArrivee).ciel), w)
+    h.groundColor.copy(tmp.a.set(amb(config).sol)).lerp(tmp.b.set(amb(configArrivee).sol), w)
+  })
   return (
     <>
       <Soleil config={config} force={l.soleil} suivre={salleActuelle} />
-      <Soleil config={config} force={l.soleil} suivre={salleArrivee} />
-      {/* Ambiance froide en haut, chaude en bas (ciel + rebonds sur la pierre) : identique partout */}
+      <Soleil config={config} force={l.soleil} suivre={salleArrivee} couleur={configArrivee?.soleil.couleur} />
+      {/* Ambiance froide en haut, chaude en bas (ciel + rebonds sur la pierre), selon la salle où l'on est */}
       <hemisphereLight
-        args={['#a9bde0', '#76675a', l.ambiance]}
+        ref={hemi}
+        args={[AMBIANCE_CHAUDE.ciel, AMBIANCE_CHAUDE.sol, l.ambiance]}
         onUpdate={(h) => h.layers.enable(CALQUE_REFLET)}
       />
     </>
   )
 }
+
+/** Ambiance par défaut des salles : ciel froid en haut, rebonds chauds sur la pierre en bas */
+const AMBIANCE_CHAUDE = { ciel: '#a9bde0', sol: '#76675a', couloir: '#ffe1c2' }
 
 const salleActuelle = () => {
   const v = store.get().salle
@@ -272,10 +296,13 @@ function Soleil({
   config,
   force,
   suivre,
+  couleur,
 }: {
   config: SalleConfig
   force: number
   suivre: () => THREE.Group | undefined
+  /** Couleur de la salle suivie, si elle diffère de celle de config (ambiance propre à la salle) */
+  couleur?: string
 }) {
   const groupe = useRef<THREE.Group>(null)
   const { spot, cible, distance } = useMemo(() => {
@@ -317,6 +344,7 @@ function Soleil({
     }
     // Même éclairement que le soleil de Blender : I = E × d² ; éteint (et non retiré) sans salle
     spot.intensity = g ? config.soleil.force * distance * distance * force : 0
+    spot.color.set(couleur ?? config.soleil.couleur)
   }, -1.8) // après le recalage de l'arrivée (navigation), avant la passe de reflet
 
   return (

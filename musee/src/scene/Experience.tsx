@@ -86,7 +86,7 @@ export function Experience() {
             ))}
         </SalleEnPlace>
       )}
-      <Eclairage config={salle} />
+      <Eclairage config={salle} configArrivee={arrivee?.config} />
       <Navigation config={salle} configArrivee={arrivee?.config ?? null} focale={rendu.focale} />
       <Decentrage />
     </Canvas>

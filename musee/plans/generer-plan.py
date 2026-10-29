@@ -702,5 +702,6 @@ def generer(nom, V):
     print(nom, "→", V["fichier"], "| fentes du couloir :", [round(x, 3) for x in fentes])
 
 
-for nom in sys.argv[1:] or VERSIONS:
-    generer(nom, VERSIONS[nom])
+if __name__ == "__main__":
+    for nom in sys.argv[1:] or VERSIONS:
+        generer(nom, VERSIONS[nom])

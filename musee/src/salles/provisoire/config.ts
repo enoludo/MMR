@@ -5,15 +5,16 @@ import lightmapMobilier from './lightmap-mobilier.json'
 /**
  * Salle 1 (provisoire) — en attendant le design définitif.
  * Construite par script dans Blender (voir blender/salle.py) :
- * salle carrée de 30 × 30 m, 17,5 m sous plafond (20 m avant la refonte du 28/10), en calcaire.
- * Plan coté : plans/salle-refonte.html.
+ * salle carrée de 40 × 40 m (plan de Ludovic du 29/10 ; 30 m avant), 17,5 m sous plafond, en calcaire.
+ * Plan coté : plans/salle-40.html (la salle de 30 m : plans/salle-refonte.html).
+ * - quatre colonnes de 4 × 4 m dans les angles, quatre bancs en arc autour de l'œuvre (moulinet) ;
  * - un puits de lumière carré (10 m) au-dessus de l'œuvre, décalé de 2,6 m vers le sud et 2,1 m vers
  *   l'est : le soleil y entre en biais (10° vers le nord, 8° vers l'ouest), découpé en bandes par six lames ;
  *   par la fente zénithale, il effleure le mur ouest (longue lueur, sans atteindre le sol) ;
- * - une fente zénithale le long du mur ouest, sur toute la longueur (et 10 m du couloir d'entrée) ;
+ * - quatre fentes zénithales de 28 m, une contre chaque mur ;
  * - l'œuvre monumentale de 10 m (modèle de 8 m agrandi), posée à même le sol (sans socle) ;
- * - deux portes de 4 × 17,5 m, jusqu'au plafond, sur deux murs opposés, chacune au bord
- *   droit de son mur (vu de l'intérieur) : l'entrée au sud, la sortie au nord.
+ * - quatre portes de 4 × 17,5 m, jusqu'au plafond, chacune au bord droit de son mur (vu de
+ *   l'intérieur) : l'entrée au sud, la sortie au nord, et deux couloirs en impasse à l'ouest et à l'est.
  *
  * Repère du site (three.js) : Y vers le haut. Blender (x, y, z) = site (x, z, -y).
  */
@@ -42,16 +43,25 @@ export const salleProvisoire: SalleConfig = {
   },
 
   // Portes de 4 × 17,5 m (PORTE_L, PORTE_H dans blender/salle.py), au bord droit de leur mur.
-  // Les deux couloirs sont le même, vu depuis ses deux salles : fentes à l'est, et la fente
-  // zénithale du mur ouest de la salle d'arrivée sur ses 10 m de ce côté.
+  // Couloirs de 14 × 4 m, fentes dans la paroi qui prolonge un mur de la salle. Le couloir de
+  // sortie est le couloir d'entrée de la salle suivante : fentes à l'est des deux côtés.
   portes: [
     {
-      id: 'entree', position: [-13, 0, 15], direction: [0, 0, 1], largeur: 4, hauteur: 17.5,
-      couloir: { fentes: 'gauche', fenteZenithale: [0, 10] },
+      id: 'entree', position: [-18, 0, 20], direction: [0, 0, 1], largeur: 4, hauteur: 17.5,
+      couloir: { fentes: 'gauche' },
     },
     {
-      id: 'sortie', position: [13, 0, -15], direction: [0, 0, -1], largeur: 4, hauteur: 17.5,
-      couloir: { fentes: 'droite', fenteZenithale: [4, 14] },
+      id: 'sortie', position: [18, 0, -20], direction: [0, 0, -1], largeur: 4, hauteur: 17.5,
+      couloir: { fentes: 'droite' },
+    },
+    // Impasses : le soleil du couloir doit passer par leurs fentes (au nord, au sud)
+    {
+      id: 'impasse-ouest', position: [-20, 0, -18], direction: [-1, 0, 0], largeur: 4, hauteur: 17.5,
+      couloir: { fentes: 'droite', ferme: true, azimut: 20 },
+    },
+    {
+      id: 'impasse-est', position: [20, 0, 18], direction: [1, 0, 0], largeur: 4, hauteur: 17.5,
+      couloir: { fentes: 'droite', ferme: true, azimut: 160 },
     },
   ],
 
@@ -122,6 +132,31 @@ export const salleProvisoire: SalleConfig = {
 
   ciel: [
     { centre: [2.1, 22.5, 2.6], taille: [10, 10] }, // haut du puits
-    { centre: [-14.55, 20.5, 0], taille: [0.9, 30] }, // haut de la fente
+    // haut des fentes zénithales : ouest, est, nord, sud
+    { centre: [-19.55, 20.5, 0], taille: [0.9, 28] },
+    { centre: [19.55, 20.5, 0], taille: [0.9, 28] },
+    { centre: [0, 20.5, -19.55], taille: [28, 0.9] },
+    { centre: [0, 20.5, 19.55], taille: [28, 0.9] },
   ],
+}
+
+/**
+ * La même salle dans une ambiance bleutée, celle de la vignette de « La maladie de Huntington »
+ * (gris bleus, lumière blanche froide). Même géométrie et même lumière précalculée : seules les
+ * couleurs changent (pierre plus bleue, qui refroidit la lumière chaude du précalcul ; soleil de
+ * l'œuvre, faisceau et poussière plus froids ; ambiance de l'œuvre et des couloirs).
+ */
+export const salleProvisoireBleue: SalleConfig = {
+  ...salleProvisoire,
+  id: 'provisoire-bleue',
+  titre: 'Salle 1 — ambiance bleutée',
+  matieres: {
+    Mur: { couleur: '#aabccb', lightmap: 'salle' },
+    Sol: { couleur: '#8b9baa', lightmap: 'salle' },
+    Plafond: { couleur: '#a4b5c4', lightmap: 'salle' },
+    SolCentre: { couleur: '#8b9baa', lightmap: 'mobilier' },
+    Banc: { couleur: '#9bacba', lightmap: 'mobilier' },
+  },
+  soleil: { ...salleProvisoire.soleil, couleur: '#eef3ff' },
+  ambiance: { ciel: '#9fb6d6', sol: '#555f67', couloir: '#d6e2ee' },
 }
