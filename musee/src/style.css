@@ -370,3 +370,18 @@ button { font: inherit; color: inherit; }
   .page, .aide { animation: none; }
   .salle-accueil, .popup { transition: opacity 0.3s ease, visibility 0.3s; }
 }
+
+/* Confirmation du bouton « Copier les réglages » (panneau M) */
+.copie-reglages {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 1000;
+  padding: 12px 20px;
+  border-radius: 24px;
+  background: rgba(20, 20, 20, 0.85);
+  color: #fff;
+  font-size: 14px;
+  pointer-events: none;
+}

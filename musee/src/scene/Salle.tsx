@@ -118,19 +118,32 @@ export function Salle({ config }: { config: SalleConfig }) {
   )
 }
 
-/** Le ciel aperçu par les ouvertures du plafond. */
+/**
+ * Le ciel aperçu par les ouvertures du plafond. Un peu au-dessus du haut des parois (et des
+ * lames) et un peu plus grand que l'ouverture : posé exactement à leur niveau, il se disputait
+ * l'affichage avec elles (bords crénelés qui scintillent).
+ */
 function Ciel({ config }: { config: SalleConfig }) {
   const mat = useMemo(() => new THREE.MeshBasicMaterial({ color: new THREE.Color(2.6, 2.9, 3.4) }), [])
   return (
     <>
       {config.ciel.map((c, i) => (
-        <mesh key={i} position={c.centre} rotation-x={Math.PI / 2} material={mat} userData={{ traversable: true }}>
-          <planeGeometry args={c.taille} />
+        <mesh
+          key={i}
+          position={[c.centre[0], c.centre[1] + DECOLLEMENT_CIEL, c.centre[2]]}
+          rotation-x={Math.PI / 2}
+          material={mat}
+          userData={{ traversable: true }}
+        >
+          <planeGeometry args={[c.taille[0] + 0.4, c.taille[1] + 0.4]} />
         </mesh>
       ))}
     </>
   )
 }
+
+/** Écart entre le ciel et le haut des ouvertures (m) */
+const DECOLLEMENT_CIEL = 0.05
 
 function Sculpture({
   config,
@@ -225,8 +238,8 @@ function Sculpture({
  */
 export function Eclairage({ config }: { config: SalleConfig }) {
   const l = useControls('Lumière sculpture', {
-    soleil: { value: 1, min: 0, max: 3, step: 0.01 },
-    ambiance: { value: 0.2, min: 0, max: 2, step: 0.01 },
+    soleil: { value: 0.55, min: 0, max: 3, step: 0.01 },
+    ambiance: { value: 0.65, min: 0, max: 2, step: 0.01 },
   })
   return (
     <>
@@ -234,7 +247,7 @@ export function Eclairage({ config }: { config: SalleConfig }) {
       <Soleil config={config} force={l.soleil} suivre={salleArrivee} />
       {/* Ambiance froide en haut, chaude en bas (ciel + rebonds sur la pierre) : identique partout */}
       <hemisphereLight
-        args={['#a9bde0', '#7a6552', l.ambiance]}
+        args={['#a9bde0', '#76675a', l.ambiance]}
         onUpdate={(h) => h.layers.enable(CALQUE_REFLET)}
       />
     </>
@@ -268,22 +281,25 @@ function Soleil({
   const { spot, cible, distance } = useMemo(() => {
     const dir = new THREE.Vector3(...config.soleil.direction).normalize()
     const puits = new THREE.Vector3(...config.soleil.puits)
-    const distance = 30
+    // Lointain, pour que ses rayons soient presque parallèles : la découpe (puits, lames) garde
+    // ainsi sa taille du plafond jusqu'au sol, comme dans le précalcul
+    const distance = 300
     const spot = new THREE.SpotLight(config.soleil.couleur)
     spot.position.copy(puits).addScaledVector(dir, -distance)
     const cible = new THREE.Object3D()
     cible.position.copy(puits).addScaledVector(dir, puits.y / -dir.y)
     spot.target = cible
-    // Cône juste assez large pour contenir le carré du puits ; la découpe carrée vient de la « map »
-    const demi = (config.soleil.taillePuits / 2) * Math.SQRT2 * 1.3
+    // Cône juste assez large pour contenir la section du faisceau ; sa découpe vient de la « map »
+    const [ox, oz] = config.soleil.ouverture
+    const demi = (Math.max(ox, oz) / 2) * Math.SQRT2 * 1.3
     spot.angle = Math.atan(demi / distance)
     spot.penumbra = 0
     spot.decay = 2
     spot.distance = 0
-    spot.map = decoupeCarree(1 / (Math.SQRT2 * 1.3))
+    spot.map = decoupe(config.soleil, demi)
     spot.castShadow = true
     spot.shadow.mapSize.set(2048, 2048)
-    spot.shadow.radius = 4 // ombres un peu plus douces
+    spot.shadow.radius = 6 // bord de l'ombre adouci (ombres filtrées, voir Experience)
     spot.shadow.bias = -0.0002
     spot.shadow.normalBias = 0.04
     spot.shadow.camera.near = distance - 2
@@ -311,18 +327,37 @@ function Soleil({
   )
 }
 
-/** Texture de découpe : un carré blanc aux bords légèrement adoucis. */
-function decoupeCarree(fraction: number) {
-  const n = 256
+/**
+ * Texture de découpe du soleil, vue depuis lui : la section du faisceau au plafond, et les
+ * ombres des lames, aux bords adoucis. `demi` : demi-largeur couverte par la texture (m).
+ * Repère de la caméra d'ombre (dont le haut est +z) : la droite de l'image est vers −x.
+ */
+function decoupe(soleil: SalleConfig['soleil'], demi: number) {
+  const n = 512
   const c = document.createElement('canvas')
   c.width = c.height = n
   const ctx = c.getContext('2d')!
+  const [cx, , cz] = soleil.puits
+  const colonne = (x: number) => n * (0.5 - (x - cx) / (2 * demi))
+  const ligne = (z: number) => n * (0.5 - (z - cz) / (2 * demi))
   ctx.fillStyle = '#000'
   ctx.fillRect(0, 0, n, n)
-  ctx.filter = 'blur(12px)' // bords de la tache de soleil adoucis
+  ctx.filter = 'blur(48px)' // bords de la tache de soleil adoucis (soleil voilé, comme le précalcul)
   ctx.fillStyle = '#fff'
-  const t = n * fraction
-  ctx.fillRect((n - t) / 2, (n - t) / 2, t, t)
+  const [ox, oz] = soleil.ouverture
+  ctx.fillRect(colonne(cx + ox / 2), ligne(cz + oz / 2), (n * ox) / (2 * demi), (n * oz) / (2 * demi))
+  const l = soleil.lames
+  if (l) {
+    // Ombres des lames (entre deux vides), ramenées au plafond le long du soleil
+    const dir = new THREE.Vector3(...soleil.direction).normalize()
+    const decalage = (dir.x / -dir.y) * (soleil.puits[1] - (l.bas + l.haut) / 2)
+    ctx.filter = 'blur(16px)' // pénombre du soleil voilé, à mi-chemin entre les lames et le sol
+    ctx.fillStyle = '#000'
+    for (let i = 0; i + 1 < l.vides.length; i++) {
+      const [x0, x1] = [l.vides[i][1] - decalage, l.vides[i + 1][0] - decalage]
+      ctx.fillRect(colonne(x1), 0, colonne(x0) - colonne(x1), n)
+    }
+  }
   const tex = new THREE.CanvasTexture(c)
   tex.colorSpace = THREE.SRGBColorSpace
   return tex

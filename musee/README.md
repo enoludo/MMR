@@ -63,11 +63,12 @@ Tous les scripts de `blender/` se lancent avec Blender en ligne de commande (`bl
 | Étape | Script | Rôle |
 |---|---|---|
 | 1 | `sculpt.py` | Allège la sculpture (`sculpture/model.obj`, ~100 000 → ~39 000 triangles), la met à 8 m de haut et produit `sculpture/sculpture.blend` et un GLB. |
-| 2 | `salle.py [résolution] [échantillons]` | Construit la salle, place le soleil et le ciel, précalcule la lumière avec Cycles et exporte la géométrie (`salle/salle-raw.glb`). Deux lightmaps : l'architecture (`lightmap.exr`) et le « mobilier » : le sol sur 12 × 12 m autour de l'œuvre et les bancs (`lightmap-mobilier.exr`, environ 6 mm par pixel, pour l'ombre de contact des pieds). La sculpture est posée au sol, enfoncée de 1,5 cm (`ENFONCE`). Sauvegarde aussi `salle/salle.blend`, modifiable dans Blender. |
+| 2 | `salle.py [résolution] [échantillons]` | Construit la salle, place le soleil et le ciel, précalcule la lumière avec Cycles et exporte la géométrie (`salle/salle-raw.glb`). Deux lightmaps : l'architecture (`lightmap.exr`) et le « mobilier » : le sol sur 18 × 18 m autour de l’œuvre (toute la tache du puits et son fondu) et les bancs (`lightmap-mobilier.exr`, environ 9 mm par pixel, pour l'ombre de contact des pieds). La sculpture est posée au sol, enfoncée de 1,5 cm (`ENFONCE`). Sauvegarde aussi `salle/salle.blend`, modifiable dans Blender. |
 | 3 | `masque.py` | Repère les surfaces dans chaque lightmap, pour effacer les coutures entre surfaces. |
 | 4 | `denoise.py` | Débruite la lightmap (OpenImageDenoise) et reconstruit les bords des surfaces. |
 | 5 | `lightmap.py` | Convertit la lumière pour le web (encodage logarithmique, sans perte) et écrit son échelle dans un `.json`, à placer dans `src/salles/provisoire/`. |
 | 6 | `npx @gltf-transform/cli optimize …` | Compresse les GLB. |
+| 6 bis | `npx @gltf-transform/cli optimize blender/sculpture/sculpture-raw.glb <tmp> --compress meshopt --simplify false --texture-compress webp --texture-size 2048` | Compresse la sculpture sans la simplifier (sinon des triangles disparaissent) ; puis l'étape 7 avec l'enfoncement `0.012`. |
 | 7 | `node blender/occlusion.mjs …` (depuis `musee/`) | Calcule l'occlusion ambiante de la sculpture par sommet, en tenant compte du sol, et l'ajoute au GLB (`_OCCLUSION`). À relancer après chaque nouvel export de la sculpture ou changement de `ENFONCE`. |
 
 Exemple complet pour la salle (environ 25 minutes sur un ordinateur récent, surtout pour le précalcul) :
@@ -83,16 +84,17 @@ python3 lightmap.py salle/lightmap-dn.exr ../public/models/salle-lightmap.webp
 python3 lightmap.py salle/lightmap-mobilier-dn.exr ../public/models/salle-lightmap-mobilier.webp
 mv ../public/models/salle-lightmap.json ../src/salles/provisoire/lightmap.json
 mv ../public/models/salle-lightmap-mobilier.json ../src/salles/provisoire/lightmap-mobilier.json
-npx @gltf-transform/cli optimize salle/salle-raw.glb ../public/models/salle.glb --compress meshopt --simplify false --join false
+npx @gltf-transform/cli optimize salle/salle-raw.glb /tmp/salle-opt.glb --compress false --simplify false --join false
+npx @gltf-transform/cli meshopt /tmp/salle-opt.glb ../public/models/salle.glb --quantization-volume scene --quantize-position 16 --quantize-texcoord 14
 ```
 
 ### Comment la lumière est construite
 
 - **La salle** est affichée sans calcul d'éclairage dans le navigateur : chaque surface = pierre × lumière précalculée (lightmap). On a ainsi la lumière riche et douce de Cycles (rebonds, ombres de la sculpture au sol) pour un coût quasi nul.
 - **La pierre est procédurale** (`src/scene/pierre.ts`) : pas de texture image, donc aucun motif répété. Sa couleur est calculée à partir de la position dans l'espace, en trois couches réglables avec la touche M : grandes nuances douces, voile moyen, grain fin. Le grain s'efface avec la distance pour éviter le scintillement.
-- **La sculpture** est éclairée en temps réel avec les mêmes valeurs que dans Blender. Le soleil du puits est un spot à découpe carrée qui projette des ombres sur l'œuvre ; une lumière d'ambiance froide en haut et chaude en bas complète.
+- **La sculpture** est éclairée en temps réel avec les mêmes valeurs que dans Blender. Le soleil du puits est un spot lointain dont la découpe reprend la section du faisceau et l'ombre des lames du puits, et qui projette des ombres sur l'œuvre ; une lumière d'ambiance froide en haut et chaude en bas complète.
 - **L'ancrage au sol** vient de trois choses : l'ombre de la sculpture et l'occlusion au pied, précalculées finement dans la lightmap du sol ; l'occlusion ambiante de la sculpture par sommet (`blender/occlusion.mjs`), qui assombrit le bas des pieds et les creux ; l'œuvre légèrement enfoncée dans le sol, pour qu'aucun jour ne passe sous les pieds.
 - **Le reflet au sol** (`src/scene/Reflet.tsx`) : à chaque image, la sculpture est rendue à mi-résolution depuis la caméra symétrique par rapport au sol. Le sol lit cette image au pixel près : le reflet est net au contact des pieds, puis s'atténue et se floute avec la hauteur. Il est plus présent en vue rasante. Force, flou et atténuation se règlent avec la touche M (« Reflet au sol »).
-- **Le faisceau visible dans l'air** est calculé dans un shader : pour chaque pixel, on mesure la quantité de faisceau traversée par le regard, avec des bords adoucis.
+- **Le faisceau visible dans l'air** est calculé dans un shader : pour chaque pixel, on mesure la quantité de faisceau traversée par le regard, avec des bords adoucis ; les lames du puits le découpent en bandes (`src/scene/lames.ts`, aussi utilisé par la poussière).
 - **La poussière qui flotte dans le faisceau** (`src/scene/Poussiere.tsx`) : quelques milliers de grains animés entièrement par la carte graphique, qui ne s'allument que dans la lumière. Densité, taille, vitesse et brillance se règlent avec la touche M ; le nombre de grains est divisé par deux sur les petits écrans.
 - **Toute modification de la position du soleil** (`SOLEIL` dans `salle.py`) doit être reportée dans `soleil.direction` de la config de la salle (repère du site : Blender (x, y, z) = site (x, z, −y)).

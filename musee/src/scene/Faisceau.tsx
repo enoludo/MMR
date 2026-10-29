@@ -2,16 +2,18 @@ import { useMemo } from 'react'
 import { useControls } from 'leva'
 import * as THREE from 'three'
 import type { SalleConfig } from '../salles/types'
+import { GLSL_LAMES, uniformsLames } from './lames'
 
 /**
  * Faisceau de soleil visible dans l'air (lumière volumétrique simplifiée).
  *
- * Le faisceau est un prisme oblique : la section carrée du puits, translatée
+ * Le faisceau est un prisme oblique : la section du puits au plafond, translatée
  * dans la direction du soleil jusqu'au sol. Pour chaque pixel, le shader
  * calcule la longueur du rayon de vue qui traverse ce prisme : plus on
  * traverse de « lumière », plus le pixel s'éclaire. On obtient un faisceau
  * aux bords naturellement adoucis, quel que soit le point de vue, y compris
  * quand on se tient dedans. Coût : un seul prisme, un calcul analytique.
+ * Les lames du puits le découpent en bandes (lames.ts).
  */
 export function Faisceau({ config }: { config: SalleConfig }) {
   const f = useControls('Faisceau', {
@@ -19,7 +21,7 @@ export function Faisceau({ config }: { config: SalleConfig }) {
   })
 
   const { geometrie, uniforms } = useMemo(() => {
-    const { direction, puits, taillePuits, couleur } = config.soleil
+    const { direction, puits, ouverture, couleur } = config.soleil
     const dir = new THREE.Vector3(...direction).normalize()
     const haut = new THREE.Vector3(...puits)
     // décalage horizontal du faisceau par mètre de descente
@@ -27,12 +29,14 @@ export function Faisceau({ config }: { config: SalleConfig }) {
     const bas = new THREE.Vector3(haut.x + pente.x * haut.y, 0, haut.z + pente.y * haut.y)
 
     // Prisme englobant (légèrement agrandi), dessiné par ses faces arrière
-    const g = new THREE.BoxGeometry(taillePuits * 1.27, 1, taillePuits * 1.27)
+    const g = new THREE.BoxGeometry(ouverture[0] * 1.27, 1, ouverture[1] * 1.27)
     const p = g.attributes.position as THREE.BufferAttribute
     for (let i = 0; i < p.count; i++) {
       const t = p.getY(i) + 0.5 // 0 = sol, 1 = plafond
       const c = bas.clone().lerp(haut, t)
-      p.setXYZ(i, p.getX(i) + c.x, Math.max(c.y, 0.02), p.getZ(i) + c.z)
+      // Le haut s'arrête un peu sous le plafond : au même niveau, le volume et le plafond se
+      // disputaient l'affichage (arête dure sur le plafond autour du puits)
+      p.setXYZ(i, p.getX(i) + c.x, THREE.MathUtils.clamp(c.y, 0.02, haut.y - 0.05), p.getZ(i) + c.z)
     }
     g.computeBoundingSphere()
 
@@ -41,7 +45,8 @@ export function Faisceau({ config }: { config: SalleConfig }) {
       uIntensite: { value: 0 },
       uHaut: { value: haut },
       uPente: { value: pente },
-      uDemi: { value: taillePuits / 2 },
+      uDemi: { value: new THREE.Vector2(ouverture[0] / 2, ouverture[1] / 2) },
+      ...uniformsLames(config.soleil),
     }
     return { geometrie: g, uniforms }
   }, [config.soleil])
@@ -64,9 +69,10 @@ export function Faisceau({ config }: { config: SalleConfig }) {
           uniform float uIntensite;
           uniform vec3 uHaut;
           uniform vec2 uPente;
-          uniform float uDemi;
+          uniform vec2 uDemi;
           varying vec3 vMonde;
           varying vec3 vCamera;
+          ${GLSL_LAMES}
 
           // Passage dans le repère du faisceau : le prisme oblique y devient un pavé droit
           vec3 versFaisceau(vec3 p) {
@@ -80,9 +86,9 @@ export function Faisceau({ config }: { config: SalleConfig }) {
             vec3 d = b - a;
             float lMonde = length(vMonde - vCamera);
             // Intersection du segment caméra → pixel avec le pavé (légèrement élargi pour le flou des bords)
-            float demiExt = uDemi * 1.25;
-            vec3 mini = vec3(-demiExt, 0.0, -demiExt);
-            vec3 maxi = vec3(demiExt, uHaut.y, demiExt);
+            vec2 demiExt = uDemi * 1.25;
+            vec3 mini = vec3(-demiExt.x, 0.0, -demiExt.y);
+            vec3 maxi = vec3(demiExt.x, uHaut.y, demiExt.y);
             vec3 inv = 1.0 / d;
             vec3 t0 = (mini - a) * inv;
             vec3 t1 = (maxi - a) * inv;
@@ -97,10 +103,11 @@ export function Faisceau({ config }: { config: SalleConfig }) {
             float somme = 0.0;
             for (int i = 0; i < N; i++) {
               vec3 q = a + d * (entree + (float(i) + 0.5) * pas);
-              float bord = max(abs(q.x), abs(q.z)) / uDemi;          // 1 = bord du puits
-              float coeur = 1.0 - smoothstep(0.6, 1.22, bord);       // bords flous
+              float bord = max(abs(q.x) / uDemi.x, abs(q.z) / uDemi.y); // 1 = bord du puits
+              float coeur = (1.0 - smoothstep(0.6, 1.22, bord)) * lames(q); // bords flous, bandes des lames
               float h = q.y / uHaut.y;
-              float hauteur = smoothstep(0.0, 0.15, h) * mix(1.0, 0.5, h); // plus dense vers le bas
+              // plus dense vers le bas, et s'efface juste sous le plafond
+              float hauteur = smoothstep(0.0, 0.15, h) * mix(1.0, 0.5, h) * (1.0 - smoothstep(0.9, 1.0, h));
               somme += coeur * hauteur;
             }
             float longueur = somme * pas * lMonde;

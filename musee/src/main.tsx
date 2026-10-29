@@ -2,6 +2,7 @@ import { StrictMode, Suspense, lazy, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { Leva } from 'leva'
+import { CopieReglages } from './ui/CopieReglages'
 import '@fontsource-variable/google-sans-flex/wght.css'
 import { Accueil } from './accueil/Accueil'
 import { APropos } from './pages/APropos'
@@ -60,6 +61,7 @@ function App() {
   return (
     <>
       <Leva hidden={!dev} collapsed={false} titleBar={{ title: 'Réglages (M)' }} />
+      {dev && <CopieReglages />}
       {(pathname === '/' || zoomVersSalle || retourVersSpirale) && <Accueil />}
       <Suspense fallback={null}>
         {idSalle && <PageOeuvre id={idSalle} />}

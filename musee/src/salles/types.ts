@@ -48,6 +48,11 @@ export interface Porte {
   direction: Vec3
   largeur: number
   hauteur: number
+  /**
+   * Couloir derrière la porte : côté des fentes en partant de la salle (gauche par défaut), et
+   * fente zénithale le long de la paroi opposée, entre deux distances au seuil (m).
+   */
+  couloir?: { fentes?: 'gauche' | 'droite'; fenteZenithale?: [number, number] }
 }
 
 /** Description complète d'une salle : ajouter une salle = ajouter un fichier de ce type. */
@@ -74,9 +79,21 @@ export interface SalleConfig {
   soleil: {
     /** Direction de propagation (repère du site) */
     direction: Vec3
-    /** Centre de l'ouverture du puits au plafond, et côté du puits */
+    /**
+     * Section du faisceau au plafond : son centre et ses côtés [x, z]. Plus étroite que le puits
+     * quand le soleil est en biais (la paroi du puits en masque une partie) : voir config.
+     */
     puits: Vec3
-    taillePuits: number
+    ouverture: [number, number]
+    /** Taille apparente du soleil (°) : flou des bords de la lumière (SOLEIL_ANGLE dans blender/salle.py) */
+    angle: number
+    /**
+     * Lames en haut du puits, parallèles à z (nord-sud) : intervalles [x0, x1] des vides entre
+     * elles (et les parois), et hauteurs du bas et du haut des lames. Elles découpent le faisceau.
+     * `douceur` : taille apparente du soleil (°) pour leurs bandes dans l'air, plus petite que
+     * `angle` pour qu'elles restent lisibles.
+     */
+    lames?: { vides: [number, number][]; bas: number; haut: number; douceur?: number }
     /** Éclairement (W/m²) du soleil dans Blender */
     force: number
     couleur: string

@@ -18,3 +18,4 @@ _a_supprimer
 
 # Copies locales de l’état d’une salle avant refonte (calculs de lumière bruts)
 blender/sauvegardes
+blender/sculpture/sculpture-raw.glb

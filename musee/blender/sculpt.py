@@ -16,6 +16,12 @@ obj.select_set(True)
 # Décimation
 m = obj.modifiers.new("dec", "DECIMATE"); m.ratio = RATIO
 bpy.ops.object.modifier_apply(modifier="dec")
+# L'allègement retourne ou replie quelques triangles : affichés d'un seul côté dans le site, ils y
+# font des trous. On réoriente toutes les faces vers l'extérieur (les plis restants se corrigent à la
+# main : voir JOURNAL.md du 28/10)
+bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT")
+bpy.ops.mesh.normals_make_consistent(inside=False)
+bpy.ops.object.mode_set(mode="OBJECT")
 
 # Mise à l'échelle + origine au pied, centrée
 bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)

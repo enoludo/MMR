@@ -20,8 +20,8 @@ export const groupesSalles = new Map<number, THREE.Group>()
 /** Angle horizontal d'une direction (même convention que la navigation : 0 = +z) */
 const cap = (d: THREE.Vector3 | Vec3) => (Array.isArray(d) ? Math.atan2(d[0], d[2]) : Math.atan2(d.x, d.z))
 
-/** Placement (position, rotation autour de y) d'une salle */
-export type Placement = { position: THREE.Vector3; rotationY: number }
+/** Placement (position, rotation autour de y, et symétrie gauche-droite éventuelle) d'une salle ou d'un couloir */
+export type Placement = { position: THREE.Vector3; rotationY: number; miroir?: boolean }
 
 export const ORIGINE: Placement = { position: new THREE.Vector3(), rotationY: 0 }
 
@@ -48,10 +48,20 @@ export function portesDuPassage(depart: SalleConfig, arrivee: SalleConfig, sens:
   return { porte: trouver(depart, quitte), porteArrivee: trouver(arrivee, rejoint) }
 }
 
-export const matricePlacement = (p: Placement, out = new THREE.Matrix4()) =>
+export const matricePlacement = (p: Placement, out = new THREE.Matrix4()) => {
   out.makeRotationY(p.rotationY).setPosition(p.position)
+  return p.miroir ? out.scale(new THREE.Vector3(-1, 1, 1)) : out
+}
 
-/** Placement du couloir : son origine au seuil de la porte, son axe -z vers l'extérieur. */
+/**
+ * Placement du couloir : son origine au seuil de la porte, son axe -z vers l'extérieur. Le
+ * couloir est construit avec ses fentes à gauche (en partant de la salle) ; s'il les faut à
+ * droite, il est retourné (symétrie gauche-droite).
+ */
 export function placementCouloir(porte: Porte): Placement {
-  return { position: new THREE.Vector3(...porte.position), rotationY: cap(porte.direction) - Math.PI }
+  return {
+    position: new THREE.Vector3(...porte.position),
+    rotationY: cap(porte.direction) - Math.PI,
+    miroir: porte.couloir?.fentes === 'droite',
+  }
 }

@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useControls } from 'leva'
 import * as THREE from 'three'
 import type { SalleConfig } from '../salles/types'
+import { GLSL_LAMES, uniformsLames } from './lames'
 
 const MAX = 8000 // grains réservés ; le réglage « densité » n'en affiche qu'une partie
 
@@ -18,23 +19,23 @@ const MAX = 8000 // grains réservés ; le réglage « densité » n'en affiche 
 export function Poussiere({ config }: { config: SalleConfig }) {
   const p = useControls('Poussière', {
     densite: { value: 1, min: 0, max: 1, step: 0.01, label: 'densité' },
-    taille: { value: 4, min: 0.3, max: 8, step: 0.05 },
-    vitesse: { value: 3, min: 0, max: 6, step: 0.05 },
-    brillance: { value: 0.95, min: 0, max: 4, step: 0.05 },
+    taille: { value: 8, min: 0.3, max: 16, step: 0.05 },
+    vitesse: { value: 6, min: 0, max: 12, step: 0.05 },
+    brillance: { value: 1, min: 0, max: 4, step: 0.05 },
   })
   const { size, viewport, camera } = useThree()
 
   const { geometrie, uniforms } = useMemo(() => {
-    const { direction, puits, taillePuits, couleur } = config.soleil
+    const { direction, puits, ouverture, couleur } = config.soleil
     const dir = new THREE.Vector3(...direction).normalize()
-    const demi = taillePuits / 2
+    const demi = new THREE.Vector2(ouverture[0] / 2, ouverture[1] / 2)
     // Grains tirés au hasard dans le repère du faisceau (pavé droit, un peu plus large)
     const base = new Float32Array(MAX * 3)
     const graine = new Float32Array(MAX)
     for (let i = 0; i < MAX; i++) {
-      base[i * 3] = (Math.random() * 2 - 1) * demi * 1.3
+      base[i * 3] = (Math.random() * 2 - 1) * demi.x * 1.3
       base[i * 3 + 1] = Math.random() * puits[1]
-      base[i * 3 + 2] = (Math.random() * 2 - 1) * demi * 1.3
+      base[i * 3 + 2] = (Math.random() * 2 - 1) * demi.y * 1.3
       graine[i] = Math.random()
     }
     const g = new THREE.BufferGeometry()
@@ -52,6 +53,7 @@ export function Poussiere({ config }: { config: SalleConfig }) {
       uVitesse: { value: 1 },
       uBrillance: { value: 1 },
       uEchelle: { value: 1 }, // pixels par mètre à 1 m de distance
+      ...uniformsLames(config.soleil),
     }
     return { geometrie: g, uniforms }
   }, [config.soleil])
@@ -62,10 +64,12 @@ export function Poussiere({ config }: { config: SalleConfig }) {
         uniforms,
         vertexShader: /* glsl */ `
           attribute float aGraine;
-          uniform float uTemps, uDemi, uTaille, uVitesse, uEchelle;
+          uniform float uTemps, uTaille, uVitesse, uEchelle;
+          uniform vec2 uDemi;
           uniform vec3 uHaut;
           uniform vec2 uPente;
           varying float vEclat;
+          ${GLSL_LAMES}
 
           void main() {
             float t = uTemps * uVitesse;
@@ -77,15 +81,15 @@ export function Poussiere({ config }: { config: SalleConfig }) {
             q.z += cos(t * 0.17 + s * 5.0) * 0.35 + cos(t * 0.53 + s * 11.0) * 0.08;
             q.y += sin(t * 0.31 + s * 13.0) * 0.12;
             // on reste dans le volume (bouclage)
-            float largeur = uDemi * 2.6;
-            q.x = mod(q.x + uDemi * 1.3, largeur) - uDemi * 1.3;
-            q.z = mod(q.z + uDemi * 1.3, largeur) - uDemi * 1.3;
+            vec2 largeur = uDemi * 2.6;
+            q.x = mod(q.x + uDemi.x * 1.3, largeur.x) - uDemi.x * 1.3;
+            q.z = mod(q.z + uDemi.y * 1.3, largeur.y) - uDemi.y * 1.3;
             q.y = mod(q.y, uHaut.y);
 
             // éclairé seulement dans le faisceau (bords doux), et pas collé au sol ni au plafond
-            float bord = max(abs(q.x), abs(q.z)) / uDemi;
+            float bord = max(abs(q.x) / uDemi.x, abs(q.z) / uDemi.y);
             float h = q.y / uHaut.y;
-            float lumiere = (1.0 - smoothstep(0.65, 1.15, bord)) * smoothstep(0.0, 0.04, h) * (1.0 - smoothstep(0.9, 1.0, h));
+            float lumiere = (1.0 - smoothstep(0.65, 1.15, bord)) * lames(q) * smoothstep(0.0, 0.04, h) * (1.0 - smoothstep(0.9, 1.0, h));
             // scintillement : le grain tourne et accroche la lumière par instants
             float scint = 0.35 + 0.65 * pow(0.5 + 0.5 * sin(t * (1.5 + aGraine * 3.0) + s * 17.0), 3.0);
 

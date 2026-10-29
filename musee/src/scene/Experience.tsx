@@ -34,7 +34,7 @@ export function Experience() {
   // Retour vers la spirale : la salle quittée attend, cachée, d'être démontée (main.tsx)
   const quittee = !useLocation().pathname.startsWith('/oeuvre/')
   const rendu = useControls('Rendu', {
-    exposition: { value: 5, min: 0.5, max: 15, step: 0.1 },
+    exposition: { value: 3.4, min: 0.5, max: 15, step: 0.1 },
     focale: { value: 55, min: 30, max: 90, step: 1, label: 'champ de vision (°)' },
   })
   if (!visitee) return null
@@ -44,7 +44,9 @@ export function Experience() {
 
   return (
     <Canvas
-      shadows
+      // Ombres filtrées (PCF) : le flou (shadow.radius) y est pris en compte, contrairement aux
+      // ombres « douces » par défaut, dont le bord crénelait l'épaule de l'œuvre
+      shadows="percentage"
       frameloop={enPreparation || quittee ? 'never' : 'always'}
       className="canvas3d"
       dpr={[1, 2]}

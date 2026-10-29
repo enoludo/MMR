@@ -30,21 +30,37 @@ OUT = os.path.join(HERE, "salle")
 os.makedirs(OUT, exist_ok=True)
 
 # --- Paramètres ----------------------------------------------------------
-C, H = 30.0, 20.0                  # côté de la salle carrée (24 m avant le 28/10), hauteur sous plafond
-PUITS = 5.0                        # puits de lumière carré au-dessus de l'œuvre
+C, H = 30.0, 17.5                  # côté de la salle carrée, hauteur sous plafond (20 m avant la refonte du 28/10)
+PUITS = 10.0                       # puits de lumière carré au-dessus de l'œuvre
 PUITS_P = 5.0                      # profondeur du puits (épaisseur de toiture)
-FENTE = (0.9, 25.0)                # fente zénithale le long du mur ouest (largeur, longueur)
+# Le soleil tombe en biais : le puits est décalé vers lui (vers le sud et un peu vers l'est) pour
+# que le faisceau soit centré sur l'œuvre à mi-hauteur (voir plans/generer-plan.py, centrer_faisceau)
+PUITS_X, PUITS_Y = 2.1, -2.6
+# Lames nord-sud en haut du puits, à rythme irrégulier : elles découpent le faisceau en bandes.
+# VIDES : largeurs des vides d'ouest en est, séparés par des lames de LAME_E × LAME_H
+LAME_E, LAME_H = 0.25, 1.5
+VIDES = [1.58, 0.85, 1.7, 0.97, 1.46, 0.73, 1.21]
+FENTE = (0.9, 30.0)                # fente zénithale le long du mur ouest (largeur, longueur : toute la salle ;
+                                   # elle se prolonge de 10 m dans le couloir d'entrée, construit par le site)
 FENTE_P = 3.0                      # profondeur de la fente
+FENTE_COULOIR = 10.0               # prolongement de la fente au-dessus du couloir d'entrée (sud)
 # Deux portes, jusqu'au plafond, sur deux murs opposés, chacune au bord droit de son mur
 # (vu de l'intérieur) : l'entrée au sud (x de -h à -h + PORTE_L), la sortie au nord
 # (x de h - PORTE_L à h). Le couloir est construit en direct par le site (Couloir.tsx).
 PORTE_L, PORTE_H = 4.0, H
 SAS = 1.0                          # amorce de couloir fermée : bloque le ciel (masquée dans le site)
 ECHELLE_OEUVRE = 1.25              # l'œuvre passe de 8 à 10 m (même échelle dans la config du site)
-SOL_FIN = 12.0                     # sol autour de l'œuvre, précalculé finement (côté, en m)
+SOL_FIN = 18.0                     # sol autour de l'œuvre, précalculé finement (côté, en m) : toute la tache
+                                   # du puits et son fondu doivent y tenir, sinon une marche apparaît à sa limite
 ENFONCE = 0.015                    # l'œuvre est posée à même le sol, légèrement enfoncée
 BANCS = [((0, -8.0), (4.5, 0.7, 0.45)), ((-7.5, 3.0), (0.7, 4.5, 0.45))]  # bancs : échelle humaine
-SOLEIL = Vector((-0.16, 0.10, -1.0)).normalized()  # direction de propagation du soleil
+# Venant du sud (10° de la verticale) et de l'est (8°) : par la fente zénithale, il effleure le mur
+# ouest et y dessine une lueur qui s'éteint vers 9 m du sol. Avec un soleil voilé (SOLEIL_ANGLE), il
+# faut au moins 8° : à 4°, le bord du disque tombait presque à la verticale et éclairait le sol
+SOLEIL = Vector((-math.tan(math.radians(8)), math.tan(math.radians(10)), -1.0)).normalized()
+SOLEIL_ANGLE = 10.0                # taille apparente (°) : soleil très voilé, tache du puits diffuse et ombres
+                                   # de l'œuvre qui s'adoucissent en s'éloignant d'elle (2,5° puis 6° le 28/10)
+CIEL_FORCE = 1.0                   # lumière du ciel : basse, pour le contraste (pénombre, faisceaux)
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 scn = bpy.context.scene
@@ -56,11 +72,12 @@ def mat(name, color, rough=0.9):
     b.inputs["Base Color"].default_value = (*color, 1); b.inputs["Roughness"].default_value = rough
     return m
 
-# Albédos proches d'un calcaire clair : ils règlent la lumière qui rebondit
-MATS = [mat("Mur", (0.55, 0.50, 0.44)), mat("Sol", (0.36, 0.33, 0.30), 0.6),
-        mat("Plafond", (0.50, 0.47, 0.43)), mat("SolCentre", (0.36, 0.33, 0.30), 0.61),
-        mat("Banc", (0.45, 0.41, 0.36))]
-MUR, SOL, PLAF, SOL_C, BANC = range(5)
+# Albédos proches d'un calcaire clair, un peu moins chaud depuis le 28/10 au soir (à mi-chemin
+# entre le beige d'avant et un gris neutre) : ils règlent la lumière qui rebondit
+MATS = [mat("Mur", (0.535, 0.50, 0.455)), mat("Sol", (0.35, 0.33, 0.305), 0.6),
+        mat("Plafond", (0.49, 0.47, 0.44)), mat("SolCentre", (0.35, 0.33, 0.305), 0.61),
+        mat("Banc", (0.44, 0.41, 0.375)), mat("Ombre", (0.03, 0.03, 0.03))]
+MUR, SOL, PLAF, SOL_C, BANC, OMBRE = range(6)
 # SolCentre a une rugosité à peine différente de Sol : sinon gltf-transform fusionne
 # les deux matières identiques, et le sol central lirait le mauvais atlas de lumière.
 
@@ -91,6 +108,8 @@ def box(cx, cy, sx, sy, sz, mi):
 
 centre = (0, 0, H / 2)
 p, fl, fL = PUITS / 2, FENTE[0], FENTE[1] / 2
+px0, px1 = PUITS_X - p, PUITS_X + p            # bords ouest et est du puits
+py0, py1 = PUITS_Y - p, PUITS_Y + p            # bords sud et nord du puits
 fx = -h + fl                                   # bord intérieur de la fente
 
 # Sol, percé au centre : le carré autour de l'œuvre est dans l'atlas « Mobilier »
@@ -98,18 +117,38 @@ c = SOL_FIN / 2
 for r in [(-h, -h, h, -c), (-h, c, h, h), (-h, -c, -c, c), (c, -c, h, c)]:
     rect_h(*r, 0, SOL, centre)
 # Plafond, découpé autour de la fente (ouest) et du puits (centre)
-for r in [(-h, -h, fx, -fL), (-h, fL, fx, h), (fx, -h, h, -p), (fx, p, h, h), (fx, -p, -p, p), (p, -p, h, p)]:
-    rect_h(*r, H, PLAF, centre)
-# Puits central : 4 parois, ouvert en haut (le ciel et le soleil entrent)
-ap = (0, 0, H + PUITS_P / 2)
-for a, b in [((-p, -p), (p, -p)), ((p, -p), (p, p)), ((p, p), (-p, p)), ((-p, p), (-p, -p))]:
+for r in [(-h, -h, fx, -fL), (-h, fL, fx, h), (fx, -h, h, py0), (fx, py1, h, h), (fx, py0, px0, py1), (px1, py0, h, py1)]:
+    if r[2] - r[0] > 1e-6 and r[3] - r[1] > 1e-6:
+        rect_h(*r, H, PLAF, centre)
+# Puits : 4 parois, ouvert en haut (le ciel et le soleil entrent)
+ap = (PUITS_X, PUITS_Y, H + PUITS_P / 2)
+for a, b in [((px0, py0), (px1, py0)), ((px1, py0), (px1, py1)), ((px1, py1), (px0, py1)), ((px0, py1), (px0, py0))]:
     rect_v(a, b, H, H + PUITS_P, MUR, ap)
-# Fente : prolongement du mur ouest + paroi intérieure + extrémités
+# Lames : pavés nord-sud d'une paroi à l'autre du puits, en haut
+x = px0
+for i, v in enumerate(VIDES[:-1]):
+    x += v
+    xa, xb, za, zb = x, x + LAME_E, H + PUITS_P - LAME_H, H + PUITS_P
+    for pts, ref in [
+        ([(xa, py0, za), (xb, py0, za), (xb, py1, za), (xa, py1, za)], (x + LAME_E / 2, PUITS_Y, za - 1)),  # dessous
+        ([(xa, py0, zb), (xb, py0, zb), (xb, py1, zb), (xa, py1, zb)], (x + LAME_E / 2, PUITS_Y, zb + 1)),  # dessus
+        ([(xa, py0, za), (xa, py1, za), (xa, py1, zb), (xa, py0, zb)], (xa - 1, PUITS_Y, (za + zb) / 2)),  # ouest
+        ([(xb, py0, za), (xb, py1, za), (xb, py1, zb), (xb, py0, zb)], (xb + 1, PUITS_Y, (za + zb) / 2)),  # est
+    ]:
+        quad(pts, MUR, ref)
+    x += LAME_E
+assert abs(x + VIDES[-1] - px1) < 1e-6, "lames et vides ne remplissent pas le puits"
+# Fente : prolongement du mur ouest + paroi intérieure + extrémités. Au sud, elle se poursuit sans
+# interruption au-dessus du couloir d'entrée : prolongée ici pour que la lumière qui y entre soit
+# juste (le site masque ce prolongement et dessine la fente du couloir), et fermée en dessous par
+# une surface sombre qui tient lieu du couloir, dans la pénombre (sans rebond ni lumière du sol)
+ys = -fL - FENTE_COULOIR
 af = (-h + fl / 2, 0, H + FENTE_P / 2)
-rect_v((-h, -fL), (-h, fL), H, H + FENTE_P, MUR, af)
-rect_v((fx, -fL), (fx, fL), H, H + FENTE_P, MUR, af)
-rect_v((-h, -fL), (fx, -fL), H, H + FENTE_P, MUR, af)
+rect_v((-h, ys), (-h, fL), H, H + FENTE_P, MUR, af)
+rect_v((fx, ys), (fx, fL), H, H + FENTE_P, MUR, af)
+rect_v((-h, ys), (fx, ys), H, H + FENTE_P, MUR, af)
 rect_v((-h, fL), (fx, fL), H, H + FENTE_P, MUR, af)
+rect_h(-h, ys, fx, -h - SAS, H, OMBRE, (-h + fl / 2, ys / 2, H + 1))
 # Murs (le sud et le nord sont percés des portes, sur toute la hauteur)
 rect_v((-h + PORTE_L, -h), (h, -h), 0, H, MUR, centre)
 rect_v((h, -h), (h, h), 0, H, MUR, centre)
@@ -126,8 +165,38 @@ def sas(x0, x1, y0, y1):
     rect_v((x0, fond), (x1, fond), 0, PORTE_H, MUR, a)
 sas(h - PORTE_L, h, h, h + SAS)        # sortie (nord)
 sas(-h, -h + PORTE_L, -h - SAS, -h)    # entrée (sud)
+def souder(bm):
+    """
+    Géométrie étanche : chaque face est construite avec ses propres sommets, et une arête longue
+    (le bas d'une paroi de la fente) en longe parfois plusieurs courtes (les morceaux de plafond).
+    Ces raccords mal fermés laissent passer des pointillés de lumière dans le site. On fusionne les
+    sommets confondus, puis on coupe chaque arête au droit des sommets posés dessus (jonctions en T).
+    """
+    eps = 1e-4
+    bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=eps)
+    coupe = True
+    while coupe:
+        coupe = False
+        for e in bm.edges:
+            a, b = e.verts
+            ab = b.co - a.co
+            l2 = ab.length_squared
+            for v in bm.verts:
+                if v is a or v is b:
+                    continue
+                t = (v.co - a.co).dot(ab) / l2
+                if eps < t < 1 - eps and (a.co + ab * t - v.co).length < eps:
+                    _, nv = bmesh.utils.edge_split(e, a, t)
+                    nv.co = v.co.copy()
+                    bmesh.ops.remove_doubles(bm, verts=[nv, v], dist=eps)
+                    coupe = True
+                    break
+            if coupe:
+                break
+
 def objet(nom):
-    """Transforme le maillage en cours en objet Blender, avec ses UV de lightmap."""
+    """Transforme le maillage en cours en objet Blender (soudé), avec ses UV de lightmap."""
+    souder(bm)
     me = bpy.data.meshes.new(nom); bm.to_mesh(me); bm.free()
     o = bpy.data.objects.new(nom, me); scn.collection.objects.link(o)
     for m in MATS: me.materials.append(m)
@@ -156,14 +225,14 @@ sc = dst.objects[0]; scn.collection.objects.link(sc); sc.location.z = -ENFONCE
 sc.scale = [v * ECHELLE_OEUVRE for v in sc.scale]
 
 # --- Lumière -------------------------------------------------------------
-sun_d = bpy.data.lights.new("Soleil", "SUN"); sun_d.energy = 5.0; sun_d.angle = math.radians(4.0)  # angle large : bords de lumière adoucis (soleil voilé)
-sun_d.color = (1.0, 0.86, 0.68)
+sun_d = bpy.data.lights.new("Soleil", "SUN"); sun_d.energy = 5.0; sun_d.angle = math.radians(SOLEIL_ANGLE)  # bords de lumière adoucis (soleil voilé)
+sun_d.color = (1.0, 0.90, 0.77)  # blanc chaud ((1, 0.86, 0.68) avant le 28/10 au soir)
 sun = bpy.data.objects.new("Soleil", sun_d); scn.collection.objects.link(sun)
 sun.rotation_euler = SOLEIL.to_track_quat("-Z", "Y").to_euler()
 # Ciel : lumière froide et douce qui entre par les ouvertures
 w = bpy.data.worlds.new("Ciel"); scn.world = w; w.use_nodes = True
 bg = w.node_tree.nodes["Background"]
-bg.inputs["Color"].default_value = (0.55, 0.68, 0.95, 1); bg.inputs["Strength"].default_value = 3.0
+bg.inputs["Color"].default_value = (0.55, 0.68, 0.95, 1); bg.inputs["Strength"].default_value = CIEL_FORCE
 # Pas de lumière dans le couloir : le passage reste dans la pénombre (retirée le 27/10)
 
 # --- Précalcul : lumière reçue (sans la couleur des matières) ---------------

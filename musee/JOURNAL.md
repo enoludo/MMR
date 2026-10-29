@@ -11,6 +11,23 @@ Une entrée par session, la plus récente en haut. Le détail technique est dans
 
 ---
 
+## 28-29/10/2026 — Claude Code (refonte de l'architecture de la salle)
+
+- **Plans cotés** (`plans/`, générés par `plans/generer-plan.py`) : `salle-provisoire.html` (la salle d'avant), `salle-refonte.html` (le projet, avec plan, coupes A–A, B–B, C–C, élévation des fentes, récapitulatif). **[vu]**
+- **Sauvegarde** de la salle d'avant : étiquette Git `salle-avant-refonte`, calculs de lumière bruts dans `blender/sauvegardes/salle-avant-refonte/`.
+- **Refonte reportée dans la 3D**, d'après les cotes de Ludovic, validées sur plan au fil de l'eau :
+  - **[à voir]** salle de **17,5 m** sous plafond (15 m dans un premier temps), portes et couloirs à 17,5 m ;
+  - **[à voir]** puits de **10 × 10 m**, décalé (2,6 m au sud, 1 m à l'est) pour que le faisceau incliné tombe sur l'œuvre ; **6 lames de 0,25 m** à rythme irrégulier, qui fragmentent le faisceau (dans l'air, sur l'œuvre, la poussière) ;
+  - **[à voir]** soleil venant du sud (10°) et un peu de l'est (4°), **voilé** (6°) : tache du puits diffuse, ombres de l'œuvre qui s'adoucissent en s'éloignant ; couleurs à **mi-chemin** entre le beige d'avant et un gris neutre (« trop chaud » sinon) ;
+  - **[à voir]** **fente zénithale de 40 m** le long du mur ouest, d'un seul tenant entre la salle et le couloir d'entrée ; le soleil y effleure le mur ouest (**lueur** du plafond jusqu'à 7,6 m du sol, sans toucher le sol) ;
+  - **[à voir]** couloirs : **fentes à l'est** dans les deux couloirs (le couloir d'entrée d'une salle est le même que le couloir de sortie de la précédente), **6 fentes de 1 × 14 m** à trumeaux égaux, soleil propre bas venant de l'est (bandes en diagonale vers le visiteur), bords plus doux, rayons plus visibles (référence `references/couloir/0ce5898e…`).
+- **Fort contraste** inscrit comme règle du projet (`CLAUDE.md`), références `references/ambiance`.
+- **Défauts corrigés** après la remarque de Ludovic (« géométrie très propre, pas de glitch ») : ciel posé au niveau du haut des lames et du puits (bords crénelés), volume du faisceau au niveau du plafond (arête dure autour du puits), **œuvre** : 3 triangles retournés et 1 replié laissés par l'allègement du modèle (des « trous » dans le site), réparés et corrigés dans `sculpt.py`. Inspecté de près avec le calcul définitif : puits, lames, raccord de la fente, couloirs. **[à voir]**
+- **Suite (29/10, nuit)** : soleil **très voilé (10°)** pour une tache du puits plus diffuse ; carré de sol fin agrandi à **18 × 18 m** (la tache débordait du carré de 12 m : bord rectiligne) ; soleil incliné à **8° vers l'est** (à 4°, le soleil voilé éclairait le pied du mur ouest), puits recentré (2,1 m à l'est). **[à voir]**
+- **Géométrie étanche [à voir]** : salle soudée dans Blender (sommets fusionnés, jonctions en T coupées : plus de pointillés lumineux le long des arêtes), compression sur une grille commune à la scène (16 bits) ; raccords salle/couloir bouchés (collerettes cachées, chant des parois en retrait d'1 cm) ; lueur de la fente du couloir fondue au seuil ; ombre de l'œuvre filtrée (bord de l'épaule lisse). Reste un écart de teinte minime sur la paroi de la fente au raccord salle/couloir, visible seulement en zoomant fort.
+- **Bouton « Copier les réglages »** en tête du panneau M ; premiers réglages de Ludovic reportés par défaut (exposition 3,4, lumière de l'œuvre, poussière). **[validé]** (réglages de Ludovic)
+- Capture de transition de « Le seuil des proportions » refaite (`plans/captures/salle-refonte-vue-arrivee.png`). Site compilé sans erreur. **Pas encore en ligne** (labo `mmr-lab` et zip à refaire), enregistré dans Git (en local, pas encore envoyé sur GitHub).
+
 ## 28/10/2026 — Claude Code (transitions : plus de temps mort au retour)
 
 - Passation rédigée (`PASSATION.md`) pour la prochaine session.

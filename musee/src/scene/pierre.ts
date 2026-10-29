@@ -159,8 +159,9 @@ bool auDelaDesPortes(vec3 p) {
     vec3 d = uPorteDir[i];
     float profondeur = dot(q, d);
     float cote = abs(dot(q, vec3(-d.z, 0.0, d.x)));
-    // dès le plan de la porte : le sas de Blender se superposerait aux parois du couloir (scintillement)
-    if (profondeur > 0.0 && cote < uPorteTaille[i].x + 0.05 && q.y < uPorteTaille[i].y + 0.05) return true;
+    // dès le plan de la porte : le sas de Blender se superposerait aux parois du couloir (scintillement) ;
+    // à toute hauteur : la fente zénithale de Blender se prolonge au-dessus du couloir, qui dessine la sienne
+    if (profondeur > 0.0 && cote < uPorteTaille[i].x + 0.05) return true;
   }
   return false;
 }
