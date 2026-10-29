@@ -19,3 +19,7 @@ _a_supprimer
 # Copies locales de l’état d’une salle avant refonte (calculs de lumière bruts)
 blender/sauvegardes
 blender/sculpture/sculpture-raw.glb
+
+# Salle de « La maladie de Huntington » : calculs de lumière bruts, export brut de l’œuvre
+blender/salle-huntington/*.exr
+blender/sculpture-huntington/huntington-raw.glb

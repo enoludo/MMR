@@ -13,6 +13,14 @@ Une entrée par session, la plus récente en haut. Le détail technique est dans
 
 ## 29/10/2026 — Claude Code (salle de 40 m, d'après le plan de Ludovic)
 
+- **[à voir]** **« La maladie de Huntington » modélisée** dans Blender d'après sa vignette (`blender/huntington.py`) : silhouette de 2,20 m en plaques anguleuses bronze et dorées, éclats qui s'envolent de la main gauche, sur un **socle rond de 80 cm**. Sa salle a son propre calcul de lumière (ombres de l'œuvre et du socle), un parcours resserré (vue d'arrivée à 7 m, cercles à 4,5 et 3 m), ses points de vue Maladie (éclats) et Manifeste (silhouette), pas de reflet au sol. À voir : l'œuvre est sombre (dorés peu visibles), interprétation stylisée.
+
+- **Suite [à voir]** (demande de Ludovic : éclats autour de la statue, +50 cm, pose retravaillée, cadrage de la vignette, lueur au pied du socle) :
+  - **œuvre de 2,70 m**, pose reprise d'après la vignette : buste penché sur sa droite et un peu tourné, tête inclinée, bras droit tendu, bras gauche plié la main au-dessus de l'épaule, jambe gauche lancée en arrière ; **36 éclats en nuage autour du haut du corps** (plus nombreux côté main levée, s'élevant en s'éloignant) ; plaques un peu plus claires, moins métalliques (elle se lisait en silhouette) ;
+  - **socle à gorge** (12 cm de haut, 10 cm de retrait) avec un **ruban lumineux** : lumière précalculée dans Blender, plus le ruban et un halo dans le site (réglages « Lueur du socle », touche M) ; sol de la salle un peu plus sombre que les murs, comme sur la vignette, pour que la lueur se lise ;
+  - **vue d'arrivée à 6,3 m**, cadrée comme la vignette (œuvre et socle entiers) ; points de vue Maladie et Manifeste recalés sur la nouvelle pose. Rayons des deux cercles gardés à 4,5 et 3 m (choix de Ludovic).
+  - calcul de lumière définitif refait.
+
 - **[à voir]** **Ambiance de couleur par salle** : la salle de « La maladie de Huntington » (l'œuvre suivante) est **bleutée** comme sa vignette (gris bleus, lumière blanche froide), sans nouveau calcul de lumière : pierre plus bleue, soleil de l'œuvre, faisceau et poussière plus froids, ambiance de l'œuvre et des couloirs (`salleProvisoireBleue`, champ `ambiance` de la config). Pendant le passage, l'ambiance de l'œuvre glisse d'une salle à l'autre.
 
 - **Plan de Ludovic** (`plans/plan salle.svg`, 1 m = 10 px) relevé et redessiné coté : `plans/salle-40.html` (`plans/generer-plan-40.py`). Ses réponses : fentes zénithales de 0,9 m, soleil au sol accepté par les fentes est et sud, couloirs est et ouest en impasse (« pour enrichir l'environnement visuellement »), fentes du couloir entre deux salles à l'est, puits décalé. **[validé]** (plan)

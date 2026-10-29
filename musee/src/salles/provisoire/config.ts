@@ -1,6 +1,8 @@
 import type { SalleConfig } from '../types'
 import lightmapSalle from './lightmap.json'
 import lightmapMobilier from './lightmap-mobilier.json'
+import lightmapHuntington from './huntington-lightmap.json'
+import lightmapMobilierHuntington from './huntington-lightmap-mobilier.json'
 
 /**
  * Salle 1 (provisoire) — en attendant le design définitif.
@@ -141,20 +143,69 @@ export const salleProvisoire: SalleConfig = {
 }
 
 /**
- * La même salle dans une ambiance bleutée, celle de la vignette de « La maladie de Huntington »
- * (gris bleus, lumière blanche froide). Même géométrie et même lumière précalculée : seules les
- * couleurs changent (pierre plus bleue, qui refroidit la lumière chaude du précalcul ; soleil de
- * l'œuvre, faisceau et poussière plus froids ; ambiance de l'œuvre et des couloirs).
+ * Salle de « La maladie de Huntington » : la même architecture, dans une ambiance bleutée, celle
+ * de sa vignette (gris bleus, lumière blanche froide) : pierre plus bleue, qui refroidit la
+ * lumière chaude du précalcul ; soleil de l'œuvre, faisceau et poussière plus froids ; ambiance
+ * de l'œuvre et des couloirs. L'œuvre (blender/huntington.py) fait 2,20 m, sur un socle rond de
+ * 80 cm : son propre précalcul (`salle.py … huntington`, ombre de l'œuvre et du socle), un
+ * parcours resserré et ses propres points de vue.
  */
 export const salleProvisoireBleue: SalleConfig = {
   ...salleProvisoire,
   id: 'provisoire-bleue',
   titre: 'Salle 1 — ambiance bleutée',
+  modele: '/models/huntington-salle.glb',
+  lightmaps: {
+    salle: { image: '/models/huntington-salle-lightmap.webp', ...lightmapHuntington },
+    mobilier: { image: '/models/huntington-salle-lightmap-mobilier.webp', ...lightmapMobilierHuntington },
+  },
+  sculpture: {
+    modele: '/models/huntington.glb',
+    position: [0, 0.795, 0], // sur le socle de 80 cm, enfoncée de 5 mm
+    rotationY: 0,
+    reflet: false,
+    lueur: { rayon: 1.1, couleur: '#e8f0ff' }, // ruban lumineux dans la gorge du socle (1,2 m de rayon)
+  },
+  parcours: {
+    centre: [0, 0],
+    rayon: 4.5,
+    rayonLointain: 6.3, // cadrage de la vignette : l'œuvre et tout son socle, avec la lueur
+    rayonProche: 3, // le socle fait 1,2 m de rayon
+    hauteurYeux: 1.7,
+    angleDepart: 0,
+    regard: { bas: 1.3, haut: 3 },
+  },
+  etapes: [
+    {
+      id: 'face',
+      libelle: 'Face à l\'œuvre',
+      titre: 'Face à l\'œuvre',
+      texte: ['Texte provisoire.'],
+      position: [0.4, 1.7, 4.6],
+      cible: [0.1, 2.5, 0],
+    },
+    {
+      id: 'visage',
+      libelle: 'Le visage',
+      titre: 'Le visage',
+      texte: ['Texte provisoire.'],
+      position: [-1.2, 1.7, 4.2], // popup Manifeste : vers le visage
+      cible: [-0.2, 3.2, 0],
+    },
+    {
+      id: 'main',
+      libelle: 'Les éclats',
+      titre: 'Les éclats',
+      texte: ['Texte provisoire.'],
+      position: [2.2, 1.7, 3.6], // popup Maladie : vers la main levée et les éclats qui s'en détachent
+      cible: [0.9, 3.1, 0.2],
+    },
+  ],
   matieres: {
     Mur: { couleur: '#aabccb', lightmap: 'salle' },
-    Sol: { couleur: '#8b9baa', lightmap: 'salle' },
+    Sol: { couleur: '#6f7d8b', lightmap: 'salle' }, // plus sombre que les murs (vignette) : la lueur du socle s'y lit
     Plafond: { couleur: '#a4b5c4', lightmap: 'salle' },
-    SolCentre: { couleur: '#8b9baa', lightmap: 'mobilier' },
+    SolCentre: { couleur: '#6f7d8b', lightmap: 'mobilier' },
     Banc: { couleur: '#9bacba', lightmap: 'mobilier' },
   },
   soleil: { ...salleProvisoire.soleil, couleur: '#eef3ff' },

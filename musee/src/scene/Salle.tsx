@@ -64,9 +64,10 @@ export function Salle({ config }: { config: SalleConfig }) {
     longueur: { value: 1.4, min: 0.2, max: 6, step: 0.05, label: 'atténuation (m)' },
   })
   useEffect(() => {
-    uReflet.uForceReflet.value = reflet.force
+    // Pas de reflet pour une œuvre sur socle : le socle en cache le pied
+    uReflet.uForceReflet.value = config.sculpture.reflet === false ? 0 : reflet.force
     uReflet.uFlouReflet.value = reflet.flou
-  }, [uReflet, reflet.force, reflet.flou])
+  }, [uReflet, reflet.force, reflet.flou, config.sculpture.reflet])
 
   const materiaux = useMemo(() => {
     const parNom: Record<string, THREE.Texture> = {}
@@ -112,8 +113,65 @@ export function Salle({ config }: { config: SalleConfig }) {
       <primitive object={scene} />
       <Ciel config={config} />
       <Sculpture config={config} uSol={uReflet} longueurReflet={reflet.longueur} />
+      {config.sculpture.lueur && <Lueur config={config} lueur={config.sculpture.lueur} />}
       <Faisceau config={config} />
       <Poussiere config={config} />
+    </group>
+  )
+}
+
+/**
+ * Lueur au pied d'un socle : un ruban lumineux caché dans la gorge du socle (GORGE_H, GORGE_R dans
+ * blender/salle.py) et son halo sur le sol. La lumière du ruban est aussi précalculée, mais elle se
+ * perd dans la tache du puits (et elle est écrêtée, voir lightmap.py) : ruban et halo la font lire.
+ */
+function Lueur({ config, lueur }: { config: SalleConfig; lueur: { rayon: number; couleur: string } }) {
+  const l = useControls('Lueur du socle', {
+    ruban: { value: 6, min: 0, max: 20, step: 0.1 },
+    halo: { value: 0.3, min: 0, max: 3, step: 0.01 },
+    etendue: { value: 0.1, min: 0.02, max: 1, step: 0.01, label: 'étendue du halo (m)' },
+  }, [config.id])
+  const ruban = useMemo(() => new THREE.MeshBasicMaterial(), [])
+  const halo = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        uniforms: { uCouleur: { value: new THREE.Color() }, uRayon: { value: 1 }, uEtendue: { value: 0.2 } },
+        vertexShader: /* glsl */ `
+          varying vec2 vPlan;
+          void main() {
+            vPlan = position.xy;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }`,
+        fragmentShader: /* glsl */ `
+          uniform vec3 uCouleur;
+          uniform float uRayon, uEtendue;
+          varying vec2 vPlan;
+          void main() {
+            float d = max(length(vPlan) - uRayon, 0.0);
+            gl_FragColor = vec4(uCouleur * exp(-d / uEtendue), 1.0);
+            #include <tonemapping_fragment>
+            #include <colorspace_fragment>
+          }`,
+      }),
+    [],
+  )
+  ruban.color.set(lueur.couleur).multiplyScalar(l.ruban)
+  halo.uniforms.uCouleur.value.set(lueur.couleur).multiplyScalar(l.halo)
+  halo.uniforms.uRayon.value = lueur.rayon
+  halo.uniforms.uEtendue.value = l.etendue
+  return (
+    <group position={[config.sculpture.position[0], 0, config.sculpture.position[2]]}>
+      {/* Ruban : contre le pied du socle, au fond de la gorge (12 cm de haut, 10 de profondeur), sur
+          presque toute sa hauteur : c'est lui qu'on voit sous le débord, en trait de lumière */}
+      <mesh material={ruban} position-y={0.065}>
+        <cylinderGeometry args={[lueur.rayon + 0.004, lueur.rayon + 0.004, 0.09, 96, 1, true]} />
+      </mesh>
+      <mesh material={halo} rotation-x={-Math.PI / 2} position-y={0.003} renderOrder={4}>
+        <ringGeometry args={[lueur.rayon, lueur.rayon + 1.5, 96, 1]} />
+      </mesh>
     </group>
   )
 }
@@ -172,7 +230,7 @@ function Sculpture({
     relief: { value: 1, min: 0, max: 3, step: 0.05 },
     occlusion: { value: 0.9, min: 0, max: 1, step: 0.01, label: 'occlusion (creux, pieds)' },
     occlusionDirecte: { value: 0.35, min: 0, max: 1, step: 0.01, label: 'occlusion sur le soleil' },
-  })
+  }, [config.id])
 
   const uSculpture = useMemo<UniformsSculpture>(
     () => ({

@@ -96,7 +96,7 @@ export function Navigation({
     auto: { value: 1, min: 0, max: 6, step: 0.1, label: 'déplacement auto (°/s)' },
     duree: { value: 2.8, min: 0.5, max: 6, step: 0.1, label: 'durée des transitions (s)' },
     dureePassage: { value: 8, min: 1, max: 15, step: 0.1, label: 'durée du passage par le couloir (s)' },
-  })
+  }, [config.id]) // chaque salle a son parcours (une œuvre de 3 m n'est pas vue comme une œuvre de 10 m)
   const r = useRef(reglages)
   r.current = reglages
 
@@ -291,6 +291,8 @@ export function Navigation({
     // l'œuvre sur l'anneau de la vue d'arrivée quand on entre par l'autre côté
     const pa = arrivee.parcours
     const [ax, az] = pa.centre
+    // Rayon de la vue d'arrivée : celui de la salle d'arrivée (le réglage en cours vaut pour celle-ci)
+    const rl = pa === p ? g.rayonLointain : pa.rayonLointain
     const degagement = new THREE.Vector3(...porteArrivee.position)
       .addScaledVector(new THREE.Vector3(...porteArrivee.direction).normalize(), -APPROCHE)
       .setY(pa.hauteurYeux)
@@ -302,7 +304,7 @@ export function Navigation({
     for (let i = 1; i <= nArcA; i++) {
       const a = aSortie + (deltaA * i) / nArcA
       ajouter(
-        new THREE.Vector3(ax + g.rayonLointain * Math.sin(a), pa.hauteurYeux, az + g.rayonLointain * Math.cos(a)).applyMatrix4(s.arrivee3d),
+        new THREE.Vector3(ax + rl * Math.sin(a), pa.hauteurYeux, az + rl * Math.cos(a)).applyMatrix4(s.arrivee3d),
       )
     }
 
@@ -325,7 +327,10 @@ export function Navigation({
   /** Point regardé à l'arrivée (celui du cercle de la salle d'arrivée), dans le repère actuel */
   function cibleArrivee(arrivee: SalleConfig, out: THREE.Vector3) {
     const s = n.current
-    const { regardBas, regardHaut, ecart } = r.current
+    const { ecart } = r.current
+    const autre = arrivee.parcours !== p
+    const regardBas = autre ? arrivee.parcours.regard.bas : r.current.regardBas
+    const regardHaut = autre ? arrivee.parcours.regard.haut : r.current.regardHaut
     const [ax, az] = arrivee.parcours.centre
     const lateral = s.sourisXLisse * ecart
     const a = s.angleArrivee

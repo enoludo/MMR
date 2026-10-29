@@ -73,7 +73,16 @@ export interface SalleConfig {
   /** Matières (noms des matériaux Blender) : couleur, et atlas de lightmap utilisé. Le grain est procédural. */
   matieres: Record<string, { couleur: string; lightmap: string }>
   /** `echelle` : agrandissement du modèle (le même que ECHELLE_OEUVRE dans blender/salle.py) */
-  sculpture: { modele: string; position: Vec3; rotationY: number; echelle?: number }
+  /** `reflet` : false pour une œuvre sur socle (pas de reflet au sol) */
+  sculpture: {
+    modele: string
+    position: Vec3
+    rotationY: number
+    echelle?: number
+    reflet?: boolean
+    /** Lueur au pied du socle : rayon du pied en retrait (m, voir GORGE_R dans blender/salle.py) et couleur */
+    lueur?: { rayon: number; couleur: string }
+  }
   /**
    * Portes de la salle : une entrée et une sortie. « Œuvre suivante » part par la sortie et
    * arrive par l'entrée de la salle suivante ; « Œuvre précédente », l'inverse.

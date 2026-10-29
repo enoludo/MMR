@@ -1,10 +1,11 @@
 """
 Lightmap EXR (lumière reçue, linéaire) -> image web 8 bits.
 
-    python3 lightmap.py salle/lightmap.exr ../public/models/salle-lightmap.webp
+    python3 lightmap.py salle/lightmap.exr ../public/models/salle-lightmap.webp [percentile]
 
 La lumière est divisée par une valeur d'échelle (le percentile 99,95, pour ne
-pas écrêter les taches de soleil), puis encodée sur une courbe logarithmique :
+pas écrêter les taches de soleil ; plus bas, 98 par exemple, quand une petite source très vive,
+comme la lueur du socle de Huntington, doit être écrêtée au lieu d'écraser le reste), puis encodée sur une courbe logarithmique :
   v = log(1 + K·x) / log(1 + K)
 Cette courbe garde beaucoup de précision dans les ombres profondes (pas de
 paliers visibles), avec un léger tramage pour casser les derniers paliers.
@@ -16,11 +17,12 @@ from PIL import Image
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:]
 src, dst = argv[0], argv[1]
+PERCENTILE = float(argv[2]) if len(argv) > 2 else 99.95
 img = bpy.data.images.load(src); w, hh = img.size
 px = np.empty(w * hh * 4, np.float32); img.pixels.foreach_get(px)
 a = px.reshape(hh, w, 4)[::-1, :, :3]
 lum = a.mean(2)
-echelle = float(np.percentile(lum[lum > 1e-4], 99.95))
+echelle = float(np.percentile(lum[lum > 1e-4], PERCENTILE))
 K = 2000.0
 x = np.clip(a / echelle, 0, 1)
 v = np.log1p(K * x) / np.log1p(K)

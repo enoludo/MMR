@@ -68,6 +68,8 @@ Tous les scripts de `blender/` se lancent avec Blender en ligne de commande (`bl
 | 4 | `denoise.py` | Débruite la lightmap (OpenImageDenoise) et reconstruit les bords des surfaces. |
 | 5 | `lightmap.py` | Convertit la lumière pour le web (encodage logarithmique, sans perte) et écrit son échelle dans un `.json`, à placer dans `src/salles/provisoire/`. |
 | 6 | `npx @gltf-transform/cli optimize …` | Compresse les GLB. |
+| 1 bis | `huntington.py [aperçu.png]` | Modélise « La maladie de Huntington » (2,20 m, plaques anguleuses et éclats, couleurs par sommet) : `sculpture-huntington/huntington.blend` et `huntington-raw.glb`, puis compression (`optimize … --compress meshopt --simplify false`) et occlusion (`occlusion.mjs … 0.005`) vers `public/models/huntington.glb`. |
+| 2 bis | `salle.py RES ÉCH ÉCH_MOB huntington` puis `chaine.sh RES huntington` | Précalcul de la salle pour une autre œuvre (son ombre, son socle) : dossier `salle-huntington/`, fichiers `huntington-salle*.webp/.glb` et `huntington-lightmap*.json`. `chaine.sh RES [œuvre]` enchaîne masque, débruitage, encodage et compression (variable `PYLIB` : dossier de Pillow). |
 | 6 bis | `npx @gltf-transform/cli optimize blender/sculpture/sculpture-raw.glb <tmp> --compress meshopt --simplify false --texture-compress webp --texture-size 2048` | Compresse la sculpture sans la simplifier (sinon des triangles disparaissent) ; puis l'étape 7 avec l'enfoncement `0.012`. |
 | 7 | `node blender/occlusion.mjs …` (depuis `musee/`) | Calcule l'occlusion ambiante de la sculpture par sommet, en tenant compte du sol, et l'ajoute au GLB (`_OCCLUSION`). À relancer après chaque nouvel export de la sculpture ou changement de `ENFONCE`. |
 

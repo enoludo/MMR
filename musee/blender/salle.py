@@ -26,7 +26,17 @@ SAMPLES = int(argv[1]) if len(argv) > 1 else 128
 # que l'architecture, dont le plafond ne reçoit que de la lumière renvoyée (très bruitée)
 SAMPLES_MOB = int(argv[2]) if len(argv) > 2 else SAMPLES
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, "salle")
+# Œuvre exposée (4e argument) : chaque œuvre a son précalcul (ombre de l'œuvre, socle éventuel)
+OEUVRE = argv[3] if len(argv) > 3 else "seuil"
+OEUVRES = {
+    # « Le seuil des proportions » : 10 m (modèle de 8 m × 1,25), à même le sol, enfoncée de 1,5 cm
+    "seuil": dict(dossier="salle", fichier=("sculpture", "sculpture.blend"), echelle=1.25, socle=None),
+    # « La maladie de Huntington » : 2,70 m, sur un socle rond de 80 cm (blender/huntington.py)
+    "huntington": dict(dossier="salle-huntington", fichier=("sculpture-huntington", "huntington.blend"),
+                       echelle=1.0, socle=(1.2, 0.8)),
+}
+O = OEUVRES[OEUVRE]
+OUT = os.path.join(HERE, O["dossier"])
 os.makedirs(OUT, exist_ok=True)
 
 # --- Paramètres ----------------------------------------------------------
@@ -54,6 +64,8 @@ SOL_FIN = 24.0                     # sol autour de l'œuvre, précalculé fineme
                                    # du puits et son fondu doivent y tenir (sinon une marche apparaît à sa
                                    # limite), et les bancs aussi (ombre de contact)
 ENFONCE = 0.015                    # l'œuvre est posée à même le sol, légèrement enfoncée
+GORGE_H, GORGE_R = 0.12, 0.10      # socle : gorge au pied (hauteur, profondeur), où est caché le ruban lumineux
+LUEUR_FORCE, LUEUR_COULEUR = 6.0, (0.92, 0.96, 1.0, 1)   # ruban lumineux du socle (émission Cycles)
 # Bancs en arc, en moulinet : de 10 à 11 m du centre, 45° chacun (angles depuis l'est, sens direct)
 BANC_R, BANC_P, BANC_H = 10.0, 1.0, 0.45
 BANCS = [(0, 45), (90, 135), (180, 225), (270, 315)]
@@ -294,6 +306,17 @@ for a0, a1 in BANCS:
     for i in range(len(trace)):
         j = (i + 1) % len(trace)
         bm.faces.new([bas[i], bas[j], haut[j], haut[i]])
+if O["socle"]:
+    # Le sol est aussi percé sous le socle (même raison que sous les bancs), sous son pied en retrait :
+    # le sol reste sous le débord, où tombe la lueur
+    rs = O["socle"][0] - GORGE_R
+    trace = [rs * Vector((math.cos(2 * math.pi * k / 48), math.sin(2 * math.pi * k / 48), 0)) for k in range(48)]
+    bas = [bm.verts.new(v + Vector((0, 0, -0.1))) for v in trace]
+    haut = [bm.verts.new(v + Vector((0, 0, 0.1))) for v in trace]
+    bm.faces.new(bas[::-1]); bm.faces.new(haut)
+    for i in range(48):
+        j = (i + 1) % 48
+        bm.faces.new([bas[i], bas[j], haut[j], haut[i]])
 bm.normal_update()
 coupe = brut("Coupe")
 trou = sol.modifiers.new("trou", "BOOLEAN")
@@ -321,13 +344,30 @@ for a0, a1 in BANCS:
         rm = (r0 + r1) / 2
         dehors = (rm * math.cos(t) - d * math.sin(t), rm * math.sin(t) + d * math.cos(t), hb / 2)
         quad([pt(r0, t, 0), pt(r1, t, 0), pt(r1, t, hb), pt(r0, t, hb)], BANC, dehors)
+if O["socle"]:
+    # Socle rond : 48 pans et un dessus, dans la matière des bancs. Il repose sur un pied en retrait
+    # (gorge de GORGE_H de haut, GORGE_R de profondeur) où un ruban lumineux éclaire le sol
+    rs, hs = O["socle"]
+    ri = rs - GORGE_R
+    cercle = lambda r: [(r * math.cos(2 * math.pi * k / 48), r * math.sin(2 * math.pi * k / 48)) for k in range(48)]
+    pts, pti = cercle(rs), cercle(ri)
+    f = bm.faces.new([bm.verts.new((x, y, hs)) for x, y in pts]); f.material_index = BANC
+    f.normal_update()
+    if f.normal.z < 0: f.normal_flip()
+    for k in range(48):
+        (x0, y0), (x1, y1) = pts[k], pts[(k + 1) % 48]
+        (u0, v0), (u1, v1) = pti[k], pti[(k + 1) % 48]
+        quad([(x0, y0, GORGE_H), (x1, y1, GORGE_H), (x1, y1, hs), (x0, y0, hs)], BANC, (1.5 * (x0 + x1), 1.5 * (y0 + y1), hs / 2))
+        quad([(u0, v0, GORGE_H), (u1, v1, GORGE_H), (x1, y1, GORGE_H), (x0, y0, GORGE_H)], BANC, (x0, y0, 0))
+        quad([(u0, v0, 0), (u1, v1, 0), (u1, v1, GORGE_H), (u0, v0, GORGE_H)], BANC, (1.5 * (u0 + u1), 1.5 * (v0 + v1), GORGE_H / 2))
 mobilier = objet("Mobilier")
 
 # Sculpture : porte son ombre dans le précalcul (elle-même est éclairée en temps réel)
-with bpy.data.libraries.load(os.path.join(HERE, "sculpture", "sculpture.blend")) as (src, dst):
+with bpy.data.libraries.load(os.path.join(HERE, *O["fichier"])) as (src, dst):
     dst.objects = ["Sculpture"]
-sc = dst.objects[0]; scn.collection.objects.link(sc); sc.location.z = -ENFONCE
-sc.scale = [v * ECHELLE_OEUVRE for v in sc.scale]
+sc = dst.objects[0]; scn.collection.objects.link(sc)
+sc.location.z = (O["socle"][1] if O["socle"] else 0) - ENFONCE
+sc.scale = [v * O["echelle"] for v in sc.scale]
 
 # --- Lumière -------------------------------------------------------------
 sun_d = bpy.data.lights.new("Soleil", "SUN"); sun_d.energy = 5.0; sun_d.angle = math.radians(SOLEIL_ANGLE)  # bords de lumière adoucis (soleil voilé)
@@ -339,6 +379,22 @@ w = bpy.data.worlds.new("Ciel"); scn.world = w; w.use_nodes = True
 bg = w.node_tree.nodes["Background"]
 bg.inputs["Color"].default_value = (0.55, 0.68, 0.95, 1); bg.inputs["Strength"].default_value = CIEL_FORCE
 # Pas de lumière dans le couloir : le passage reste dans la pénombre (retirée le 27/10)
+if O["socle"]:
+    # Ruban lumineux dans la gorge du socle : seule sa lumière est précalculée (il n'est pas exporté)
+    rl = O["socle"][0] - GORGE_R + 0.01
+    bm = bmesh.new()
+    bas = [bm.verts.new((rl * math.cos(2 * math.pi * k / 96), rl * math.sin(2 * math.pi * k / 96), 0.01)) for k in range(96)]
+    haut = [bm.verts.new(v.co + Vector((0, 0, GORGE_H - 0.03))) for v in bas]
+    for i in range(96):
+        j = (i + 1) % 96
+        bm.faces.new([bas[i], bas[j], haut[j], haut[i]])
+    me = bpy.data.meshes.new("Lueur"); bm.to_mesh(me); bm.free()
+    lueur = bpy.data.objects.new("Lueur", me); scn.collection.objects.link(lueur)
+    ml = bpy.data.materials.new("Lueur"); ml.use_nodes = True
+    em = ml.node_tree.nodes.new("ShaderNodeEmission")
+    em.inputs["Color"].default_value = LUEUR_COULEUR; em.inputs["Strength"].default_value = LUEUR_FORCE
+    ml.node_tree.links.new(em.outputs[0], ml.node_tree.nodes["Material Output"].inputs["Surface"])
+    me.materials.append(ml)
 
 # --- Précalcul : lumière reçue (sans la couleur des matières) ---------------
 scn.render.engine = "CYCLES"; scn.cycles.device = "CPU"
