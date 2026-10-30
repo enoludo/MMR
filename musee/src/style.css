@@ -283,15 +283,8 @@ button { font: inherit; color: inherit; }
 .pied > * { pointer-events: auto; }
 .pied__suivante { padding: 0 22px 0 24px; }
 /* Pendant le passage par le couloir, l'interface s'efface (elle revient avec la nouvelle œuvre) */
-.salle-ui--passage .salle-accueil, .salle-ui--passage .aide { opacity: 0; visibility: hidden; }
+.salle-ui--passage .salle-accueil { opacity: 0; visibility: hidden; }
 .pied .pilule:disabled { cursor: default; opacity: 0.5; }
-
-.aide {
-  position: fixed; z-index: 10; left: 50%; bottom: calc(36px + var(--haut) / 2); transform: translate(-50%, 50%);
-  margin: 0; max-width: calc(100vw - 32px); padding: 8px 16px; border-radius: var(--rayon);
-  background: var(--verre-sombre); -webkit-backdrop-filter: var(--flou); backdrop-filter: var(--flou);
-  font-size: 13px; text-align: center; cursor: pointer; animation: apparition 0.6s 1.2s both;
-}
 
 /* --- Chargement d'une salle ------------------------------------------- */
 .chargement {
@@ -303,7 +296,7 @@ button { font: inherit; color: inherit; }
 /* En entrant depuis la spirale : la barre seule, en bas, sur l'image de la carte */
 /* Transition avec la spirale : l'interface de la salle s'efface (voir InterfaceSalle) ; le
    premier écran, lui, part et revient lettre par lettre (ui/apparition.ts) */
-.salle-ui--transition .aide, .salle-ui--transition .pied { opacity: 0; visibility: hidden; }
+.salle-ui--transition .pied { opacity: 0; visibility: hidden; }
 .pied { transition: opacity 0.45s ease, visibility 0.45s; }
 .chargement--discret { background: transparent; justify-content: flex-end; padding-bottom: 48px; pointer-events: none; }
 .chargement__logo { height: 64px; width: auto; }
@@ -363,11 +356,10 @@ button { font: inherit; color: inherit; }
   .pied { bottom: 12px; }
   .pied .pilule { width: var(--haut); padding: 0; justify-content: center; }
   .pied .pilule span { display: none; }
-  .aide { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .page, .aide { animation: none; }
+  .page { animation: none; }
   .salle-accueil, .popup { transition: opacity 0.3s ease, visibility 0.3s; }
 }
 

@@ -10,7 +10,6 @@ import { Popup, PopupChiffres, PopupEntete, PopupLien, PopupTexte } from './Popu
 import { sortir } from '../transition'
 import { useApparition } from './apparition'
 
-const tactile = () => window.matchMedia('(pointer: coarse)').matches
 
 /** Affiche le premier écran ou un popup, et envoie la caméra vers le point de vue associé (voir Oeuvre.vues). */
 export function choisirOnglet(oeuvre: Oeuvre, onglet: Onglet) {
@@ -47,7 +46,6 @@ export function InterfaceSalle({ oeuvre }: { oeuvre: Oeuvre }) {
     autres: '.salle-accueil__liens > *, .salle-accueil__bas > *',
     visible: !enTransition,
   })
-  const [aide, setAide] = useState(true)
   const ouvert = onglet !== 'info'
 
   // Le popup garde son contenu pendant qu'il disparaît
@@ -66,17 +64,12 @@ export function InterfaceSalle({ oeuvre }: { oeuvre: Oeuvre }) {
   }, [oeuvre.id])
 
   useEffect(() => {
-    const cacher = () => setAide(false)
-    window.addEventListener('wheel', cacher, { once: true })
-    window.addEventListener('touchmove', cacher, { once: true })
     const clavier = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement) return
       if (e.key === 'Escape') store.set({ menu: false })
     }
     window.addEventListener('keydown', clavier)
     return () => {
-      window.removeEventListener('wheel', cacher)
-      window.removeEventListener('touchmove', cacher)
       window.removeEventListener('keydown', clavier)
     }
   }, [])
@@ -146,14 +139,6 @@ export function InterfaceSalle({ oeuvre }: { oeuvre: Oeuvre }) {
       <Popup ouvert={ouvert} onFermer={fermerPopup} etiquette={contenu === 'maladie' ? 'La maladie' : 'Manifeste'}>
         {contenu === 'maladie' ? <Maladie oeuvre={oeuvre} /> : <Manifeste oeuvre={oeuvre} />}
       </Popup>
-
-      {aide && (
-        <p className="aide" onClick={() => setAide(false)}>
-          {tactile()
-            ? "Glissez sur les côtés pour tourner autour de l'œuvre"
-            : "Faites défiler pour tourner autour de l'œuvre"}
-        </p>
-      )}
 
       <nav className="pied" aria-label="Navigation dans la collection">
         <button type="button" className="pilule pied__precedente" disabled={enPassage} onClick={() => partirVers(precedente, 'precedente')}>
