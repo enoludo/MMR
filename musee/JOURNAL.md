@@ -102,6 +102,7 @@ Une entrée par session, la plus récente en haut. Le détail technique est dans
     - image : comparaison dans la salle du Seuil (`plans/comparaisons/lightmaps-webp-contre-ktx2.png`) : 98 % des pixels identiques ou à 1 niveau près, écart moyen 0,4 niveau dans les ombres, aucune différence visible côte à côte ; seul écart mesurable : la fine ligne d'ombre de contact sous les orteils ;
     - contrepartie : fichiers plus lourds à télécharger (4,1 et 3,8 Mo au lieu de 2,9 : ≈ 8 Mo par salle au lieu de 6) ; les WebP restent la source des KTX2 ;
     - la salle d'arrivée d'un passage fait aussi son premier dessin à l'avance, objet par objet sur un pixel : pire image d'un passage 0,13 s (0,2 à 0,37 s sinon, au moment où elle apparaît).
+    Enregistré dans Git (`e2e9f62`, en local) et mis en ligne sur le labo `mmr-lab` (sans les lightmaps WebP, inutiles au site) : salles et passage vérifiés en ligne, sans erreur.
 
 - **[à voir]** **Ambiance de couleur par salle** : la salle de « La maladie de Huntington » (l'œuvre suivante) est **bleutée** comme sa vignette (gris bleus, lumière blanche froide), sans nouveau calcul de lumière : pierre plus bleue, soleil de l'œuvre, faisceau et poussière plus froids, ambiance de l'œuvre et des couloirs (`salleProvisoireBleue`, champ `ambiance` de la config). Pendant le passage, l'ambiance de l'œuvre glisse d'une salle à l'autre.
 
