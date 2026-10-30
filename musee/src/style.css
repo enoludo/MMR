@@ -5,7 +5,7 @@
 }
 
 /*
- * Valeurs de la maquette Figma « MMR » (écrans de la salle 445:275, 447:602, 448:911,
+ * Valeurs de la maquette Figma « MMR » (écrans de la salle 477:973, 447:602, 448:911,
  * header 365:1320), dessinée en 1680 × 1050.
  */
 :root {
@@ -125,9 +125,9 @@ button { font: inherit; color: inherit; }
   text-transform: uppercase; text-wrap: balance; max-width: 60vw;
 }
 /* Masques de lettres (SplitText) : de la marge pour les accents, compensée (voir README de la galerie) */
-.accueil__titre .char-mask, .salle-accueil__titre .char-mask { padding-block: 0.25em 0.15em; margin-block: -0.25em -0.15em; }
+.accueil__titre .char-mask, .salle-accueil__titre .char-mask, .popup__titre .char-mask { padding-block: 0.25em 0.15em; margin-block: -0.25em -0.15em; }
 /* Un mot ne se coupe jamais entre deux lettres (il dépasse plutôt, comme le texte non découpé) */
-.accueil__titre .word, .salle-accueil__titre .word { white-space: nowrap; }
+.accueil__titre .word, .salle-accueil__titre .word, .popup__titre .word { white-space: nowrap; }
 .accueil__cta {
   display: inline-flex; align-items: center; justify-content: center;
   height: var(--haut); padding: 0 1.5rem; border-radius: var(--rayon);
@@ -146,7 +146,9 @@ button { font: inherit; color: inherit; }
 .accueil--cachee { visibility: hidden; }
 .accueil--transition .accueil__cta { pointer-events: none; }
 .entete__centre { transition: opacity 0.45s ease, visibility 0.45s; }
-.accueil--transition .entete__centre, .salle-ui--transition .entete__centre { opacity: 0; visibility: hidden; }
+/* Titre et croix du header : effacés pendant les transitions avec la spirale et les passages par le couloir */
+.accueil--transition .entete__centre, .salle-ui--transition .entete__centre,
+.salle-ui--passage .entete__centre { opacity: 0; visibility: hidden; }
 
 /* --- Transition spirale ↔ salle : canvas plein écran (ui/ToileTransition.ts) -- */
 /* Au-dessus des canvas, sous le texte de la spirale et l'interface de la salle (z-index 10) */
@@ -168,123 +170,219 @@ button { font: inherit; color: inherit; }
 }
 
 /*
- * Premier écran, à gauche (maquette 445:275) : grille de 3 colonnes (marges 24),
- * il occupe la première (544 px en 1680), avec 96 px de marge intérieure et sans fond.
- * Marges et titres se resserrent en dessous de 1680 px.
+ * Premier écran, à gauche (maquette 477:973, dessinée en 1680 × 1050) : grille de 3 colonnes
+ * sans marge, il occupe la première (560 px), centré verticalement, avec 48 px de marge
+ * intérieure (96 px à gauche, demande de Ludovic du 30/10) et 48 px entre les blocs, sans fond.
  */
 .salle-accueil {
-  --p: clamp(32px, calc(9.6vw - 65px), 96px); /* 96 px en 1680, 50 px en 1200 */
+  --p: 48px;
+  --p-gauche: 96px;
   position: fixed; z-index: 10; top: 50%; transform: translateY(-50%);
   max-height: calc(100% - 2 * (var(--marge) + var(--haut) + 16px));
-  padding: var(--p); overflow: hidden auto;
+  padding: var(--p) var(--p) var(--p) var(--p-gauche); overflow: hidden auto;
   transition: opacity 0.45s ease, visibility 0.45s, transform 0.6s cubic-bezier(.2,.7,.2,1);
-  left: var(--marge); width: clamp(380px, calc((100vw - 48px) / 3), 560px);
-  display: flex; flex-direction: column; justify-content: safe center; gap: clamp(48px, 5.7vw, 96px);
+  left: 0; width: clamp(540px, 33.333vw, 640px); /* 540 : les deux cartouches et les marges */
+  display: flex; flex-direction: column; justify-content: safe center; gap: 48px;
   pointer-events: none; /* les zones vides laissent passer le regard et le scroll */
 }
 .salle-accueil > * { pointer-events: auto; }
-.salle-accueil--cache { opacity: 0; visibility: hidden; transform: translate(-24px, -50%); }
+/* Popup ouvert : le premier écran part élément par élément (useApparition, cascade) ; le
+   panneau lui-même (fond sur mobile) s'efface ensuite */
+.salle-accueil--cache {
+  opacity: 0; visibility: hidden;
+  transition: opacity 0.4s ease 1.25s, visibility 0s 1.7s, transform 0.6s cubic-bezier(.2,.7,.2,1);
+}
 
-.salle-accueil__haut { display: flex; flex-direction: column; gap: 24px; }
+.salle-accueil__haut { display: flex; flex-direction: column; gap: 48px; }
 .salle-accueil__titre {
   margin: 0; font-family: var(--titre); font-weight: 400; text-transform: uppercase;
   font-size: clamp(40px, 3.57vw, 60px); line-height: 1;
 }
-.salle-accueil__liens { display: flex; flex-direction: column; }
 
-/* Liens Maladie et Manifeste, qui ouvrent les popups */
-.lien-popup {
-  appearance: none; background: none; border: 0; border-bottom: 1px solid rgba(255, 255, 255, 0.5);
-  cursor: pointer; text-align: left; width: 100%;
-  display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
-  padding: 24px 6px; transition: border-color 0.2s ease;
+/* Cartouches Maladie et Manifeste (photo, libellé, titre), qui ouvrent les popups */
+.salle-accueil__cartouches { display: flex; gap: 12px; } /* 6 px sur la maquette, 12 à la demande de Ludovic */
+.cartouche {
+  appearance: none; border: 0; cursor: pointer; text-align: left;
+  position: relative; isolation: isolate; overflow: hidden; flex: none;
+  width: 192px; height: 192px; padding: 24px; border-radius: 12px; background: #000;
+  display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start;
+  font-weight: 300; /* Geist Light de la maquette */
 }
-.lien-popup--maladie { padding-bottom: 36px; }
-.lien-popup:hover { border-bottom-color: #fff; }
-.lien-popup__libelle { font-weight: 700; font-size: 16px; line-height: 25px; text-transform: uppercase; }
-.lien-popup__maladie { font-size: clamp(24px, 1.9vw, 32px); line-height: 25px; }
-.lien-popup__libelle, .lien-popup__maladie { display: inline-flex; align-items: center; gap: 12px; }
-.lien-popup svg { flex: none; transition: transform 0.25s ease; }
-.lien-popup:hover svg { transform: translateX(4px); }
+.cartouche__photo {
+  position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; object-fit: cover;
+  transition: transform 0.8s cubic-bezier(.2,.7,.2,1);
+}
+/* Voile du bas, plus sombre sous le nom de la maladie */
+.cartouche::after {
+  content: ''; position: absolute; inset: 0; z-index: -1;
+  background: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.5));
+}
+.cartouche--maladie::after { background: linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.75)); }
+/* Pour la lisibilité du texte (demande de Ludovic du 30/10), comme les cartes œuvre précédente /
+   suivante : flou progressif de 15 px, entier en bas, qui s'estompe jusqu'à mi-hauteur */
+.cartouche::before {
+  content: ''; position: absolute; inset: 0; z-index: -1;
+  -webkit-backdrop-filter: var(--flou); backdrop-filter: var(--flou);
+  -webkit-mask-image: linear-gradient(to top, #000, rgba(0, 0, 0, 0) 50%);
+  mask-image: linear-gradient(to top, #000, rgba(0, 0, 0, 0) 50%);
+}
+.cartouche:is(:hover, :focus-visible) .cartouche__photo { transform: scale(1.1); }
+.cartouche__texte { display: flex; flex-direction: column; max-width: 144px; }
+.cartouche__libelle { font-size: 14px; line-height: 21px; }
+.cartouche__titre { font-size: 20px; line-height: 20px; text-wrap: balance; }
 
-.salle-accueil__bas { display: flex; flex-direction: column; align-items: flex-start; gap: 24px; }
-.soutien { display: flex; flex-direction: column; gap: 12px; padding: 24px 0; }
-.soutien__libelle { margin: 0; font-size: 16px; line-height: 30px; }
+.salle-accueil__bas { display: flex; flex-direction: column; align-items: flex-start; gap: 48px; }
+.soutien { display: flex; flex-direction: column; gap: 12px; }
+.soutien__libelle { margin: 0; font-weight: 300; font-size: 14px; line-height: 18px; }
 .soutien__logo { display: block; width: 162px; height: 24px; }
 .soutien__nom { margin: 0; font-weight: 700; font-size: 20px; letter-spacing: 0.02em; text-transform: uppercase; line-height: 24px; }
-.pilule--partage { gap: 8px; padding: 0 32px 0 24px; }
+.pilule--partage { gap: 8px; padding: 0 32px 0 24px; background: var(--verre-leger); }
+.pilule--partage:hover { background: var(--verre); }
 
 /*
- * Popup (src/ui/Popup.tsx ; maquettes 447:602 et 448:911, dessinées en 1680 × 1050).
- * Grille de la maquette : 5 colonnes de 288 px entre deux marges de 120 px, sans
- * gouttière. Le popup occupe les deux dernières colonnes (576 px), centré
- * verticalement, avec 96 px de marge intérieure : le texte tient sur 384 px.
- * Plus petit que 1680 px, la grille rétrécit avec la fenêtre ; le texte garde ses
- * 384 px tant que possible (mêmes retours à la ligne) et c'est la marge qui diminue.
- * Sur un écran peu haut, la marge haute et basse diminue, puis le contenu défile.
+ * Popup (src/ui/Popup.tsx ; maquettes 471:511 « Maladie » et 477:2158 « Manifeste », dessinées
+ * en 1680 × 1050) : 653 px de large à 96 px du bord droit, centré verticalement, coins de 24 px,
+ * 96 px de marge intérieure : le texte tient sur 461 px.
+ * La marge intérieure est la même sur les quatre côtés (demande de Ludovic du 30/10) : 96 px
+ * quand l'écran le permet, jusqu'à 24 px sur les plus petits. Elle diminue avec la largeur (le
+ * texte garde ses 461 px tant que possible) et avec la hauteur (le popup tient sans défiler) ;
+ * au-delà, le contenu défile.
  */
 .popup {
-  --grille-marge: min(120px, 7.143vw);
-  --largeur: max(400px, calc((100vw - 2 * var(--grille-marge)) * 2 / 5));
-  --marge-x: clamp(40px, calc((var(--largeur) - 384px) / 2), 96px);
-  --marge-y: clamp(48px, calc(20vh - 114px), 96px); /* 96 px dès 1050 px de haut */
-  position: fixed; z-index: 10; top: 50%; right: var(--grille-marge); width: var(--largeur);
+  --bord: min(96px, 5.714vw);
+  --largeur: clamp(400px, 38.87vw, 653px);
+  /* Marge intérieure : 96 px en 1680 × 1050, 48 px en 900 de haut, 24 px au plus petit */
+  --marge-p: clamp(24px, min(calc((var(--largeur) - 461px) / 2), calc(32vh - 240px)), 96px);
+  position: fixed; z-index: 10; top: 50%; right: var(--bord); width: var(--largeur);
   max-height: calc(100% - 2 * (var(--marge) + var(--haut) + 12px)); /* entre le header et le pied */
-  display: flex; flex-direction: column; border-radius: var(--rayon);
+  display: flex; flex-direction: column; border-radius: var(--rayon); /* 30 px sur la maquette */
   background: var(--verre-sombre); -webkit-backdrop-filter: var(--flou); backdrop-filter: var(--flou);
   opacity: 0; visibility: hidden; transform: translate(24px, -50%);
   transition: opacity 0.45s ease, visibility 0.45s, transform 0.6s cubic-bezier(.2,.7,.2,1);
+  transition-delay: 0.35s; /* à la fermeture, le contenu part d'abord (Popup.tsx) */
 }
 .popup--ouvert {
   opacity: 1; visibility: visible; transform: translateY(-50%);
   transition-duration: 0.45s, 0s, 0.6s; /* visible tout de suite : la croix peut prendre le focus */
+  transition-delay: 0.2s, 0s, 0.2s; /* le premier écran commence à partir, le popup suit */
 }
-/* Croix : bouton de 48 px à 12 px du coin, sans fond */
-.popup__fermer { position: absolute; z-index: 1; top: 12px; right: 12px; background: transparent; }
+/* Croix : bouton rond de 48 px à 6 px du coin, transparent (noir sur la maquette ; demande de
+   Ludovic du 30/10) */
+.popup__fermer {
+  position: absolute; z-index: 1; top: 6px; right: 6px; background: transparent;
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+}
 .popup__fermer:hover { background: var(--verre-leger); }
-.popup__defilement { overflow: hidden auto; overscroll-behavior: contain; padding: var(--marge-y) var(--marge-x); }
-/* Blocs espacés de 24 px */
+.popup__defilement {
+  overflow: hidden auto; overscroll-behavior: contain; padding: var(--marge-p);
+  scrollbar-width: none; /* la barre mangeait la marge de droite (le contenu défile toujours) */
+}
+.popup__defilement::-webkit-scrollbar { display: none; }
+/* Blocs espacés de 24 px (48 px avant les chiffres et le bouton) */
 .popup__contenu { display: flex; flex-direction: column; gap: 24px; }
 
-.popup__entete { display: flex; flex-direction: column; gap: 12px; }
-.popup__entete--titre { margin-bottom: 11px; } /* le texte commence 35 px sous le grand titre */
-.popup__surtitre { margin: 0; font-weight: 700; font-size: 16px; line-height: 25px; text-transform: uppercase; }
+/* Surtitre et grand titre, soulignés d'un filet ; à l'écart de la croix quand la marge est petite */
+.popup__entete {
+  display: flex; flex-direction: column; gap: 24px; padding-bottom: 24px;
+  padding-right: max(0px, calc(62px - var(--marge-p)));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+.popup__surtitre { margin: 0; font-size: 16px; line-height: 25px; }
 .popup__titre {
   margin: 0; font-family: var(--titre); font-weight: 400; text-transform: uppercase;
-  font-size: 48px; line-height: 48px;
+  font-size: 48px; line-height: 48px; /* 60 px sur la maquette, réduit à la demande de Ludovic */
 }
-.popup__texte p { margin: 0 0 24px; font-size: 16px; line-height: 24px; white-space: pre-line; }
+/* Texte courant : 16 px Light (Maladie) ; 14 px (Manifeste, `petit`) */
+.popup__texte p { margin: 0 0 24px; font-weight: 300; font-size: 16px; line-height: 24px; white-space: pre-line; }
+.popup__texte--petit p { margin-bottom: 21px; font-weight: 400; font-size: 14px; line-height: 21px; }
 .popup__texte p:last-child { margin-bottom: 0; }
-/* Sous le grand titre, la maquette resserre le texte à 366 px (retours à la ligne identiques) */
-.popup__entete--titre + .popup__texte { max-width: 95.45%; }
 
-.popup__chiffres { margin: 0; }
+/* Chiffres clés : deux par ligne, 48 px entre les colonnes, chacun souligné d'un filet */
+.popup__chiffres { margin: 24px 0 0; display: grid; grid-template-columns: 1fr 1fr; column-gap: 48px; }
 .popup__chiffre {
-  display: flex; flex-direction: column; padding: 24px 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.5);
-  font-weight: 700; line-height: 25px; text-transform: uppercase;
+  display: flex; flex-direction: column; justify-content: center; gap: 12px; padding: 24px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2); line-height: 25px;
 }
-.popup__chiffre dt { font-size: 14px; }
-.popup__chiffre dd { margin: 0; font-size: 24px; }
-.popup__lien { align-self: flex-start; }
+.popup__chiffre dt { font-weight: 300; font-size: 14px; }
+.popup__chiffre dd { margin: 0; font-size: 36px; text-transform: uppercase; }
+/* Bouton rouge « En savoir plus » */
+.popup__lien { align-self: flex-start; margin-top: 24px; padding: 0 32px; background: #d93e34; }
+.popup__lien:hover { background: #c2352c; }
 
 /* Écrans peu hauts (portables) : premier écran resserré pour que tout tienne sans défiler */
-@media (max-height: 900px) and (min-width: 761px) {
-  .salle-accueil { padding-block: 32px; gap: 32px; }
-  .soutien { padding: 0; }
-  .lien-popup { padding-block: 16px; }
-  .lien-popup--maladie { padding-bottom: 24px; }
+@media (max-height: 800px) and (min-width: 761px) {
+  .salle-accueil { padding-block: 24px; }
+  .salle-accueil, .salle-accueil__haut, .salle-accueil__bas { gap: 32px; }
 }
 
-.pied {
-  position: fixed; z-index: 10; left: var(--marge); right: var(--marge); bottom: 36px;
-  display: flex; justify-content: space-between; align-items: center; pointer-events: none;
+/*
+ * En bas au centre : flèches œuvre précédente / suivante (« SliderControls »). Au survol, le rond
+ * s'ouvre en carte de 256 × 144 (maquette 477:973) vers l'extérieur : visuel de l'œuvre, voile
+ * clair en bas ; la flèche se décale et le libellé apparaît à côté d'elle.
+ */
+.pied { position: fixed; z-index: 10; left: 50%; bottom: var(--marge); }
+.fleche {
+  --ouverture: 0.55s cubic-bezier(.2,.7,.2,1);
+  appearance: none; border: 0; padding: 0; cursor: pointer;
+  position: absolute; bottom: 0; isolation: isolate; overflow: hidden;
+  width: var(--haut); height: var(--haut); border-radius: var(--rayon);
+  background: var(--verre); -webkit-backdrop-filter: var(--flou); backdrop-filter: var(--flou);
+  display: flex; align-items: flex-end;
+  transition: width var(--ouverture), height var(--ouverture), background-color 0.2s ease;
 }
-.pied > * { pointer-events: auto; }
-.pied__suivante { padding: 0 22px 0 24px; }
-/* Pendant le passage par le couloir, l'interface s'efface (elle revient avec la nouvelle œuvre) */
-.salle-ui--passage .salle-accueil { opacity: 0; visibility: hidden; }
-.pied .pilule:disabled { cursor: default; opacity: 0.5; }
+.fleche--precedente { right: 4px; justify-content: flex-end; } /* s'ouvre vers la gauche */
+.fleche--suivante { left: 4px; justify-content: flex-start; } /* s'ouvre vers la droite */
+.fleche__image {
+  position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; object-fit: cover;
+  opacity: 0; transform: scale(1.15);
+  transition: opacity 0.4s ease, transform var(--ouverture);
+}
+.fleche::after {
+  content: ''; position: absolute; inset: 0; z-index: -1; opacity: 0;
+  background: linear-gradient(rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.2));
+  transition: opacity 0.4s ease;
+}
+/* Flou progressif sous le libellé (demande de Ludovic du 30/10, flou de 15 px de la maquette) :
+   entier en bas, il s'estompe jusqu'à mi-hauteur */
+.fleche::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; opacity: 0;
+  -webkit-backdrop-filter: var(--flou); backdrop-filter: var(--flou);
+  -webkit-mask-image: linear-gradient(to top, #000, rgba(0, 0, 0, 0) 50%);
+  mask-image: linear-gradient(to top, #000, rgba(0, 0, 0, 0) 50%);
+  transition: opacity 0.4s ease;
+}
+/* Ligne du bas de la carte : libellé et flèche, centrés ; fermée, la flèche seule au milieu du rond */
+.fleche__libelle {
+  flex: none; display: flex; align-items: center; justify-content: center;
+  width: 256px; height: var(--haut); font-size: 14px; white-space: nowrap;
+  transition: transform var(--ouverture);
+}
+.fleche--precedente .fleche__libelle { flex-direction: row-reverse; }
+.fleche__libelle svg { flex: none; }
+.fleche__texte {
+  display: block; overflow: hidden; max-width: 0; opacity: 0;
+  transition: max-width var(--ouverture), margin var(--ouverture), opacity 0.3s ease;
+}
+/* Fermée, la ligne (256 px) déborde du rond : on la recale pour que la flèche soit au centre */
+.fleche--suivante .fleche__libelle { transform: translateX(calc(var(--haut) / 2 - 128px)); }
+.fleche--precedente .fleche__libelle { transform: translateX(calc(128px - var(--haut) / 2)); }
+
+@media (hover: hover) {
+  .fleche:is(:hover, :focus-visible) { width: 256px; height: 144px; }
+  .fleche:is(:hover, :focus-visible) .fleche__image { opacity: 1; transform: none; }
+  .fleche:is(:hover, :focus-visible)::after, .fleche:is(:hover, :focus-visible)::before { opacity: 1; }
+  .fleche:is(:hover, :focus-visible) .fleche__libelle { transform: none; }
+  .fleche:is(:hover, :focus-visible) .fleche__texte { max-width: 160px; opacity: 1; transition-delay: 0s, 0s, 0.12s; }
+  .fleche--suivante:is(:hover, :focus-visible) .fleche__texte { margin-right: 12px; }
+  .fleche--precedente:is(:hover, :focus-visible) .fleche__texte { margin-left: 12px; }
+}
+.fleche:disabled { cursor: default; }
+/* Pendant le passage par le couloir, le premier écran part élément par élément (useApparition,
+   cascade) ; le panneau lui-même (fond sur mobile) s'efface ensuite */
+.salle-ui--passage .salle-accueil {
+  opacity: 0; visibility: hidden;
+  transition: opacity 0.4s ease 1.25s, visibility 0s 1.7s, transform 0.6s cubic-bezier(.2,.7,.2,1);
+}
 
 /* --- Chargement d'une salle ------------------------------------------- */
 .chargement {
@@ -296,7 +394,8 @@ button { font: inherit; color: inherit; }
 /* En entrant depuis la spirale : la barre seule, en bas, sur l'image de la carte */
 /* Transition avec la spirale : l'interface de la salle s'efface (voir InterfaceSalle) ; le
    premier écran, lui, part et revient lettre par lettre (ui/apparition.ts) */
-.salle-ui--transition .pied { opacity: 0; visibility: hidden; }
+/* Flèches du bas : effacées pendant les transitions avec la spirale et les passages par le couloir */
+.salle-ui--transition .pied, .salle-ui--passage .pied { opacity: 0; visibility: hidden; }
 .pied { transition: opacity 0.45s ease, visibility 0.45s; }
 .chargement--discret { background: transparent; justify-content: flex-end; padding-bottom: 48px; pointer-events: none; }
 .chargement__logo { height: 64px; width: auto; }
@@ -330,32 +429,32 @@ button { font: inherit; color: inherit; }
     max-height: 52%; border-radius: var(--rayon);
   }
   .salle-accueil {
-    --p: 24px;
+    --p: 24px; --p-gauche: 24px;
     justify-content: flex-start; gap: 16px; transform: none;
     background: var(--verre-sombre); -webkit-backdrop-filter: var(--flou); backdrop-filter: var(--flou);
   }
   .salle-accueil--cache { transform: translateY(24px); }
-  .popup { --marge-x: 24px; --marge-y: 24px; max-height: 60%; transform: translateY(24px); }
+  .popup { --marge-p: 24px; max-height: 60%; transform: translateY(24px); }
   .popup--ouvert { transform: none; }
-  .salle-accueil__haut { gap: 8px; }
+  .salle-accueil__haut { gap: 16px; }
   .salle-accueil__titre { font-size: 28px; }
-  .lien-popup, .lien-popup--maladie { padding: 12px 4px; gap: 4px; }
-  .lien-popup__maladie { font-size: 20px; }
+  .cartouche { flex: 1; width: auto; height: 112px; padding: 16px; }
+  .cartouche__libelle { font-size: 13px; line-height: 18px; }
+  .cartouche__titre { font-size: 18px; line-height: 20px; }
   .salle-accueil__bas { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
-  .soutien { padding: 0; gap: 4px; }
+  .soutien { gap: 4px; }
   .soutien__libelle { font-size: 13px; line-height: 18px; }
   .soutien__logo { width: 108px; height: 16px; }
-  .popup__fermer { top: 4px; right: 4px; }
-  .popup__entete { padding-right: 32px; }
+  .popup__entete { gap: 12px; padding-bottom: 16px; }
   .popup__titre { font-size: 32px; line-height: 32px; }
   .popup__texte p { font-size: 15px; line-height: 22px; }
-  .popup__entete--titre + .popup__texte { max-width: none; }
-  .popup__chiffre { padding: 16px 4px; }
-  .popup__chiffre dd { font-size: 20px; }
+  .popup__chiffres { column-gap: 24px; margin-top: 8px; }
+  .popup__chiffre { padding: 16px 0; gap: 4px; justify-content: flex-end; }
+  .popup__chiffre dt { line-height: 18px; }
+  .popup__chiffre dd { font-size: 24px; }
+  .popup__lien { margin-top: 8px; }
 
-  .pied { bottom: 12px; }
-  .pied .pilule { width: var(--haut); padding: 0; justify-content: center; }
-  .pied .pilule span { display: none; }
+
 }
 
 @media (prefers-reduced-motion: reduce) {

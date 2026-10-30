@@ -17,8 +17,10 @@ import { LONGUEUR_COULOIR, groupesSalles, matricePlacement, placementArrivee, po
  *   flèches ← →) ; sans action, on y dérive très lentement, dans le sens du dernier scroll ;
  * - la caméra regarde toujours l'œuvre ; la hauteur de la souris dans la fenêtre
  *   règle le regard : du pied (souris en bas) au sommet (souris en haut) ;
- * - les popups Maladie et Manifeste mènent à des points de vue hors du cercle (étapes) ;
- *   en les fermant (croix, clic à côté, Échap), on revient sur le cercle, là où on l'avait quitté ;
+ * - les popups Maladie et Manifeste mènent à des points de vue hors du cercle (étapes) ; on peut
+ *   y tourner autour de l'œuvre (scroll, à leur distance et leur hauteur) et le regard y suit
+ *   la souris comme sur le cercle ; en les fermant (croix, clic à côté, Échap), on revient sur
+ *   le cercle, là où on l'avait quitté (décalé d'autant qu'on a tourné au point de vue) ;
  * - œuvre précédente / suivante : on longe le cercle jusqu'en face de la porte (l'entrée
  *   ou la sortie, voir portesDuPassage), on
  *   traverse le couloir et l'on entre dans la salle d'arrivée, posée au bout (passage.ts).
@@ -60,6 +62,8 @@ const lerp = THREE.MathUtils.lerp
 
 /** Radians parcourus par pixel de scroll (sens horaire vu du dessus) */
 const RAD_PAR_PIXEL = 0.0012
+/** Au point de vue d'un popup : après avoir tourné de cet angle autour de l'œuvre, on regarde son axe */
+const TOUR_VERS_AXE = Math.PI / 3
 /** Passage : on s'aligne sur l'axe de la porte à cette distance avant elle (et après la porte d'arrivée) */
 const APPROCHE = 6
 /** Passage, après le couloir : le regard vise ce point plus loin sur le trajet (m), amorti */
@@ -110,6 +114,11 @@ export function Navigation({
     sourisX: 0, // -1 = gauche, 1 = droite
     sourisXLisse: 0,
     etape: -1,
+    /** Au point de vue d'un popup : angle dont on a tourné autour de l'œuvre (scroll), et sa cible */
+    tourEtape: 0,
+    tourEtapeCible: 0,
+    /** Hauteur de la souris en partant vers le point de vue : le regard s'en écarte comme sur le cercle */
+    sourisEtape: 0.55,
     /** Sens du déplacement automatique : celui du dernier scroll (-1 = horaire) */
     sens: -1,
     /** 0 → 1 : le déplacement automatique démarre en douceur (arrivée, retour d'étape) */
@@ -188,6 +197,29 @@ export function Navigation({
     return out.set(cx + Math.cos(angle) * lateral, lerp(regardBas, regardHaut, s.sourisLisse), cz - Math.sin(angle) * lateral)
   }
 
+  /**
+   * Vue au point de vue d'un popup (étape), tournée de `tourEtape` autour de l'axe de l'œuvre,
+   * à la même distance et la même hauteur. Le point regardé tourne avec la caméra et rejoint
+   * l'axe à mesure qu'on s'éloigne du point de vue (sinon on finirait par regarder le vide) ;
+   * sa hauteur suit la souris, avec l'amplitude du cercle, à partir du regard de l'étape.
+   */
+  function vueEtape(e: SalleConfig['etapes'][number], pos: THREE.Vector3, cible: THREE.Vector3) {
+    const s = n.current
+    const c = versCyl(e.position)
+    depuisCyl({ angle: c.angle + s.tourEtape, rayon: c.rayon, y: c.y }, pos)
+    const ct = versCyl(e.cible)
+    const versAxe = lisse(borner(Math.abs(s.tourEtape) / TOUR_VERS_AXE))
+    depuisCyl({ angle: ct.angle + s.tourEtape, rayon: ct.rayon * (1 - versAxe), y: ct.y }, cible)
+    // Amplitude du regard sur le cercle (angle entre regard bas et regard haut, vus depuis lui)
+    const g = r.current
+    const yeux = P().hauteurYeux
+    const plage = Math.atan2(g.regardHaut - yeux, g.rayon) - Math.atan2(g.regardBas - yeux, g.rayon)
+    const d = Math.hypot(cible.x - pos.x, cible.z - pos.z)
+    const tangage = Math.atan2(cible.y - pos.y, d) + (s.sourisLisse - s.sourisEtape) * plage
+    cible.y = pos.y + d * Math.tan(borner(tangage, -1.3, 1.3))
+    return pos
+  }
+
   function demarrerTransition(arrivee: Cyl) {
     const s = n.current
     s.depart = versCyl(camera.position)
@@ -208,6 +240,8 @@ export function Navigation({
     if (s.mode === 'cercle' || s.mode === 'retour') s.angleMemoire = s.angle // position exacte sur l'anneau
     s.mode = 'aller'
     s.etape = i
+    s.tourEtape = s.tourEtapeCible = 0
+    s.sourisEtape = s.souris
     demarrerTransition(versCyl(e.position))
     store.set({ etape: i, arrive: false })
   }
@@ -215,6 +249,9 @@ export function Navigation({
   function revenirAuCercle() {
     const s = n.current
     if (s.mode === 'cercle' || s.mode === 'retour' || s.mode === 'passage' || s.mode === 'sortie') return
+    // On a tourné autour de l'œuvre au point de vue : on retrouve le cercle d'autant plus loin
+    if (s.mode === 'etape') s.angleMemoire += s.tourEtape
+    s.tourEtape = s.tourEtapeCible = 0
     s.mode = 'retour'
     s.anneau = 'cercle' // on revient toujours sur le cercle de la visite
     s.angle = s.angleCible = s.angleMemoire
@@ -233,10 +270,18 @@ export function Navigation({
     store.set({ onglet: 'info' })
   }
 
-  /** Avancer sur l'anneau ; depuis la vue d'arrivée, le premier scroll mène sur le cercle */
+  /**
+   * Avancer sur l'anneau ; depuis la vue d'arrivée, le premier scroll mène sur le cercle.
+   * Au point de vue d'un popup, on tourne autour de l'œuvre sans quitter le popup (on n'en sort
+   * que par la croix, un clic à côté ou Échap).
+   */
   function avancer(radians: number) {
     const s = n.current
-    // Devant un popup, on lit : on n'en sort que par la croix, un clic à côté ou Échap
+    if (s.mode === 'etape') {
+      s.tourEtapeCible += radians
+      if (radians !== 0) s.sens = Math.sign(radians)
+      return
+    }
     if (s.mode !== 'cercle') return
     if (s.anneau === 'loin' && radians !== 0) s.anneau = 'cercle'
     s.angleCible += radians
@@ -413,7 +458,7 @@ export function Navigation({
       doigt.y = e.clientY
       doigt.distance += Math.hypot(dx, dy)
       const s = n.current
-      if (s.mode !== 'cercle') return
+      if (s.mode !== 'cercle' && s.mode !== 'etape') return
       avancer(dx * 2.2 * RAD_PAR_PIXEL * r.current.vitesse)
       s.souris = borner(s.souris + (dy / window.innerHeight) * 1.3)
     }
@@ -553,8 +598,8 @@ export function Navigation({
       if (s.t >= 1) arriver(pos, cible)
     } else if (s.mode === 'etape') {
       const e = salle.current.etapes[s.etape]
-      pos.set(...e.position)
-      cible.set(...e.cible)
+      s.tourEtape = instant ? s.tourEtapeCible : amortir(s.tourEtape, s.tourEtapeCible, g.amorti, dt)
+      vueEtape(e, pos, cible)
       fov = e.focale ?? focale
     } else {
       // Transition dans l'espace, en coordonnées cylindriques autour de l'œuvre :
@@ -570,7 +615,8 @@ export function Navigation({
       let fovFin = focale
       if (s.mode === 'aller') {
         const e = salle.current.etapes[s.etape]
-        cibleFin = tmp.cibleCercle.set(...e.cible)
+        cibleFin = tmp.cibleCercle
+        vueEtape(e, tmp.posEntree, cibleFin) // suit la souris pendant l'aller
         fovFin = e.focale ?? focale
       } else if (s.mode === 'sortie') {
         // Le regard de la vue initiale, sans la souris : celui de la capture de la carte
@@ -625,6 +671,14 @@ export function Navigation({
       /** Capture de la vue d'entrée (image et profondeur), voir outils/capture.ts */
       capturer: (nom: string) =>
         import('../outils/capture').then((m) => m.capturer({ gl, scene, camera, etat: n.current, nom, focale, transition: reglagesTransition(salle.current) })),
+      /** Photos des cartouches Maladie et Manifeste (points de vue des popups), voir outils/capture.ts */
+      capturerCartouches: async (nom: string) => {
+        const { oeuvres } = await import('../oeuvres')
+        const oeuvre = oeuvres.find((o) => o.id === nom)
+        if (!oeuvre) throw new Error(`œuvre inconnue : ${nom}`)
+        const m = await import('../outils/capture')
+        return m.capturerCartouches({ gl, scene, camera, etat: n.current, etapes: salle.current.etapes, vues: oeuvre.vues, aller: allerEtape, retour: revenirAuCercle, nom })
+      },
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [camera])

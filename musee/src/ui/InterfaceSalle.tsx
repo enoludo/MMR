@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useProgress } from '@react-three/drei'
-import { CaretLeftIcon, CaretRightIcon } from '@phosphor-icons/react'
 import { nouvelleCle, store, useEtat, type Sens } from '../store'
 import { lienOeuvre, oeuvres, type Oeuvre, type Onglet } from '../oeuvres'
 import { EnTete } from './EnTete'
-import { IconeChevron, IconeCroix, IconePartage } from './icones'
+import { IconeCroix, IconeFleche, IconePartage } from './icones'
 import { Popup, PopupChiffres, PopupEntete, PopupLien, PopupTexte } from './Popup'
 import { sortir } from '../transition'
 import { useApparition } from './apparition'
@@ -25,10 +24,10 @@ function partirVers(oeuvre: Oeuvre, sens: Sens) {
 }
 
 /**
- * Interface d'une salle, d'après la maquette Figma (écrans 445:275, 447:602, 448:911) :
- * header avec le titre de l'œuvre (retour à la collection), premier écran à gauche
- * (titre, liens Maladie et Manifeste, soutien, partage), popups Maladie et Manifeste
- * à droite, œuvre précédente / suivante en bas.
+ * Interface d'une salle, d'après la maquette Figma (premier écran 477:973, popups 447:602
+ * et 448:911) : header avec le titre de l'œuvre (retour à la collection), premier écran à
+ * gauche (titre, cartouches Maladie et Manifeste, soutien, partage), popups Maladie et
+ * Manifeste à droite, en bas flèches œuvre précédente / suivante (qui s'ouvrent en carte au survol).
  */
 export function InterfaceSalle({ oeuvre }: { oeuvre: Oeuvre }) {
   const onglet = useEtat((e) => e.onglet)
@@ -37,16 +36,31 @@ export function InterfaceSalle({ oeuvre }: { oeuvre: Oeuvre }) {
   // s'efface ; en sortant, il disparaît dès que la caméra repart vers la vue initiale.
   // Titre lettre par lettre et liens en fondu, comme le titre de la spirale.
   const enTransition = useEtat((e) => !!e.transition && !(e.transition.sens === 'entree' && e.transition.phase === 'fondu'))
+  const ouvert = onglet !== 'info'
+  // Popup en train de se fermer (ouvert au rendu précédent)
+  const etaitOuvert = useRef(ouvert)
+  const popupFerme = useRef(false)
+  if (etaitOuvert.current !== ouvert) {
+    popupFerme.current = etaitOuvert.current
+    etaitOuvert.current = ouvert
+  }
   const premierEcran = useRef<HTMLElement>(null)
   const titre = useRef<HTMLHeadingElement>(null)
   useApparition({
     conteneur: premierEcran,
     titre,
     texte: oeuvre.titre,
-    autres: '.salle-accueil__liens > *, .salle-accueil__bas > *',
-    visible: !enTransition,
+    autres: '.cartouche, .salle-accueil__bas > *',
+    // Vers l'œuvre précédente / suivante ou à l'ouverture d'un popup : il part dès le clic,
+    // élément par élément ; il revient à l'arrivée dans la salle suivante ou à la fermeture
+    visible: !enTransition && !enPassage && !ouvert,
+    cascade: enPassage || ouvert,
+    // À la fermeture d'un popup, on attend que son contenu soit parti
+    delai: popupFerme.current ? 0.35 : 0,
   })
-  const ouvert = onglet !== 'info'
+  useEffect(() => {
+    popupFerme.current = false // une seule fois, à la fermeture
+  })
 
   // Le popup garde son contenu pendant qu'il disparaît
   const [contenu, setContenu] = useState<'maladie' | 'manifeste'>('maladie')
@@ -95,38 +109,24 @@ export function InterfaceSalle({ oeuvre }: { oeuvre: Oeuvre }) {
         }
       />
 
-      {/* Premier écran : on ouvre les popups depuis ses liens Maladie et Manifeste */}
+      {/* Premier écran : on ouvre les popups depuis ses cartouches Maladie et Manifeste */}
       <section
         ref={premierEcran}
         className={`salle-accueil ${ouvert ? 'salle-accueil--cache' : ''}`}
-        inert={ouvert || enTransition}
+        inert={ouvert || enTransition || enPassage}
         aria-label={oeuvre.titre}
       >
         <div className="salle-accueil__haut">
           {/* Écrit et découpé en lettres par useApparition */}
           <h1 className="salle-accueil__titre" ref={titre} />
-          <div className="salle-accueil__liens">
-            <button
-              type="button"
-              className="lien-popup lien-popup--maladie"
-              onClick={() => choisirOnglet(oeuvre, 'maladie')}
-            >
-              <span className="lien-popup__libelle">Maladie</span>
-              <span className="lien-popup__maladie">
-                {oeuvre.maladie || 'À venir'}
-                <IconeChevron />
-              </span>
-            </button>
-            <button
-              type="button"
-              className="lien-popup"
-              onClick={() => choisirOnglet(oeuvre, 'manifeste')}
-            >
-              <span className="lien-popup__libelle">
-                Manifeste
-                <IconeChevron />
-              </span>
-            </button>
+          <div className="salle-accueil__cartouches">
+            <Cartouche
+              oeuvre={oeuvre}
+              onglet="maladie"
+              libelle="Maladie"
+              titre={oeuvre.maladie || 'À venir'}
+            />
+            <Cartouche oeuvre={oeuvre} onglet="manifeste" libelle="Manifeste" titre={oeuvre.manifesteTitre} />
           </div>
         </div>
 
@@ -141,16 +141,43 @@ export function InterfaceSalle({ oeuvre }: { oeuvre: Oeuvre }) {
       </Popup>
 
       <nav className="pied" aria-label="Navigation dans la collection">
-        <button type="button" className="pilule pied__precedente" disabled={enPassage} onClick={() => partirVers(precedente, 'precedente')}>
-          <CaretLeftIcon size={12} weight="bold" aria-hidden />
-          <span>Œuvre précédente</span>
-        </button>
-        <button type="button" className="pilule pied__suivante" disabled={enPassage} onClick={() => partirVers(suivante, 'suivante')}>
-          <span>Œuvre suivante</span>
-          <CaretRightIcon size={12} weight="bold" aria-hidden />
-        </button>
+        <Fleche oeuvre={precedente} sens="precedente" desactivee={enPassage} />
+        <Fleche oeuvre={suivante} sens="suivante" desactivee={enPassage} />
       </nav>
     </div>
+  )
+}
+
+/**
+ * Flèche œuvre précédente ou suivante, en bas : un rond ; au survol, il s'ouvre en carte
+ * (maquette 477:973) avec le visuel de l'œuvre, la flèche se décale et le libellé apparaît.
+ * Lance le passage par le couloir.
+ */
+function Fleche({ oeuvre, sens, desactivee }: { oeuvre: Oeuvre; sens: Sens; desactivee: boolean }) {
+  return (
+    <button type="button" className={`fleche fleche--${sens}`} disabled={desactivee} onClick={() => partirVers(oeuvre, sens)}>
+      <img className="fleche__image" src={oeuvre.vignette ?? oeuvre.image} alt="" />
+      <span className="fleche__libelle">
+        <span className="fleche__texte">{sens === 'suivante' ? 'Œuvre suivante' : 'Œuvre précédente'}</span>
+        <IconeFleche suivant={sens === 'suivante'} />
+      </span>
+    </button>
+  )
+}
+
+/**
+ * Cartouche du premier écran (maquette 477:973) : photo, libellé et titre (nom de la maladie,
+ * titre du manifeste). Ouvre le popup et envoie la caméra vers son point de vue.
+ */
+function Cartouche({ oeuvre, onglet, libelle, titre }: { oeuvre: Oeuvre; onglet: 'maladie' | 'manifeste'; libelle: string; titre?: string }) {
+  return (
+    <button type="button" className={`cartouche cartouche--${onglet}`} onClick={() => choisirOnglet(oeuvre, onglet)}>
+      <img className="cartouche__photo" src={oeuvre.cartouches?.[onglet] ?? oeuvre.image} alt="" />
+      <span className="cartouche__texte">
+        <span className="cartouche__libelle">{libelle}</span>
+        {titre && <span className="cartouche__titre">{titre}</span>}
+      </span>
+    </button>
   )
 }
 
@@ -170,7 +197,7 @@ function Soutien({ oeuvre }: { oeuvre: Oeuvre }) {
   )
 }
 
-/** Popup Maladie (maquette 447:602) */
+/** Popup Maladie (maquette 471:511) */
 function Maladie({ oeuvre }: { oeuvre: Oeuvre }) {
   const t = oeuvre.maladieTexte
   return (
@@ -183,12 +210,12 @@ function Maladie({ oeuvre }: { oeuvre: Oeuvre }) {
   )
 }
 
-/** Popup Manifeste (maquette 448:911) */
+/** Popup Manifeste (maquette 477:2158) */
 function Manifeste({ oeuvre }: { oeuvre: Oeuvre }) {
   return (
     <>
-      <PopupEntete surtitre="Manifeste" />
-      <PopupTexte paragraphes={oeuvre.manifeste} />
+      <PopupEntete surtitre="Manifeste" titre={oeuvre.manifesteTitre} />
+      <PopupTexte paragraphes={oeuvre.manifeste} petit />
     </>
   )
 }
@@ -211,7 +238,7 @@ function Partager({ oeuvre }: { oeuvre: Oeuvre }) {
     }
   }
   return (
-    <button type="button" className="pilule pilule--sombre pilule--partage" onClick={partager}>
+    <button type="button" className="pilule pilule--partage" onClick={partager}>
       <IconePartage />
       <span aria-live="polite">{copie ? 'Lien copié' : 'Partager cette œuvre'}</span>
     </button>

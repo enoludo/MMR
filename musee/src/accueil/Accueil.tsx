@@ -7,6 +7,7 @@ import { BackgroundTint } from './gallery/BackgroundTint.js'
 import { getCenteredSlot } from './gallery/centeredSlot.js'
 import { cartesSpirale } from '../oeuvres'
 import { EnTete } from '../ui/EnTete'
+import { IconeFleche } from '../ui/icones'
 import { store, useEtat } from '../store'
 import { carteVivante, entrer, prechargerOeuvre } from '../transition'
 import { imagePrete } from '../ui/ToileTransition'
@@ -228,24 +229,12 @@ export function Accueil() {
 
       <div className="accueil__fleches">
         <button type="button" className="bouton-rond" aria-label="Carte précédente" onClick={() => defiler.current(-1)}>
-          <Chevron />
+          <IconeFleche />
         </button>
         <button type="button" className="bouton-rond" aria-label="Carte suivante" onClick={() => defiler.current(1)}>
-          <Chevron suivant />
+          <IconeFleche suivant />
         </button>
       </div>
     </div>
-  )
-}
-
-/** Flèche fournie pour la galerie spirale (un seul tracé, retourné pour « suivant »). */
-function Chevron({ suivant = false }: { suivant?: boolean }) {
-  return (
-    <svg width="8" height="14" viewBox="0 0 8 14" fill="none" aria-hidden style={suivant ? { transform: 'scaleX(-1)' } : undefined}>
-      <path
-        d="M6.41896 13.5376L0.182914 7.30159C-0.0609489 7.058 -0.0609489 6.66277 0.182914 6.41918L6.41896 0.183135C6.75859 -0.156502 7.33854 -0.00110698 7.46285 0.462845C7.52054 0.678166 7.45899 0.907914 7.30136 1.06554L1.50573 6.86039L7.30136 12.6552C7.641 12.9949 7.4856 13.5748 7.02165 13.6991C6.80633 13.7568 6.57659 13.6953 6.41896 13.5376Z"
-        fill="currentColor"
-      />
-    </svg>
   )
 }

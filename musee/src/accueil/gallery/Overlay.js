@@ -1,6 +1,11 @@
 import gsap from 'gsap';
 import { SplitText } from 'gsap/SplitText';
 
+// Lettres du titre (site React) : mêmes réglages que le titre des salles (ui/apparition.ts).
+// Toujours passées en copie : GSAP complète les objets qu'on lui donne.
+const ENTREE_LETTRES = { yPercent: 110, opacity: 0 };
+const APPARITION_LETTRES = { yPercent: 0, opacity: 1, duration: 0.8, ease: 'power3.out', stagger: 0.022 };
+
 gsap.registerPlugin(SplitText);
 
 /**
@@ -76,9 +81,11 @@ export class Overlay {
             // 100. 130 gives real headroom rather than a ~1px margin that
             // rounding/antialiasing can eat — which is what still let the
             // very top sliver of each letter show before the tween
-            // started.
-            { yPercent: 130 },
-            { yPercent: 0, duration: 0.4, ease: 'power4.out', stagger: 0.012 }
+            // started. Site React (30/10, demande de Ludovic) : lettres plus douces,
+            // comme dans les salles (ui/apparition.ts) — elles se fondent en montant, donc
+            // encore transparentes en entrant dans leur masque : 110 suffit.
+            { ...ENTREE_LETTRES },
+            { ...APPARITION_LETTRES }
           )
           .fromTo(
             this.ctaEl,
@@ -116,7 +123,7 @@ export class Overlay {
     });
     gsap.set(this.titleEl, { opacity: 1 });
     if (this.masque) {
-      gsap.set(this.split.chars, { yPercent: 130 });
+      gsap.set(this.split.chars, { ...ENTREE_LETTRES });
       gsap.set(this.ctaEl, { opacity: 0, y: 12 });
     }
   }
@@ -134,7 +141,7 @@ export class Overlay {
     if (this.cartePrevue) return this.poser(this.cartePrevue);
     this.timeline = gsap.timeline();
     if (this.split) {
-      this.timeline.to(this.split.chars, { yPercent: -130, duration: 0.3, ease: 'power2.in', stagger: 0.008 }, 0);
+      this.timeline.to(this.split.chars, { yPercent: -110, opacity: 0, duration: 0.45, ease: 'power2.inOut', stagger: 0.012 }, 0);
     }
     this.timeline.to(this.ctaEl, { opacity: 0, y: -10, duration: 0.25, ease: 'power1.in' }, 0);
   }
@@ -149,7 +156,7 @@ export class Overlay {
     this.timeline = gsap
       .timeline()
       .set(this.titleEl, { opacity: 1 })
-      .fromTo(this.split.chars, { yPercent: 130 }, { yPercent: 0, duration: 0.4, ease: 'power4.out', stagger: 0.012 })
+      .fromTo(this.split.chars, { ...ENTREE_LETTRES }, { ...APPARITION_LETTRES })
       .fromTo(this.ctaEl, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out' }, '<');
   }
 }

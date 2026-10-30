@@ -30,15 +30,21 @@ export interface Oeuvre {
   maladie: string
   /** Image de la carte, dans la spirale */
   image: string
+  /** Visuel de l'œuvre, sur la carte « Œuvre suivante » des salles (à défaut, l'image de la carte) */
+  vignette?: string
   /**
    * Capture de la vue d'entrée de la salle (outils/capture.ts), sans extension : la profondeur
    * (-profondeur.png) et les réglages (.json) donnent la parallaxe de la transition depuis la spirale
    */
   vueEntree?: string
+  /** Photos des cartouches Maladie et Manifeste du premier écran (à défaut, l'image de la carte) */
+  cartouches?: Partial<Record<'maladie' | 'manifeste', string>>
   mecene?: { nom: string; lien?: string }
   /** Partenaire : logo sous « Avec le soutien de » (à défaut, le nom du mécène) */
   partenaire?: { nom: string; logo?: string }
   maladieTexte: TexteMaladie
+  /** Titre du manifeste, sous « Manifeste » dans sa cartouche */
+  manifesteTitre?: string
   /** Paragraphes du manifeste ; un retour à la ligne (\n) dans un paragraphe est conservé */
   manifeste: string[]
   /** Salle 3D où l'œuvre est exposée */
@@ -50,6 +56,15 @@ export interface Oeuvre {
 const A_VENIR = ['Texte à venir.']
 const maladieAVenir = (titre: string): TexteMaladie => ({ titre, paragraphes: A_VENIR })
 
+/**
+ * Photos des cartouches : les points de vue des popups Maladie et Manifeste, photographiés
+ * dans la salle (`__visite.capturerCartouches(id)`, outils/capture.ts)
+ */
+const capturesCartouches = (id: string): Oeuvre['cartouches'] => ({
+  maladie: versionne(`/assets/captures/${id}-maladie.webp`),
+  manifeste: versionne(`/assets/captures/${id}-manifeste.webp`),
+})
+
 /** Pour les tests, toutes les œuvres sont exposées dans la salle provisoire. */
 const VUES_PROVISOIRES: Oeuvre['vues'] = { info: null, maladie: 'main', manifeste: 'visage' }
 
@@ -60,7 +75,9 @@ export const oeuvres: Oeuvre[] = [
     maladie: 'Acromégalie',
     // Capture de sa salle (vue d'entrée, outils/capture.ts) ; l'ancien visuel : /assets/images/geant-de-marbre.webp
     image: versionne('/assets/captures/le-seuil-des-proportions.webp'),
+    vignette: versionne('/assets/images/geant-de-marbre.webp'),
     vueEntree: '/assets/captures/le-seuil-des-proportions',
+    cartouches: capturesCartouches('le-seuil-des-proportions'),
     mecene: { nom: 'Fondation Delorme-Vasseur' },
     partenaire: { nom: 'Recordati', logo: versionne('/assets/logos/recordati.svg') },
     // Textes et chiffres de la maquette Figma (chiffres et lien à faire valider)
@@ -69,15 +86,19 @@ export const oeuvres: Oeuvre[] = [
       paragraphes: [
         "L'acromégalie est une maladie hormonale rare due à une production excessive et prolongée d'hormone de croissance (GH) par l'hypophyse, le plus souvent causée par une petite tumeur bénigne (adénome hypophysaire).",
       ],
+      // Maquette 471:511 (« Traitemennt » et « O » corrigés)
       chiffres: [
-        { libelle: 'Personnes concernées', valeur: '1/2 000 000' },
+        { libelle: 'Personnes concernées', valeur: '1/2M' },
         { libelle: 'Gène en cause', valeur: 'ACVR1' },
+        { libelle: "Mal diagnostiqué d'abord", valeur: '9/10' },
+        { libelle: 'Traitement curatif', valeur: '0' },
       ],
       lien: 'https://www.orpha.net/fr/disease/detail/963',
     },
+    manifesteTitre: 'Métamorphose', // maquettes Figma 477:973 et 477:2158
+    // Maquette 477:2158 : le second paragraphe seulement, d'un seul tenant
     manifeste: [
-      "La monumentalité place le visiteur face à un corps devenu impossible à ignorer. Au sein de cette silhouette, les mains, les pieds et la mâchoire dépassent progressivement leur juste mesure. Ces disproportions localisées traduisent la manière dont l'acromégalie transforme lentement le corps, sans le faire grandir en hauteur.",
-      "Ici, le corps ne grandit plus en hauteur, il change d'échelle.\nDans l'acromégalie, l'excès d'hormone de croissance transforme lentement les contours, les mains, les pieds, les traits du visage s'élargissent au fil des années. L'œuvre révèle cette métamorphose progressive, longtemps discrète, jusqu'au moment où la mesure du corps devient impossible à ignorer.",
+      "Ici, le corps ne grandit plus en hauteur, il change d'échelle. Dans l'acromégalie, l'excès d'hormone de croissance transforme lentement les contours, les mains, les pieds, les traits du visage s'élargissent au fil des années. L'œuvre révèle cette métamorphose progressive, longtemps discrète, jusqu'au moment où la mesure du corps devient impossible à ignorer.",
     ],
     salle: salleProvisoire,
     vues: VUES_PROVISOIRES,
@@ -88,7 +109,9 @@ export const oeuvres: Oeuvre[] = [
     maladie: 'Maladie de Huntington',
     // Capture de sa salle (vue d'entrée, outils/capture.ts) ; l'ancien visuel : /assets/images/la-maladie-de-huntington.webp
     image: versionne('/assets/captures/la-maladie-de-huntington.webp'),
+    vignette: versionne('/assets/images/la-maladie-de-huntington.webp'),
     vueEntree: '/assets/captures/la-maladie-de-huntington',
+    cartouches: capturesCartouches('la-maladie-de-huntington'),
     maladieTexte: maladieAVenir('Maladie de Huntington'),
     manifeste: A_VENIR,
     salle: salleProvisoireBleue, // ambiance bleutée, comme sa vignette

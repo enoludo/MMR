@@ -156,3 +156,65 @@ export async function capturer({
     etat.enEntree = false
   }
 }
+
+/** Côté des photos des cartouches (192 px à l'écran, ×3) */
+const COTE_CARTOUCHE = 576
+
+/**
+ * Photos des cartouches Maladie et Manifeste du premier écran (maquette 471:344) : la vue où va
+ * la caméra à l'ouverture de chaque popup (Oeuvre.vues), sans le décalage dû au popup, recadrée
+ * au carré au centre. Dans la salle de l'œuvre, sur le premier écran :
+ * `await __visite.capturerCartouches('le-seuil-des-proportions')`. Fichiers :
+ * public/assets/captures/<nom>-maladie.webp et <nom>-manifeste.webp. À refaire si la salle, la
+ * lumière ou les points de vue changent.
+ */
+export async function capturerCartouches({
+  gl,
+  scene,
+  camera,
+  etat,
+  etapes,
+  vues,
+  aller,
+  retour,
+  nom,
+}: {
+  gl: THREE.WebGLRenderer
+  scene: THREE.Scene
+  camera: THREE.PerspectiveCamera
+  /** État de la navigation (Navigation.tsx) */
+  etat: { mode: string }
+  etapes: { id: string }[]
+  vues: Partial<Record<string, string | null>>
+  aller: (i: number) => void
+  retour: () => void
+  nom: string
+}) {
+  const fichiers: string[] = []
+  for (const onglet of ['maladie', 'manifeste']) {
+    const i = etapes.findIndex((e) => e.id === vues[onglet])
+    if (i < 0) throw new Error(`pas de point de vue pour ${onglet}`)
+    aller(i)
+    // Arrivée au point de vue, puis le temps que le regard et le reflet se posent
+    while (etat.mode !== 'etape') await images(1)
+    await images(30)
+
+    const ratio = gl.getPixelRatio()
+    gl.setPixelRatio(resolutionMax())
+    gl.render(scene, camera)
+    const { width, height } = gl.domElement
+    const cote = Math.min(width, height)
+    const photo = document.createElement('canvas')
+    photo.width = photo.height = COTE_CARTOUCHE
+    const ctx = photo.getContext('2d')!
+    ctx.imageSmoothingQuality = 'high'
+    ctx.drawImage(gl.domElement, (width - cote) / 2, (height - cote) / 2, cote, cote, 0, 0, COTE_CARTOUCHE, COTE_CARTOUCHE)
+    gl.setPixelRatio(ratio)
+
+    const fichier = `${nom}-${onglet}.webp`
+    await envoyer(fichier, await enBlob(photo, 'image/webp', 0.88))
+    fichiers.push(fichier)
+  }
+  retour()
+  return fichiers
+}
