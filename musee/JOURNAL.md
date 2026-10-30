@@ -113,6 +113,7 @@ Une entrée par session, la plus récente en haut. Le détail technique est dans
     - fondu d'arrivée dans la salle ramené de 1 s à 0,6 s (réglable touche M, « Transitions · <salle> ») ;
     - comparaison figée à mi-parcours, écran 2560 × 1440 Retina : `plans/comparaisons/transition-profondeur-avant-apres.png`.
   - **[abandonné]** Contour lissé (quatre rayons par pixel au bord de l'œuvre) et passage des rayons derrière les contours (plus de stries) : jugé « pire qu'avant » par Ludovic sur grand écran Retina ; le calcul de la transition devenait environ deux fois plus lourd (shader beaucoup plus gros, plus lent partout). Retour à l'ancien calcul.
+  - Enregistré dans Git (`b5f5304`, en local) et mis en ligne sur le labo `mmr-lab` : cartes de la spirale en version légère et entrée dans une salle vérifiées en ligne, sans erreur.
 
 - **[à voir]** **Ambiance de couleur par salle** : la salle de « La maladie de Huntington » (l'œuvre suivante) est **bleutée** comme sa vignette (gris bleus, lumière blanche froide), sans nouveau calcul de lumière : pierre plus bleue, soleil de l'œuvre, faisceau et poussière plus froids, ambiance de l'œuvre et des couloirs (`salleProvisoireBleue`, champ `ambiance` de la config). Pendant le passage, l'ambiance de l'œuvre glisse d'une salle à l'autre.
 
