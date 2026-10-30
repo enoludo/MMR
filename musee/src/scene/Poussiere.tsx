@@ -19,9 +19,9 @@ const MAX = 16000 // grains réservés (8000 avant le 29/10) ; le réglage « de
 export function Poussiere({ config }: { config: SalleConfig }) {
   const p = useControls('Poussière', {
     densite: { value: 1, min: 0, max: 1, step: 0.01, label: 'densité' },
-    taille: { value: 8, min: 0.3, max: 16, step: 0.05 },
-    vitesse: { value: 6, min: 0, max: 12, step: 0.05 },
-    brillance: { value: 1, min: 0, max: 4, step: 0.05 },
+    taille: { value: 3.35, min: 0.3, max: 16, step: 0.05 },
+    vitesse: { value: 1.05, min: 0, max: 12, step: 0.05 },
+    brillance: { value: 0.45, min: 0, max: 4, step: 0.05 },
   })
   const { size, viewport, camera } = useThree()
 
