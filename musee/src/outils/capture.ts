@@ -11,9 +11,12 @@ import type { ReglagesCapture } from '../ui/ToileTransition'
  * ouvrir la salle de l'œuvre, attendre la fin du chargement, puis dans la console
  * `await __visite.capturer('le-seuil-des-proportions')`. Les fichiers arrivent dans
  * public/assets/captures (via vite.config.ts) : <nom>.webp (image dessinée en double
- * résolution, 5120 × 2880, nette pendant le zoom de la transition), <nom>-profondeur.png
- * (2560 × 1440), <nom>.json.
+ * résolution, 5120 × 2880, nette pendant le zoom de la transition) et <nom>-profondeur.png à la
+ * même résolution, leur version légère <nom>-2880.webp et <nom>-profondeur-2880.png, <nom>.json.
  */
+
+/** Largeur de la version légère (image et profondeur), voir versionLegere (version.ts) */
+const LEGERE = 2880
 
 const Z_PROCHE = 1
 const Z_LOIN = 80
@@ -100,25 +103,31 @@ export async function capturer({
         cachees.push(o)
       }
     })
-    const [lp, hp] = [width, height]
-    const cible = new THREE.WebGLRenderTarget(lp, hp)
-    scene.overrideMaterial = matiereProfondeur
-    gl.setRenderTarget(cible)
-    gl.render(scene, camera)
-    gl.setRenderTarget(null)
-    scene.overrideMaterial = null
+    // À la résolution de chaque image (l'entière et la légère) : un point de profondeur par pixel,
+    // sinon le contour de l'œuvre se déplace par marches pendant la parallaxe (crénelage vu le 30/10)
+    const profondeur = (lp: number, hp: number) => {
+      const cible = new THREE.WebGLRenderTarget(lp, hp)
+      scene.overrideMaterial = matiereProfondeur
+      gl.setRenderTarget(cible)
+      gl.render(scene, camera)
+      gl.setRenderTarget(null)
+      scene.overrideMaterial = null
+      const octets = new Uint8Array(lp * hp * 4)
+      gl.readRenderTargetPixels(cible, 0, 0, lp, hp, octets)
+      cible.dispose()
+      // readPixels part du bas : on remet l'image à l'endroit
+      const prof = document.createElement('canvas')
+      prof.width = lp
+      prof.height = hp
+      const ctx = prof.getContext('2d')!
+      const donnees = ctx.createImageData(lp, hp)
+      for (let y = 0; y < hp; y++) donnees.data.set(octets.subarray((hp - 1 - y) * lp * 4, (hp - y) * lp * 4), y * lp * 4)
+      ctx.putImageData(donnees, 0, 0)
+      return prof
+    }
+    const prof = profondeur(image.width, image.height)
+    const profLegere = profondeur(LEGERE, Math.round(LEGERE / FORMAT_CAPTURE))
     cachees.forEach((o) => (o.visible = true))
-    const octets = new Uint8Array(lp * hp * 4)
-    gl.readRenderTargetPixels(cible, 0, 0, lp, hp, octets)
-    cible.dispose()
-    // readPixels part du bas : on remet l'image à l'endroit
-    const prof = document.createElement('canvas')
-    prof.width = lp
-    prof.height = hp
-    const ctx = prof.getContext('2d')!
-    const donnees = ctx.createImageData(lp, hp)
-    for (let y = 0; y < hp; y++) donnees.data.set(octets.subarray((hp - 1 - y) * lp * 4, (hp - y) * lp * 4), y * lp * 4)
-    ctx.putImageData(donnees, 0, 0)
 
     const reglages: ReglagesCapture & { recul: number } = {
       champ: camera.fov,
@@ -130,9 +139,18 @@ export async function capturer({
     }
     if (Math.abs(camera.fov - (focale + transition.champEnPlus)) > 0.01) console.warn('champ inattendu', camera.fov)
     await envoyer(`${nom}.webp`, await enBlob(image, 'image/webp', 0.92))
+    // Version légère, 2880 px de large (cartes de la spirale, écrans qui n'ont pas plus de pixels : version.ts)
+    const legere = document.createElement('canvas')
+    legere.width = LEGERE
+    legere.height = Math.round(LEGERE / FORMAT_CAPTURE)
+    const cl = legere.getContext('2d')!
+    cl.imageSmoothingQuality = 'high'
+    cl.drawImage(image, 0, 0, legere.width, legere.height)
+    await envoyer(`${nom}-${LEGERE}.webp`, await enBlob(legere, 'image/webp', 0.92))
     await envoyer(`${nom}-profondeur.png`, await enBlob(prof, 'image/png'))
+    await envoyer(`${nom}-profondeur-${LEGERE}.png`, await enBlob(profLegere, 'image/png'))
     await envoyer(`${nom}.json`, JSON.stringify(reglages, null, 2))
-    return { image: `${image.width} × ${image.height}`, profondeur: `${lp} × ${hp}`, reglages }
+    return { image: `${image.width} × ${image.height}`, profondeur: `${prof.width} × ${prof.height}`, reglages }
   } finally {
     entree.fige = null
     etat.enEntree = false

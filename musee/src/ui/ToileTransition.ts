@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import type { Cadre } from '../store'
 import { FORMAT_CAPTURE, TRANSITION_DEFAUT } from '../entree'
-import { versionne } from '../version'
+import { versionLegere, versionne } from '../version'
 
 /**
  * Canvas plein écran des transitions spirale ↔ salle (piloté par ui/Transition.tsx) : il
@@ -192,6 +192,35 @@ const profondeurs = new Map<string, Promise<THREE.Texture>>()
 const reglages = new Map<string, Promise<ReglagesCapture>>()
 const pretes = new Map<string, THREE.Texture | ReglagesCapture>()
 
+/**
+ * Écran qui a plus de pixels que la version légère de la capture (2880 px de large) : on prend
+ * l'originale (5120 px). Sinon la légère suffit, et prend trois fois moins de mémoire (≈ 25 Mo au lieu de 78).
+ */
+const grandEcran = () => Math.max(screen.width, screen.height) * Math.min(window.devicePixelRatio, 2) > 2880
+
+/** Œuvres dont les images restent chargées : les plus récemment utilisées ; au-delà, la plus ancienne est libérée */
+const GARDEES = 2
+const utilisees = new Map<string, string | undefined>()
+
+/** L'œuvre (son image, sa capture) vient de servir ; libère la plus ancienne au-delà de GARDEES */
+function utiliser(image: string, vueEntree?: string) {
+  utilisees.delete(image)
+  utilisees.set(image, vueEntree)
+  while (utilisees.size > GARDEES) {
+    const [ancienne, base] = utilisees.entries().next().value!
+    utilisees.delete(ancienne)
+    liberer(images, 'i', ancienne)
+    if (base) liberer(profondeurs, 'p', base)
+  }
+}
+
+/** Retire la texture de la carte graphique et des caches (elle sera rechargée, du cache du navigateur, si besoin) */
+function liberer(carte: Map<string, Promise<THREE.Texture>>, prefixe: string, cle: string) {
+  carte.get(cle)?.then((t) => t.dispose()).catch(() => {})
+  carte.delete(cle)
+  pretes.delete(prefixe + cle)
+}
+
 function garder<T extends THREE.Texture | ReglagesCapture>(cle: string, p: Promise<T>) {
   p.then((v) => pretes.set(cle, v)).catch(() => {})
   return p
@@ -209,7 +238,7 @@ function chargerImage(url: string) {
       url,
       garder(
         'i' + url,
-        bitmap(url).then((b) => {
+        bitmap(grandEcran() ? url : versionLegere(url)).then((b) => {
           const t = new THREE.Texture(b)
           t.colorSpace = THREE.NoColorSpace
           t.flipY = false // ignoré pour une ImageBitmap : retournée dans le shader
@@ -232,7 +261,7 @@ function chargerProfondeur(base: string) {
       garder(
         'p' + base,
         // Octets exacts (profondeur codée sur 16 bits) : ni conversion de couleur, ni prémultiplication
-        bitmap(versionne(`${base}-profondeur.png`))
+        bitmap(grandEcran() ? versionne(`${base}-profondeur.png`) : versionLegere(versionne(`${base}-profondeur.png`)))
           .then((b) => {
             const t = new THREE.Texture(b)
             t.colorSpace = THREE.NoColorSpace
@@ -260,6 +289,7 @@ function chargerReglages(base: string) {
  */
 export function prechargerImages(image: string, vueEntree?: string) {
   obtenirToile()
+  utiliser(image, vueEntree)
   chargerImage(image)
   if (vueEntree) {
     chargerProfondeur(vueEntree)
@@ -349,6 +379,7 @@ export class ToileTransition {
     }
     const u = this.matiere.uniforms
 
+    utiliser(d.image, d.vueEntree)
     chargerImage(d.image)
     const image = pretes.get('i' + d.image) as THREE.Texture | undefined
     const prof = d.vueEntree ? (pretes.get('p' + d.vueEntree) as THREE.Texture | undefined) : undefined

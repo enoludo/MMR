@@ -1,7 +1,7 @@
 import type { SalleConfig } from './salles/types'
 import { salleProvisoire, salleProvisoireBleue } from './salles/provisoire/config'
 import { reglagesTransition } from './entree'
-import { versionne } from './version'
+import { versionLegere, versionne } from './version'
 
 /**
  * Ce qu'affiche la salle (maquette Figma, écrans 445:275, 447:602, 448:911) :
@@ -144,7 +144,10 @@ export const lienOeuvre = (o: Oeuvre) => `/oeuvre/${o.id}`
  */
 export const cartesSpirale = [...oeuvres.slice(1), oeuvres[0]].map((o) => ({
   id: o.id,
-  image: o.image,
+  // Carte de 960 × 540 px : la version légère de la capture suffit (décodage trois fois plus court)
+  image: versionLegere(o.image),
+  /** Image de la transition (ui/ToileTransition) */
+  imageTransition: o.image,
   title: o.titre,
   cta: 'Découvrir',
   link: lienOeuvre(o),

@@ -50,7 +50,7 @@ export const TRANSITION_DEFAUT: ReglagesTransition = {
   zoomCarte: 2,
   regard: 0.55,
   zoomEntree: 1.4,
-  fonduEntree: 1,
+  fonduEntree: 0.6, // 1 s jusqu’au 30/10 : l’image de la transition s’attardait sur la salle
   zoomSortie: 1.4,
   fonduSortie: 0.5,
   monteeImage: 1.6,

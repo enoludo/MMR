@@ -104,6 +104,15 @@ Une entrée par session, la plus récente en haut. Le détail technique est dans
     - la salle d'arrivée d'un passage fait aussi son premier dessin à l'avance, objet par objet sur un pixel : pire image d'un passage 0,13 s (0,2 à 0,37 s sinon, au moment où elle apparaît).
     Enregistré dans Git (`e2e9f62`, en local) et mis en ligne sur le labo `mmr-lab` (sans les lightmaps WebP, inutiles au site) : salles et passage vérifiés en ligne, sans erreur.
   - **[validé]** **Poussière, nouveaux réglages par défaut** (valeurs de Ludovic, 30/10) : densité 1, taille 3,35 (8 avant), vitesse 1,05 (6), brillance 0,45 (1). Enregistré (`7c0858f`) et en ligne sur le labo.
+  - **[vu]** **Images de transition plus légères** :
+    - chaque capture de salle a une version de 2880 px de large (`<id>-2880.webp`, produite aussi par l'outil de capture) : utilisée par les cartes de la spirale (décodage 17 ms au lieu de 66) et pour les transitions sur les écrans qui n'ont pas plus de pixels (≈ 25 Mo dans la carte graphique au lieu de 78) ; les grands écrans (comme celui de Ludovic, 2560 × 1440 Retina) gardent l'image entière ;
+    - les images de transition ne restent chargées que pour les deux dernières œuvres utilisées (avant : toutes, jusqu'à la fermeture de la page) ; une image libérée se recharge pendant que la caméra recule, avant la réduction vers la carte (vérifié) ;
+    - comparaison à plein écran en 1440 × 900 (`plans/comparaisons/transition-5120-contre-2880.png`) : écart moyen inférieur à 1 niveau sur 255, images superposées au pixel près.
+  - **[vu]** **Contour de l'œuvre pendant la transition** (remarque de Ludovic : « sur grand écran Retina, le contour de l'œuvre pixélise, et l'image de transition met un peu de temps à disparaître en arrivant dans la salle ») :
+    - la profondeur des captures est maintenant à la résolution de l'image (5120 × 2880, et 2880 pour la version légère ; 2560 avant) : marches du contour et stries deux fois plus fines, sans calcul en plus ; captures du Seuil et de Huntington refaites ;
+    - fondu d'arrivée dans la salle ramené de 1 s à 0,6 s (réglable touche M, « Transitions · <salle> ») ;
+    - comparaison figée à mi-parcours, écran 2560 × 1440 Retina : `plans/comparaisons/transition-profondeur-avant-apres.png`.
+  - **[abandonné]** Contour lissé (quatre rayons par pixel au bord de l'œuvre) et passage des rayons derrière les contours (plus de stries) : jugé « pire qu'avant » par Ludovic sur grand écran Retina ; le calcul de la transition devenait environ deux fois plus lourd (shader beaucoup plus gros, plus lent partout). Retour à l'ancien calcul.
 
 - **[à voir]** **Ambiance de couleur par salle** : la salle de « La maladie de Huntington » (l'œuvre suivante) est **bleutée** comme sa vignette (gris bleus, lumière blanche froide), sans nouveau calcul de lumière : pierre plus bleue, soleil de l'œuvre, faisceau et poussière plus froids, ambiance de l'œuvre et des couloirs (`salleProvisoireBleue`, champ `ambiance` de la config). Pendant le passage, l'ambiance de l'œuvre glisse d'une salle à l'autre.
 

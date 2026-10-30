@@ -108,7 +108,7 @@ export function Accueil() {
       // Sous l'image de la transition, la carte 3D est cachée : elle grandirait avec la spirale sans
       // avoir tout à fait la forme de l'image, et ses bords dépasseraient. On la revoit au fondu du retour.
       const aCacher =
-        transition && !(transition.sens === 'sortie' && transition.phase === 'fondu') && imagePrete(carte.image)
+        transition && !(transition.sens === 'sortie' && transition.phase === 'fondu') && imagePrete(carte.imageTransition)
           ? slot
           : null
       if (cachee !== aCacher) {

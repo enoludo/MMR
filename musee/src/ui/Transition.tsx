@@ -7,7 +7,7 @@ import { store, useEtat, type Cadre, type Transition as EtatTransition } from '.
 import { captureSalle, carteVivante } from '../transition'
 import { avancee, champEntree, entree, partVisible, reglagesTransition, temps } from '../entree'
 import type { SalleConfig } from '../salles/types'
-import { obtenirToile, reglagesCapture } from './ToileTransition'
+import { obtenirToile, prechargerImages, reglagesCapture } from './ToileTransition'
 
 /** Au-delà, on montre la salle même si elle n'a pas signalé être prête (ms) */
 const ATTENTE_MAX = 20000
@@ -167,6 +167,8 @@ export function Transition() {
     }
 
     if (t.phase === 'retour') {
+      // Image de l'œuvre prête pour la réduction (libérée si d'autres œuvres ont servi depuis, ToileTransition)
+      prechargerImages(oeuvre.image, oeuvre.vueEntree)
       // La caméra rejoint la vue initiale (Navigation, mode « sortie ») ; par sécurité, on n'attend pas plus de 4 s
       const secours = setTimeout(() => suite({ phase: 'photo' }), 4000)
       return () => clearTimeout(secours)
