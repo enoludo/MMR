@@ -115,6 +115,7 @@ Une entrée par session, la plus récente en haut. Le détail technique est dans
   - **[abandonné]** Contour lissé (quatre rayons par pixel au bord de l'œuvre) et passage des rayons derrière les contours (plus de stries) : jugé « pire qu'avant » par Ludovic sur grand écran Retina ; le calcul de la transition devenait environ deux fois plus lourd (shader beaucoup plus gros, plus lent partout). Retour à l'ancien calcul.
   - Enregistré dans Git (`b5f5304`, en local) et mis en ligne sur le labo `mmr-lab` : cartes de la spirale en version légère et entrée dans une salle vérifiées en ligne, sans erreur.
   - **[à voir]** **Message « Faites défiler pour tourner autour de l'œuvre » retiré** du bas des salles (demande de Ludovic), ainsi que sa version tactile. Enregistré (`28232d9`) et en ligne sur le labo.
+  - **Passation** (30/10) : `PASSATION.md` réécrite pour la prochaine étape choisie par Ludovic, **la refonte de l'interface web des salles** d'après une nouvelle maquette Figma (à demander en début de session) ; « Points ouverts » de `CLAUDE.md` à jour.
 
 - **[à voir]** **Ambiance de couleur par salle** : la salle de « La maladie de Huntington » (l'œuvre suivante) est **bleutée** comme sa vignette (gris bleus, lumière blanche froide), sans nouveau calcul de lumière : pierre plus bleue, soleil de l'œuvre, faisceau et poussière plus froids, ambiance de l'œuvre et des couloirs (`salleProvisoireBleue`, champ `ambiance` de la config). Pendant le passage, l'ambiance de l'œuvre glisse d'une salle à l'autre.
 

@@ -1,90 +1,91 @@
-# Passation — après les transitions spirale ↔ salles
+# Passation — avant la refonte de l'interface des salles
 
-Rédigée le 28/10/2026 (fin d'après-midi) par Claude Code, à la fin de la session « transitions ».
+Rédigée le 30/10/2026 par Claude Code, à la fin de la session « salle de 40 m, Huntington, fluidité ».
 À lire après `CLAUDE.md` (contexte, décisions de Ludovic, architecture détaillée) et le haut de `JOURNAL.md`.
-Remplace la passation du 28/10 au matin, qui préparait les transitions (elles sont faites).
+Remplace la passation du 28/10 (transitions spirale ↔ salles), toujours lisible dans l'historique Git.
 
-**Prochaine étape :** pas encore choisie par Ludovic. Lui demander en début de session (pistes en section 6).
+**Prochaine étape, choisie par Ludovic : refaire l'interface web des salles.** Celle en place ne lui
+convient pas. Il va montrer une nouvelle maquette Figma : lui demander le lien (ou l'identifiant
+de l'écran) en début de session, avant de toucher au code.
 
 ---
 
 ## 1. Où en est-on
 
-Tout est fait, vérifié dans le navigateur (en développement et sur le site compilé), statut **[à voir]** : Ludovic a testé et réagi au fil de l'eau (« Super », « Top ! »), sans validation formelle.
+**Ce qui a été fait depuis le 28/10** (détail et statuts dans `JOURNAL.md`) :
+- **Salle de 40 × 40 m** d'après le plan de Ludovic, et une deuxième œuvre modélisée, **« La maladie de
+  Huntington »** (statue de 2,70 m sur socle lumineux, salle bleutée).
+- **Réglages propres à chaque salle** (navigation, transitions, sculpture : touche M, dossiers au nom de la salle).
+- **Passages entre salles** sans saut de caméra ni de couleur, ambiance qui glisse dans le couloir.
+- **Fluidité** (toutes validées ou vues par Ludovic) : résolution adaptative (plancher 1,5), faisceau deux fois
+  moins coûteux, salles voisines préchargées, salle d'arrivée préparée cachée, lightmaps en KTX2, images
+  de transition allégées (version 2880 px, deux œuvres gardées en mémoire), profondeur des captures
+  à pleine résolution, fondu d'arrivée de 0,6 s.
+- **Abandonné :** lissage du contour de l'œuvre pendant la transition (calcul deux fois plus lourd, jugé
+  « pire » par Ludovic sur grand écran Retina). Un léger crénelage du contour reste visible pendant la
+  parallaxe ; ne le reprendre qu'avec une méthode qui ne coûte presque rien.
+- **Retiré :** le message « Faites défiler pour tourner autour de l'œuvre » en bas des salles.
 
-**Les transitions entre la spirale (accueil) et les salles marchent dans les deux sens :**
-- **Entrée** (« Découvrir ») : la spirale recentre la carte, le titre part lettre par lettre, la salle se prépare cachée dessous, puis la carte grandit jusqu'au plein écran avec toute la spirale. L'image s'ouvre dans son masque (×2 → ×1) et l'on avance déjà dedans (parallaxe calculée avec la profondeur d'une capture de la salle). L'image se fond ensuite dans la vraie 3D, qui poursuit le même mouvement jusqu'à la vue initiale. Le titre et les liens de la salle montent lettre par lettre.
-- **Retour** (croix du titre, logo, menu « La collection ») : les textes de la salle repartent, la caméra rejoint la vue initiale, la salle est photographiée, la photo se réduit dans la carte de la spirale (recentrée sur l'œuvre quittée) en se fondant dans son image, puis le titre de la carte remonte lettre par lettre.
-- **Raccords soignés aujourd'hui :** la vignette sombre de la salle et l'éclairage plus sombre des cartes de la spirale sont repris dans l'image de transition (plus de voile qui saute) ; la photo de la salle suit exactement le mouvement de l'image (plus de dédoublement) ; le retour démarre sans temps mort (≈ 0,07 s après la photo, contre 0,4 à 1,9 s).
-- Seule « Le seuil des proportions » a une capture de sa salle (`public/assets/captures/`). Les autres œuvres font un zoom simple sur leur photo.
+**En ligne :** labo Fluidbook Toolbox `mmr-lab`, https://mmr-lab.labs.cubedesigners.com/ (dernière version).
+Vercel n'est plus mis à jour depuis le 27/10.
 
-**Ce qui est en ligne :**
-- **Fluidbook Toolbox, labo `mmr-lab`** : https://mmr-lab.labs.cubedesigners.com/ (dernière version). Mot de passe HTTP dans la fiche du labo ; filtre IP désactivé à la demande de Ludovic, noindex gardé.
-- **Zip à héberger** : `~/MMR/musee-site-a-heberger-2026-10-28-v2.zip` (dernière version, `.htaccess` compris).
-- **Vercel** (projet `mmr`) : **pas** mis à jour depuis le 27/10.
+**Git :** tout est enregistré **en local** (commit `47dd1a9`). GitHub (`enoludo/MMR`, branche
+`claude/spirale-interactive-gallery-b4mzwd`) s'arrête au commit `dbd6f64` du 28/10 : **20 commits ne sont
+pas envoyés**. Ludovic a dit « pas maintenant » pour l'envoi ; le lui reproposer à l'occasion (`git push`
+depuis `~/MMR`).
 
-**Git :** `musee/` est suivi depuis aujourd'hui dans `enoludo/MMR` (racine `~/MMR`, branche `claude/spirale-interactive-gallery-b4mzwd`). Envoyé sur GitHub jusqu'au commit `a4dfe4e`. Les deux derniers commits (notes de mise en ligne, `ec0b4e2` et `2567c7f`) **et cette passation** sont seulement en local : les envoyer avec l'accord de Ludovic (`git push` depuis `~/MMR`).
+## 2. L'interface actuelle des salles : ce qu'il y a à refaire
 
-## 2. Où est le code des transitions
+Maquette de référence jusqu'ici : Figma `BV6AsWeLSbWpCA7AarJGdr`, écrans 445:275 (premier écran),
+447:602 (popup Maladie), 448:911 (popup Manifeste). La nouvelle maquette les remplacera.
 
-| Fichier | Rôle |
-|---|---|
-| `src/transition.ts` | `entrer()`, `sortir()`, préchargement d'une œuvre (`prechargerOeuvre`) |
-| `src/store.ts` | `transition` : sens, phase, cadre de la carte, photo |
-| `src/ui/Transition.tsx` | déroulé phase par phase, durées (touche M, « Transitions »), la spirale suit la boîte |
-| `src/ui/ToileTransition.ts` | canvas plein écran et son shader : masque, parallaxe (`surface()`), photo, vignette, éclairage |
-| `src/entree.ts` | mouvement d'entrée commun à l'image et à la 3D (`avancee()`, `poseEntree`), `RECUL`, `ZOOM_CARTE` |
-| `src/ui/apparition.ts` | textes de la salle lettre par lettre (`useApparition`) |
-| `src/accueil/gallery/Overlay.js` | titre de la spirale : `cacher()` / `montrer()` |
-| `src/accueil/Accueil.tsx` | recentrage, poignée de main du retour, spirale préparée cachée |
-| `src/main.tsx` | spirale et salle rendues hors des routes, pour survivre au changement d'adresse |
-| `src/outils/capture.ts` | (dev) capture d'une salle pour une nouvelle œuvre : `await __visite.capturer('<id>')` |
+| Élément | Où | Rôle actuel |
+|---|---|---|
+| Interface de la salle | `src/ui/InterfaceSalle.tsx` | assemble tout ; `choisirOnglet()` ouvre un popup **et** envoie la caméra vers un point de vue |
+| Premier écran (à gauche, sans fond) | `InterfaceSalle`, classe `.salle-accueil` | titre (lettre par lettre), liens Maladie › et Manifeste ›, « Avec le soutien de » (logo), « Partager cette œuvre » |
+| Popups Maladie et Manifeste (à droite) | `src/ui/Popup.tsx` (`Popup`, `PopupEntete`, `PopupTexte`, `PopupChiffres`, `PopupLien`) | réutilisables ; focus clavier, fermeture par la croix, un clic à côté ou Échap |
+| Header commun (spirale et salles) | `src/ui/EnTete.tsx` | logo, élément central (dans une salle : pilule titre + croix = retour à la spirale), son, menu |
+| Œuvre précédente / suivante | `InterfaceSalle`, `.pied` | lance le passage par le couloir (`partirVers`) |
+| Écran de chargement | `InterfaceSalle`, `Chargement` | logo et barre ; barre seule en entrant depuis la spirale |
+| Textes lettre par lettre | `src/ui/apparition.ts` (`useApparition`, GSAP SplitText) | titre et liens du premier écran, à l'entrée et à la sortie des transitions |
+| Icônes | `src/ui/icones.tsx` et `@phosphor-icons/react` | |
+| Styles | `src/style.css`, sections « Éléments communs », « Header », « Salle », « Popup », « Mobile » | valeurs de la maquette (verre, flou 15 px, rayon 24, hauteur 48, marge 24) |
+| Contenus | `src/oeuvres.ts` (`Oeuvre` : `titre`, `maladie`, `maladieTexte`, `manifeste`, `mecene`, `partenaire`, `vues`) | textes encore provisoires (« À venir ») sauf le Seuil |
 
-Phases : entrée `preparation` → `zoom` → `attente` → `fondu` ; retour `retour` → `photo` → `attente` → `zoom` → `fondu`. Le détail est dans `CLAUDE.md`, « Transitions spirale ↔ salle ».
+**Liens avec la 3D, à garder en tête quelle que soit la nouvelle maquette :**
+- `store.onglet` (`'info'`, `'maladie'`, `'manifeste'`) : l'interface l'écrit, la caméra le lit. Chaque onglet a
+  un point de vue (`oeuvre.vues` → `salle.etapes`, réglables dans la config de la salle) ; `store.demande` envoie
+  la caméra (`Navigation.tsx`). Retour au premier écran = retour sur le cercle.
+- `scene/Decentrage.tsx` décale le cadrage pour que l'œuvre reste au milieu de l'espace libre : il **mesure**
+  `.salle-accueil` et `.popup--ouvert` dans la page. Si les classes ou la place des panneaux changent,
+  l'adapter.
+- Transitions avec la spirale et passages : classes `.salle-ui--transition` et `.salle-ui--passage` qui
+  effacent l'interface ; le premier écran part et revient lettre par lettre (`useApparition`, `visible`).
+  Le titre central du header sert aussi de bouton de retour (`sortir()`).
+- La vignette sombre `.salle-ui__vignette` est recopiée dans le shader de la transition (`ToileTransition.ts`) :
+  si elle change, changer les deux, sinon un voile saute à la fin de l'entrée.
+- Les panneaux laissent passer le regard et la molette dans leurs zones vides (`pointer-events: none` sur le
+  conteneur, `auto` sur les enfants) : à conserver, sinon la navigation se bloque au-dessus de l'interface.
+- Mobile (moins de 760 px) : premier écran et popup en bas, au-dessus des boutons ; à revoir avec la maquette.
 
-## 3. Mettre en ligne
+## 3. Méthode proposée pour la refonte
 
-- **Labo `mmr-lab`** (outil `lab_upload_zip`, mode miroir `clean: true`, versionné) :
-  1. `npm run build` ;
-  2. copier `dist/` sans le `.htaccess` (refusé sur un labo « static ») ;
-  3. y ajouter une copie de `index.html` dans `oeuvre/<id>/` pour chaque œuvre et dans `a-propos/` (sinon une adresse ouverte directement renvoie une erreur) ;
-  4. zipper, demander l'URL d'envoi (`lab_upload_zip` sans contenu), envoyer avec `curl -F file=@…`.
-- **Zip à héberger (Apache)** : contenu de `dist/` à la racine du zip, `.htaccess` compris, à servir à la racine d'un domaine.
-- **Vercel** : `npx vercel --prod --yes` depuis `musee/`, ou `Mettre en ligne.command`.
+1. Lire la maquette avec les outils Figma (charger la compétence `figma:figma-design-to-code` avant
+   `get_design_context`), écran par écran ; relever la grille, les cotes, les états (ouvert, survol, mobile).
+2. Faire valider à Ludovic la liste des éléments et des comportements (ce qui ouvre quoi, où va la caméra)
+   avant d'écrire le code.
+3. Réutiliser ce qui tient (`Popup` et ses blocs, `useApparition`, `EnTete`) ; remplacer le reste.
+4. Contrôler les cotes en 1680 × 1050 comme jusqu'ici, puis en 1440 × 900, en grand écran et sur mobile ;
+   montrer des captures côte à côte avec la maquette.
+5. Vérifier qu'aucune transition ne casse : entrée et retour avec la spirale, passage par le couloir,
+   ouverture et fermeture des popups (la caméra et le décentrage suivent).
 
-## 4. Mettre au point
+## 4. Rappels pratiques
 
-- `npm run dev` → http://localhost:5173. Avant d'annoncer : `npx tsc --noEmit`, `npm run build`, coup d'œil au navigateur.
-- **Ralentir ou figer une transition** (console, dev) : importer gsap depuis l'URL exacte de `performance.getEntriesByType('resource')` (elle peut porter un `?t=` après un rechargement à chaud), puis `gsap.globalTimeline.timeScale(0)` pour figer, `1` pour reprendre. S'abonner à `store` (même méthode d'import) pour figer à une phase précise.
-- **Isoler l'image ou la photo** pendant le retour : remplacer `obtenirToile().dessiner` par une version qui force `melange` (0 = image seule, 1 = photo seule).
-- **Mesurer la fluidité comme en ligne** : `npm run build`, `npx vite preview`, mesurer les écarts entre images (`requestAnimationFrame`) et profiler (`new Profiler(...)`, autorisé par l'en-tête de `vite.config.ts`). Le navigateur intégré tourne à 30 images/s même au repos : raisonner en relatif.
-
-## 5. Pièges rencontrés aujourd'hui
-
-- **Une phase change une image avant l'adresse** (le store est synchrone, la navigation non) : tout ce qui dépend des deux à la fois doit tolérer cet état intermédiaire, sinon un composant est démonté puis recréé (c'était la cause du temps mort au retour).
-- **Ne jamais démonter la salle ou créer un moteur de rendu pendant un mouvement** : perdre un contexte WebGL bloque ≈ 0,1 s, en créer un ≈ 0,2 s, compiler les shaders de la spirale ≈ 0,3 s (d'où `compileAsync`, le moteur de la spirale gardé, la salle démontée 1,5 s après le retour).
-- **Toute modification de la salle, de sa lumière ou de la vue initiale** oblige à refaire la capture de « Le seuil » (sinon image et 3D ne se superposent plus).
-- **Si l'éclairage de la spirale ou la vignette de la salle changent**, mettre à jour leur copie dans le shader de transition (`cardLighting`, fonction `vignette`).
-- **SplitText et React** : un élément découpé en lettres doit être rendu vide par React et rempli en JavaScript (`apparition.ts`), sinon React et SplitText se disputent son contenu.
-- Les erreurs de la console s'accumulent d'un rechargement à chaud à l'autre : recharger la page avant de conclure.
-- Les labos Fluidbook ont un **filtre IP** (403 hors réseau Cubedesigners) et un mot de passe HTTP : la Toolbox voit le site répondre alors que Ludovic reçoit un 403.
-
-## 6. Points ouverts et pistes pour la suite
-
-**À faire valider par Ludovic (transitions) :** durées, force de la parallaxe, rendu sur mobile (rien n'a été essayé sur téléphone), délai entre le clic et le départ du zoom (≈ 1 s dans le navigateur intégré, le temps que la salle se prépare).
-
-**Repris de `CLAUDE.md` :**
-- chiffres du popup Maladie (« ACVR1 » ne correspond pas à l'acromégalie), lien Orphanet ;
-- recadrage des vues Maladie (main) et Manifeste (visage) avec le popup ouvert ;
-- réglages du couloir à fentes, bancs et rayons dans la salle agrandie ;
-- mobile : le premier écran pousse l'œuvre vers le haut, le popup Maladie défile ;
-- une seule salle provisoire pour toutes les œuvres ;
-- ménage de `~/MMR/_to_delete/` et `musee/_a_supprimer/`.
-
-**Pistes de prochaine étape à proposer :**
-1. Captures de salle pour les autres œuvres (la transition avec parallaxe ne vaut aujourd'hui que pour « Le seuil »).
-2. Vue Grille (Figma `58:207`) et écran d'intro (`118:1180`), encore à faire.
-3. Passage sur mobile : transitions, premier écran, popups.
-4. Son.
-5. Découper le code principal (`index` de 1,3 Mo) pour un premier affichage plus rapide.
-6. Mettre Vercel à jour, ou décider si le labo `mmr-lab` le remplace.
+- **Serveur de développement :** `npm run dev` (http://localhost:5173 ; 5175 quand le port est pris).
+- **Vérifier avant d'annoncer :** `npx tsc --noEmit`, `npm run build`, un coup d'œil dans le navigateur.
+- **Mettre en ligne sur le labo :** `npm run build`, copier `dist/` sans `.htaccess` ni les lightmaps WebP,
+  ajouter une copie de `index.html` dans `oeuvre/<id>/` pour chaque œuvre et dans `a-propos/`, zipper, puis
+  `lab_upload_zip` (labo `mmr-lab`, `clean: true`). Ludovic le demande à chaque fois (« pousse sur toolbox »).
+- **Ludovic :** répondre en français, court ; montrer des captures avant/après ; ne marquer « validé » dans le
+  journal que sur son accord explicite ; enregistrer dans Git ou mettre en ligne seulement à sa demande.

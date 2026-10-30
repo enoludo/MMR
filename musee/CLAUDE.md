@@ -1,7 +1,7 @@
 # CLAUDE.md — Musée des Maladies Rares (MMR), site 3D
 
 Contexte de travail pour Claude Code. À lire en entier au début de chaque session.
-Dernière mise à jour : 27/10/2026, reprise des passations du projet Claude « MMR » (Cowork).
+Dernière mise à jour : 30/10/2026 (passation avant la refonte de l'interface des salles).
 
 ## Interlocuteur et façon de travailler
 
@@ -90,11 +90,13 @@ Depuis Claude Code, lancer les scripts avec le Blender de l'application : `/Appl
 ## Points ouverts
 
 - **Salle de 40 m (29/10), reportée dans la 3D, à voir avec Ludovic :** plan coté `plans/salle-40.html` (`plans/generer-plan-40.py`). À régler avec lui : contraste, lames, couloirs et impasses (touche M, bouton « Copier les réglages »). Vue d'arrivée, points de vue Maladie/Manifeste et anneaux de la caméra repris tels quels de la salle de 30 m : à revoir dans la salle plus grande.
-- **Prochaine étape :** voir ci-dessus. Contexte général : `PASSATION.md` (28/10, fin d'après-midi).
+- **Prochaine étape (30/10) : refaire l'interface web des salles** d'après une nouvelle maquette Figma que Ludovic va montrer (l'actuelle, écrans 445:275, 447:602, 448:911, ne lui convient plus). Lui demander le lien en début de session. Tout est préparé dans `PASSATION.md` (30/10) : éléments actuels, liens avec la 3D (`store.onglet`, points de vue, `Decentrage`, classes des transitions), méthode.
 - **Transitions spirale ↔ salles (28/10), à voir avec Ludovic :** durées (zoom 1,4 / 1,4 s, fondus 1 / 0,5 s, `TRANSITION_DEFAUT` dans `entree.ts`, propres à chaque salle), raccords des voiles sombres (vignette, éclairage de la carte) et textes lettre par lettre (non vus sur mobile), amplitude de la parallaxe (limitée à 1,6 m de recul par le mur sud), effet sur mobile (le décentrage du premier écran en bas n'est pas pris en compte par la capture), temps d'attente une fois en ligne (le montage de la salle fige l'image ≈ 0,5 s en dev). « Le seuil des proportions » et « La maladie de Huntington » ont une capture ; les autres œuvres ont une photo sans rapport avec la salle provisoire. L'arrivée directe par une adresse garde l'écran de chargement complet, sans mouvement.
 - Chiffres du popup Maladie repris du Figma, à faire valider : « 1/2 000 000 » et « ACVR1 » ne correspondent pas à l'acromégalie (ACVR1 est le gène de la FOP). Lien « En savoir plus » (Orphanet) à confirmer.
-- Recadrer les points de vue Maladie (main) et Manifeste (visage) avec le popup ouvert à droite.
-- Mobile : le popup Maladie défile ; le premier écran pousse l'œuvre vers le haut.
+- Recadrer les points de vue Maladie (main) et Manifeste (visage) avec le popup ouvert à droite (à reprendre avec la nouvelle interface).
+- Mobile : le popup Maladie défile ; le premier écran pousse l'œuvre vers le haut (à reprendre avec la nouvelle interface).
+- Transition spirale → salle : léger crénelage du contour de l'œuvre pendant la parallaxe sur grand écran Retina (un lissage trop coûteux a été abandonné le 30/10).
+- Git : 20 commits locaux non envoyés sur GitHub (depuis `dbd6f64`), à proposer à Ludovic.
 - Couloir à fentes : réglages à valider avec Ludovic (soleil, douceur, rayons dans l'air, lumière des portes, soleil de la fente zénithale). Léger liseré sombre au pied d'un banc.
 - Agrandissement de l'œuvre et de la salle (28/10) : vérifier les bancs (placés pour l'ancienne salle), le rayon du cercle (9 m), l'exposition de la salle plus grande, et recadrer les points de vue (mis à l'échelle ×1,25).
 - Toutes les œuvres utilisent la salle provisoire : le passage vers une salle différente (autres modèles) n'a pas encore été essayé ; prévoir son préchargement.
