@@ -1,12 +1,77 @@
 <!doctype html>
-<html lang="fr">
+<html lang="fr" class="intro-active">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Musée des maladies rares</title>
     <meta name="description" content="Visite virtuelle du Musée des maladies rares." />
+    <!--
+      Écran d'accueil (src/ui/Intro.tsx, maquette Figma 118:1180) : ses styles et le logo sont ici,
+      dans la page, pour s'afficher dès la première image, avant le chargement du JavaScript
+    -->
+    <style>
+      html, body { margin: 0; background: #181410; }
+      .intro {
+        --d: 0s; --s: 0s; /* délais d'apparition et de sortie de chaque élément (Intro.tsx) */
+        position: fixed; inset: 0; z-index: 60; display: grid; place-items: center;
+        background: #000; color: #fff; /* noir opaque tant que la visite charge dessous */
+        font-family: 'Google Sans Flex Variable', 'Google Sans', system-ui, sans-serif;
+        transition: background-color 1.4s ease;
+      }
+      /* Tout est chargé : la spirale (ou la salle) apparaît en fondu sous un voile sombre */
+      .intro--fond { background: rgba(0, 0, 0, 0.78); }
+      .intro__contenu { display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 24px; }
+      .intro__logo { width: min(633px, 84vw); }
+      .intro__logo-svg { display: block; width: 100%; height: auto; overflow: visible; }
+      /* Logo : une copie pâle (éteinte), et une copie qui s'allume case par case sur la trame de ses
+         points à mesure que le site charge (masque intro-allumage du SVG) */
+      .intro__eteint { opacity: 0.1; }
+      .intro__case { opacity: 0; transition: opacity 0.6s ease; }
+      .intro__case.allume { opacity: 1; }
+      /* Tout allumé : sans masque, le logo est net (les raccords des cases laissaient de fins filets) */
+      .intro--complet .intro__eteint { visibility: hidden; }
+      .intro--complet .intro__allume { mask: none; }
+      .intro__bas { display: flex; flex-direction: column; align-items: center; gap: 24px; min-height: 160px; }
+      .intro__havas { display: block; width: 177px; height: auto; }
+      .intro__boutons { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+      .intro__entrer {
+        appearance: none; border: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 10px;
+        height: 48px; padding: 0 28px 0 24px; border-radius: 24px; background: #fff; color: #000;
+        font: inherit; font-size: 14px; font-weight: 500; transition: background-color 0.25s ease;
+      }
+      .intro__entrer:hover { background: #ececec; }
+      .intro__sans {
+        appearance: none; border: 0; cursor: pointer; background: none; color: #fff; font: inherit;
+        font-size: 13px; padding: 8px 12px; opacity: 0.7; text-decoration: underline; text-underline-offset: 4px;
+        text-decoration-color: rgba(255, 255, 255, 0.4); transition: opacity 0.25s ease;
+      }
+      .intro__sans:hover { opacity: 1; }
+      .intro :focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+      /* Prêt : Havas et les boutons arrivent l'un après l'autre */
+      .intro__havas, .intro__entrer, .intro__sans {
+        opacity: 0; transform: translateY(12px); visibility: hidden;
+        transition: opacity 0.6s ease, transform 0.8s cubic-bezier(.2,.7,.2,1), visibility 0s 0.8s;
+      }
+      .intro--pret .intro__havas, .intro--pret .intro__entrer, .intro--pret .intro__sans { opacity: 1; transform: none; visibility: visible; transition-delay: var(--d), var(--d), 0s; }
+      /* Entrée dans la visite : tout part par le haut en cascade, le voile s'efface */
+      .intro--sortie { background-color: rgba(0, 0, 0, 0); pointer-events: none; transition-delay: 0.25s; }
+      .intro--sortie .intro__logo, .intro--sortie .intro__havas,
+      .intro--sortie .intro__entrer, .intro--sortie .intro__sans {
+        opacity: 0; transform: translateY(-14px);
+        transition: opacity 0.5s ease var(--s), transform 0.6s cubic-bezier(.45,0,.55,1) var(--s);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .intro, .intro * { transition-duration: 0.01s !important; transition-delay: 0s !important; }
+      }
+    </style>
   </head>
   <body>
+    <div id="intro-statique" class="intro" aria-hidden="true">
+      <div class="intro__contenu">
+        <div class="intro__logo" id="intro-logo"><!--logo-mmr--></div>
+        <div class="intro__bas"></div>
+      </div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

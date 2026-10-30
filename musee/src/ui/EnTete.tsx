@@ -4,6 +4,7 @@ import { XIcon } from '@phosphor-icons/react'
 import { IconeMenu, IconeSon, IconeSonCoupe } from './icones'
 import { store, useEtat } from '../store'
 import { sortir } from '../transition'
+import { cliquer } from '../musique'
 
 /**
  * Header commun à toutes les pages (maquette Figma, header 365:1320) :
@@ -16,6 +17,7 @@ export function EnTete({ centre }: { centre?: ReactNode }) {
   const menu = useEtat((e) => e.menu)
   // Depuis une salle, le retour à la collection passe par la transition vers la spirale
   const versCollection = (e: MouseEvent) => {
+    cliquer()
     store.set({ menu: false })
     if (sortir()) e.preventDefault()
   }
@@ -54,7 +56,15 @@ export function EnTete({ centre }: { centre?: ReactNode }) {
 
       <nav id="menu-principal" className={`menu ${menu ? 'menu--ouvert' : ''}`} aria-hidden={!menu}>
         <Link to="/" onClick={versCollection}>La collection</Link>
-        <Link to="/a-propos" onClick={() => store.set({ menu: false })}>À propos</Link>
+        <Link
+          to="/a-propos"
+          onClick={() => {
+            cliquer()
+            store.set({ menu: false })
+          }}
+        >
+          À propos
+        </Link>
       </nav>
     </>
   )

@@ -12,12 +12,26 @@ import { store, useEtat } from '../store'
 import { carteVivante, entrer, prechargerOeuvre } from '../transition'
 import { imagePrete } from '../ui/ToileTransition'
 import { ResolutionAdaptative } from '../resolution'
+import { cliquer } from '../musique'
+import { avancer, prevoir } from '../chargement'
 
 /** Une carte restée centrée ce temps-là (ms) : on précharge sa salle */
 const DELAI_PRECHARGEMENT = 1000
 /** « Découvrir » sur une carte pas tout à fait centrée : elle glisse au centre avant de grandir (s, pour un écart d'une carte) */
 const DUREE_CENTRAGE = 0.45
 const reduitMouvement = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
+/** Écran d'accueil affiché (ui/Intro.tsx) : la spirale se prépare dessous, son titre attend */
+const enIntro = () => {
+  const i = store.get().intro
+  return i === 'chargement' || i === 'pret'
+}
+/** À l'entrée dans la visite, le titre de la carte attend que le logo de l'écran d'accueil soit parti (ms) */
+const TITRE_APRES_INTRO = 500
+/**
+ * Écran d'accueil prêt depuis ce temps-là (ms), immobile (boutons affichés) : on peut précharger la
+ * salle de la carte centrée, qui fige la page ≈ 0,5 s ; pendant l'allumage du logo, il se voyait
+ */
+const PRECHARGEMENT_APRES_INTRO = 1800
 
 /**
  * Page d'accueil : la galerie spirale (projet « Galerie spirale », racine de ~/MMR),
@@ -64,6 +78,10 @@ export function Accueil() {
     if (store.get().transition) overlay.cacher()
 
     let raf = 0
+    /** Instant où l'on est entré dans la visite (sortie de l'écran d'accueil) */
+    let sortieIntro = 0
+    /** Instant où l'écran d'accueil est devenu prêt */
+    let introPrete = 0
     let centre: { slot: (typeof galerie.slots)[number]; carte: (typeof cartesSpirale)[number] } | null = null
     let centreDepuis = 0
     /** Carte 3D cachée sous l'image de la transition */
@@ -75,13 +93,22 @@ export function Accueil() {
     // images des cartes déjà préparées (elles arrivent juste après la construction)
     /** « Découvrir » : la carte glisse au centre, puis l'entrée commence */
     let centrage: { carte: string; depart: number; cible: number; debut: number; duree: number } | null = null
-    let prete = !store.get().transition
+    // Écran d'accueil : images des cartes et calculs d'affichage comptent dans son chargement
+    const accueil = enIntro()
+    if (accueil) {
+      prevoir('spirale-images', 3)
+      prevoir('spirale-calcul', 2)
+    }
+    let prete = !store.get().transition && !accueil
     if (!prete)
       setTimeout(() =>
         galerie
           .prepare()
           .catch(() => {})
-          .then(() => (prete = true)),
+          .then(() => {
+            prete = true
+            avancer('spirale-calcul', 1)
+          }),
       )
     // Baisse la résolution si la machine peine, la remonte quand elle suit (voir resolution.ts)
     const resolution = new ResolutionAdaptative((r) => galerie.renderer.setPixelRatio(r))
@@ -118,12 +145,16 @@ export function Accueil() {
         cachee = aCacher
       }
       if (carte.id !== centre?.carte.id) centreDepuis = performance.now()
-      else if (performance.now() - centreDepuis > DELAI_PRECHARGEMENT) prechargerOeuvre(carte.id)
+      else if (performance.now() - centreDepuis > DELAI_PRECHARGEMENT && peutPrecharger()) prechargerOeuvre(carte.id)
       centre = { slot, carte }
       // Titre de la carte : il part lettre par lettre au clic sur « Découvrir », et revient de même
       // au retour d'une salle, quand l'image se fond dans la carte
-      if (transition && !(transition.sens === 'sortie' && transition.phase === 'fondu')) overlay.cacher()
+      if (store.get().intro === 'sortie') sortieIntro ||= maintenant
+      if (store.get().intro === 'pret') introPrete ||= maintenant
+      const titreAttend = enIntro() || (store.get().intro === 'sortie' && maintenant - sortieIntro < TITRE_APRES_INTRO)
+      if ((transition && !(transition.sens === 'sortie' && transition.phase === 'fondu')) || titreAttend) overlay.cacher()
       else overlay.montrer()
+      if (accueil) avancer('spirale-images', galerie.slots.filter((s) => s.texture).length / galerie.slots.length)
       overlay.setCard(carte)
       teinte.setCard(carte, galerie.cardColors.get(carte.id))
       // Retour d'une salle, pendant que la caméra rejoint la vue initiale : la spirale, cachée,
@@ -145,6 +176,10 @@ export function Accueil() {
         centrage = null
         if (carte.id === id) entrer(id, galerie.cardScreenFrame(slot))
       }
+    }
+    function peutPrecharger() {
+      const i = store.get().intro
+      return i === null || i === 'sortie' || (i === 'pret' && introPrete > 0 && performance.now() - introPrete > PRECHARGEMENT_APRES_INTRO)
     }
     animer()
     decouvrir.current = () => {
@@ -219,6 +254,7 @@ export function Accueil() {
             onClick={(e) => {
               // Lien posé par Overlay.js (href = /oeuvre/…) : la transition navigue sans recharger la page
               e.preventDefault()
+              cliquer()
               decouvrir.current()
             }}
           >

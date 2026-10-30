@@ -96,7 +96,8 @@ export function useApparition({
       // Lettres plus douces que le titre de la spirale (demande de Ludovic du 30/10) : plus lentes,
       // en fondu, départ et arrêt progressifs
       tl.fromTo(lettres, { yPercent: 110, opacity: 0 }, { yPercent: 0, opacity: 1, duration: 0.8, ease: 'power3.out', stagger: 0.022 }, 0)
-      tl.fromTo(elements(), { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out', stagger: 0.06 }, 0.3)
+      const autres = elements()
+      tl.fromTo(autres, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out', stagger: 0.06 }, 0.3)
       anim.current = tl
     } else if (cascade) {
       sortir(lettres, { transform: 'translate(0, -110%)', opacity: 0 }, 0.6, POWER2_INOUT, 0, 0.018)

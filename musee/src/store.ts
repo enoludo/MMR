@@ -65,11 +65,32 @@ type Etat = {
   derniereOeuvre: string | null
   /** Ce qu'affiche la salle : le premier écran (info) ou un popup (maladie, manifeste) */
   onglet: Onglet
-  /** Son coupé (bouton du header ; pas encore de son dans le site) */
+  /** Son coupé (bouton du header), gardé d'une visite à l'autre (ui/Musique.tsx) */
   muet: boolean
+  /**
+   * Écran d'accueil (ui/Intro.tsx) : le site charge, puis il est prêt (boutons d'entrée), puis on
+   * entre dans la visite (sortie de l'écran) ; null une fois l'écran parti
+   */
+  intro: 'chargement' | 'pret' | 'sortie' | null
   /** Menu principal ouvert */
   menu: boolean
   dev: boolean
+}
+
+/** Choix du visiteur gardé dans le navigateur (absent en navigation privée : son remis) */
+function lireMuet() {
+  try {
+    return localStorage.getItem('mmr-muet') === '1'
+  } catch {
+    return false
+  }
+}
+export function garderMuet(muet: boolean) {
+  try {
+    localStorage.setItem('mmr-muet', muet ? '1' : '0')
+  } catch {
+    /* stockage indisponible */
+  }
 }
 
 let etat: Etat = {
@@ -83,7 +104,8 @@ let etat: Etat = {
   arrive: false,
   demande: null,
   onglet: 'info',
-  muet: false,
+  muet: lireMuet(),
+  intro: 'chargement',
   menu: false,
   dev: false,
 }

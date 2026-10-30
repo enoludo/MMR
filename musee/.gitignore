@@ -23,3 +23,7 @@ blender/sculpture/sculpture-raw.glb
 # Salle de « La maladie de Huntington » : calculs de lumière bruts, export brut de l’œuvre
 blender/salle-huntington/*.exr
 blender/sculpture-huntington/huntington-raw.glb
+
+# Sons d'origine (re-téléchargeables) : seules leurs versions compressées (public/assets/musiques) sont suivies
+sons/*.mp3
+sons/*.wav

@@ -75,6 +75,10 @@ button { font: inherit; color: inherit; }
 .onglets__onglet.actif { background: #000; }
 
 /* --- Header ----------------------------------------------------------- */
+/* Sous l'écran d'accueil (ui/Intro.tsx), le header et les flèches attendent ; ils arrivent avec la visite */
+.entete, .accueil__fleches, .pied { transition: opacity 0.8s ease 0.5s, visibility 0s 0.5s; }
+.intro-active .entete, .intro-active .accueil__fleches, .intro-active .pied { opacity: 0; visibility: hidden; transition: none; }
+
 .entete {
   position: fixed; top: var(--marge); left: var(--marge); right: var(--marge); z-index: 30;
   display: flex; justify-content: space-between; align-items: flex-start;

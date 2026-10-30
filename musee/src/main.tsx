@@ -7,6 +7,9 @@ import '@fontsource-variable/google-sans-flex/wght.css'
 import { Accueil } from './accueil/Accueil'
 import { APropos } from './pages/APropos'
 import { Transition } from './ui/Transition'
+import { Musique } from './ui/Musique'
+import { Intro } from './ui/Intro'
+import { prevoir } from './chargement'
 import { store, useEtat } from './store'
 import './style.css'
 
@@ -16,6 +19,9 @@ const PageOeuvre = lazy(() => import('./pages/PageOeuvre').then((m) => ({ defaul
 const SORTIE_TEXTE_SALLE = 750
 /** Délai avant de démonter la salle quittée, une fois revenu sur la spirale (ms) */
 const DEMONTAGE_SALLE = 1500
+
+// Arrivée directe dans une salle : l'écran d'accueil attend aussi la salle (chargée à la demande)
+if (window.location.pathname.startsWith('/oeuvre/')) prevoir('salle', 6)
 
 function App() {
   const dev = useEtat((e) => e.dev)
@@ -82,6 +88,8 @@ function App() {
         </Routes>
       </Suspense>
       <Transition />
+      <Musique />
+      <Intro />
     </>
   )
 }

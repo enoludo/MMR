@@ -7,11 +7,14 @@ import { EnTete } from './EnTete'
 import { IconeCroix, IconeFleche, IconePartage } from './icones'
 import { Popup, PopupChiffres, PopupEntete, PopupLien, PopupTexte } from './Popup'
 import { sortir } from '../transition'
+import { cliquer } from '../musique'
+import { avancer } from '../chargement'
 import { useApparition } from './apparition'
 
 
 /** Affiche le premier écran ou un popup, et envoie la caméra vers le point de vue associé (voir Oeuvre.vues). */
 export function choisirOnglet(oeuvre: Oeuvre, onglet: Onglet) {
+  if (onglet !== 'info' && store.get().onglet !== onglet) cliquer()
   const vue = oeuvre.vues[onglet]
   const i = vue ? oeuvre.salle.etapes.findIndex((e) => e.id === vue) : -1
   store.set({ onglet, demande: i >= 0 ? i : 'cercle' })
@@ -20,6 +23,7 @@ export function choisirOnglet(oeuvre: Oeuvre, onglet: Onglet) {
 /** Part vers la salle d'une autre œuvre, par la porte et le couloir (voir scene/passage.ts). */
 function partirVers(oeuvre: Oeuvre, sens: Sens) {
   if (store.get().passage) return
+  cliquer()
   store.set({ onglet: 'info', passage: { cle: nouvelleCle(), oeuvre: oeuvre.id, sens } })
 }
 
@@ -35,7 +39,12 @@ export function InterfaceSalle({ oeuvre }: { oeuvre: Oeuvre }) {
   // Transition avec la spirale : en entrant, le premier écran apparaît quand l'image de la carte
   // s'efface ; en sortant, il disparaît dès que la caméra repart vers la vue initiale.
   // Titre lettre par lettre et liens en fondu, comme le titre de la spirale.
-  const enTransition = useEtat((e) => !!e.transition && !(e.transition.sens === 'entree' && e.transition.phase === 'fondu'))
+  const enTransition = useEtat(
+    (e) =>
+      (!!e.transition && !(e.transition.sens === 'entree' && e.transition.phase === 'fondu')) ||
+      e.intro === 'chargement' ||
+      e.intro === 'pret', // arrivée directe : le premier écran apparaît à l'entrée dans la visite
+  )
   const ouvert = onglet !== 'info'
   // Popup en train de se fermer (ouvert au rendu précédent)
   const etaitOuvert = useRef(ouvert)
@@ -100,6 +109,7 @@ export function InterfaceSalle({ oeuvre }: { oeuvre: Oeuvre }) {
             className="pilule pilule--titre"
             aria-label={`${oeuvre.titre} : retour à la collection`}
             onClick={(e) => {
+              cliquer()
               if (sortir()) e.preventDefault()
             }}
           >
@@ -248,6 +258,12 @@ function Partager({ oeuvre }: { oeuvre: Oeuvre }) {
 function Chargement() {
   const { active, progress } = useProgress()
   const [fini, setFini] = useState(false)
+  // Arrivée directe par l'adresse : l'écran d'accueil (ui/Intro.tsx) montre le chargement de la salle
+  const [sousIntro] = useState(() => store.get().intro !== null)
+  const affichee = useEtat((e) => e.salleAffichee !== null)
+  useEffect(() => {
+    if (sousIntro) avancer('salle', affichee ? 1 : (progress / 100) * 0.9)
+  }, [sousIntro, affichee, progress])
   // En entrant depuis la spirale, l'image de la carte sert d'écran d'attente : la barre seule
   const [discret] = useState(() => store.get().transition?.sens === 'entree')
   useEffect(() => {
@@ -256,7 +272,7 @@ function Chargement() {
       return () => clearTimeout(t)
     }
   }, [active, progress])
-  if (fini) return null
+  if (fini || sousIntro) return null
   return (
     <div className={`chargement ${discret ? 'chargement--discret' : ''} ${!active && progress === 100 ? 'chargement--fin' : ''}`}>
       {!discret && <img className="chargement__logo" src="/assets/logo-mmr.png" alt="Musée des Maladies Rares" />}

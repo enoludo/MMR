@@ -46,8 +46,17 @@ function enregistrementCaptures(): Plugin {
   }
 }
 
+/** Logo de l'écran d'accueil écrit dans index.html (src/ui/intro/logo-mmr.svg) : visible dès la première image */
+function logoDansLaPage(): Plugin {
+  return {
+    name: 'logo-dans-la-page',
+    transformIndexHtml: (html) =>
+      html.replace('<!--logo-mmr-->', readFileSync(path.resolve(__dirname, 'src/ui/intro/logo-mmr.svg'), 'utf8')),
+  }
+}
+
 export default defineConfig({
-  plugins: [react(), enregistrementCaptures()],
+  plugins: [react(), enregistrementCaptures(), logoDansLaPage()],
   define: { __EMPREINTES__: JSON.stringify(empreintes()) },
   server: { open: true },
   // Mesures de performance sur le site compilé (npx vite preview) : profilage JavaScript autorisé

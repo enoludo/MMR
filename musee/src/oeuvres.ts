@@ -32,6 +32,8 @@ export interface Oeuvre {
   image: string
   /** Visuel de l'œuvre, sur la carte « Œuvre suivante » des salles (à défaut, l'image de la carte) */
   vignette?: string
+  /** Musique de la salle, en boucle (ui/Musique.tsx ; à défaut, celle de la spirale) */
+  musique?: string
   /**
    * Capture de la vue d'entrée de la salle (outils/capture.ts), sans extension : la profondeur
    * (-profondeur.png) et les réglages (.json) donnent la parallaxe de la transition depuis la spirale
@@ -76,6 +78,8 @@ export const oeuvres: Oeuvre[] = [
     // Capture de sa salle (vue d'entrée, outils/capture.ts) ; l'ancien visuel : /assets/images/geant-de-marbre.webp
     image: versionne('/assets/captures/le-seuil-des-proportions.webp'),
     vignette: versionne('/assets/images/geant-de-marbre.webp'),
+    // « Melancholy Dreamscape », ViraMiller (Pixabay, licence Pixabay : sans mention obligatoire)
+    musique: versionne('/assets/musiques/le-seuil-des-proportions.m4a'),
     vueEntree: '/assets/captures/le-seuil-des-proportions',
     cartouches: capturesCartouches('le-seuil-des-proportions'),
     mecene: { nom: 'Fondation Delorme-Vasseur' },
@@ -110,6 +114,8 @@ export const oeuvres: Oeuvre[] = [
     // Capture de sa salle (vue d'entrée, outils/capture.ts) ; l'ancien visuel : /assets/images/la-maladie-de-huntington.webp
     image: versionne('/assets/captures/la-maladie-de-huntington.webp'),
     vignette: versionne('/assets/images/la-maladie-de-huntington.webp'),
+    // « Ambient Atmospheric Cinematic Ethereal Piano », Denis-Pavlov-Music (Pixabay, licence Pixabay : sans mention obligatoire)
+    musique: versionne('/assets/musiques/la-maladie-de-huntington.m4a'),
     vueEntree: '/assets/captures/la-maladie-de-huntington',
     cartouches: capturesCartouches('la-maladie-de-huntington'),
     maladieTexte: maladieAVenir('Maladie de Huntington'),
@@ -160,6 +166,12 @@ export const oeuvres: Oeuvre[] = [
 ]
 
 export const lienOeuvre = (o: Oeuvre) => `/oeuvre/${o.id}`
+
+/**
+ * Musique de la spirale et des salles qui n'ont pas la leur : « Ambient Abstract (Extended) »,
+ * Siarhei_Korbut (Pixabay, licence Pixabay : sans mention obligatoire)
+ */
+export const musiqueSpirale = versionne('/assets/musiques/spirale.m4a')
 
 /**
  * Cartes de la spirale d'accueil (format attendu par src/accueil/gallery).

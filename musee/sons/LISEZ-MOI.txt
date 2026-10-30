@@ -1,0 +1,12 @@
+Dossier des sons d'origine (MP3 téléchargés sur Pixabay ou ailleurs).
+Déposez-les ici tels quels : Claude Code les compresse et les place dans
+public/assets/musiques pour le site. Ce dossier n'est pas mis en ligne.
+
+Utilisés sur le site (licence Pixabay, sans mention obligatoire) :
+- viramiller-melancholy-dreamscape → public/assets/musiques/le-seuil-des-proportions.m4a
+- siarhei_korbut-ambient-abstract-extended → public/assets/musiques/spirale.m4a
+- denis-pavlov-music-...-ethereal-piano → public/assets/musiques/la-maladie-de-huntington.m4a
+- humordome-soft-ui-pop-light-minimal-click → public/assets/sons/clic.wav
+  (les trois premiers pops seulement, 0,32 s, mono, fondu de 60 ms à la fin)
+- soul_serenity_sounds-clock-livingroom-gentle-clicks-alongside-the-ticking : essayé pour un cliquetis
+  à l'apparition des titres (quatre tics de 0,18 s pris à 1, 2, 4 et 6 s), retiré le 30/10
