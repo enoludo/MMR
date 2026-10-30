@@ -96,7 +96,6 @@ Depuis Claude Code, lancer les scripts avec le Blender de l'application : `/Appl
 - Recadrer les points de vue Maladie (main) et Manifeste (visage) avec le popup ouvert à droite (à reprendre avec la nouvelle interface).
 - Mobile : le popup Maladie défile ; le premier écran pousse l'œuvre vers le haut (à reprendre avec la nouvelle interface).
 - Transition spirale → salle : léger crénelage du contour de l'œuvre pendant la parallaxe sur grand écran Retina (un lissage trop coûteux a été abandonné le 30/10).
-- Git : 20 commits locaux non envoyés sur GitHub (depuis `dbd6f64`), à proposer à Ludovic.
 - Couloir à fentes : réglages à valider avec Ludovic (soleil, douceur, rayons dans l'air, lumière des portes, soleil de la fente zénithale). Léger liseré sombre au pied d'un banc.
 - Agrandissement de l'œuvre et de la salle (28/10) : vérifier les bancs (placés pour l'ancienne salle), le rayon du cercle (9 m), l'exposition de la salle plus grande, et recadrer les points de vue (mis à l'échelle ×1,25).
 - Toutes les œuvres utilisent la salle provisoire : le passage vers une salle différente (autres modèles) n'a pas encore été essayé ; prévoir son préchargement.

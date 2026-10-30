@@ -29,10 +29,8 @@ de l'écran) en début de session, avant de toucher au code.
 **En ligne :** labo Fluidbook Toolbox `mmr-lab`, https://mmr-lab.labs.cubedesigners.com/ (dernière version).
 Vercel n'est plus mis à jour depuis le 27/10.
 
-**Git :** tout est enregistré **en local** (commit `47dd1a9`). GitHub (`enoludo/MMR`, branche
-`claude/spirale-interactive-gallery-b4mzwd`) s'arrête au commit `dbd6f64` du 28/10 : **20 commits ne sont
-pas envoyés**. Ludovic a dit « pas maintenant » pour l'envoi ; le lui reproposer à l'occasion (`git push`
-depuis `~/MMR`).
+**Git :** tout est enregistré et envoyé sur GitHub (`enoludo/MMR`, branche
+`claude/spirale-interactive-gallery-b4mzwd`), jusqu'à cette passation (envoi du 30/10, à la demande de Ludovic).
 
 ## 2. L'interface actuelle des salles : ce qu'il y a à refaire
 
