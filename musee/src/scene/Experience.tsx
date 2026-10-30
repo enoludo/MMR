@@ -230,6 +230,35 @@ function PreparationPassage({ cle, children }: { cle: number; children: ReactNod
       }
       // Matières de la salle cachée, avec les lumières de toute la scène
       if (!fini) await gl.compileAsync(g, camera, scene)
+      // Premier dessin de chaque objet, réduit à un pixel, un par image : le pilote graphique y
+      // prépare ses états de dessin (et ses textures), ≈ 0,2 à 0,4 s d'un coup sinon, à l'apparition
+      const objets: THREE.Object3D[] = []
+      g.traverse((o) => {
+        if ((o as THREE.Mesh).isMesh || (o as THREE.Points).isPoints) objets.push(o)
+      })
+      const autres: THREE.Object3D[] = []
+      for (const o of objets) {
+        await imageSuivante()
+        if (fini) return
+        scene.traverse((x) => {
+          if (((x as THREE.Mesh).isMesh || (x as THREE.Points).isPoints) && x.visible && x !== o && !objets.includes(x)) autres.push(x)
+        })
+        autres.forEach((x) => (x.visible = false))
+        objets.forEach((x) => (x.userData.visiblePreparation = x.visible))
+        objets.forEach((x) => (x.visible = x === o && x.userData.visiblePreparation))
+        g.visible = true
+        const ombres = gl.shadowMap.autoUpdate
+        gl.shadowMap.autoUpdate = false
+        gl.setScissorTest(true)
+        gl.setScissor(0, 0, 1, 1)
+        gl.render(scene, camera)
+        gl.setScissorTest(false)
+        gl.shadowMap.autoUpdate = ombres
+        g.visible = false
+        objets.forEach((x) => (x.visible = x.userData.visiblePreparation))
+        autres.forEach((x) => (x.visible = true))
+        autres.length = 0
+      }
       if (!fini) setPrete(true)
     })()
     // Par sécurité : au plus tard 2 s après le départ, ou dès qu'on y est arrivé

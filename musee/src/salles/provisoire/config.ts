@@ -26,8 +26,8 @@ export const salleProvisoire: SalleConfig = {
   titre: 'Salle 1 — Le géant',
   modele: versionne('/models/salle.glb'),
   lightmaps: {
-    salle: { image: versionne('/models/salle-lightmap.webp'), ...lightmapSalle },
-    mobilier: { image: versionne('/models/salle-lightmap-mobilier.webp'), ...lightmapMobilier },
+    salle: { image: versionne('/models/salle-lightmap.ktx2'), ...lightmapSalle },
+    mobilier: { image: versionne('/models/salle-lightmap-mobilier.ktx2'), ...lightmapMobilier },
   },
   // Couleur de chaque matière = albédo utilisé dans Blender (même rendu des rebonds)
   matieres: {
@@ -157,8 +157,8 @@ export const salleProvisoireBleue: SalleConfig = {
   titre: 'Salle 2 — Huntington', // nom des dossiers de la touche M (« Navigation · Salle 2 — Huntington »)
   modele: versionne('/models/huntington-salle.glb'),
   lightmaps: {
-    salle: { image: versionne('/models/huntington-salle-lightmap.webp'), ...lightmapHuntington },
-    mobilier: { image: versionne('/models/huntington-salle-lightmap-mobilier.webp'), ...lightmapMobilierHuntington },
+    salle: { image: versionne('/models/huntington-salle-lightmap.ktx2'), ...lightmapHuntington },
+    mobilier: { image: versionne('/models/huntington-salle-lightmap-mobilier.ktx2'), ...lightmapMobilierHuntington },
   },
   sculpture: {
     modele: versionne('/models/huntington.glb'),

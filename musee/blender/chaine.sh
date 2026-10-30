@@ -26,4 +26,8 @@ npx --yes @gltf-transform/cli optimize blender/$D/salle-raw.glb $S/salle-opt.glb
 # Grille de quantification commune à toute la scène : les sommets partagés par le sol et le carré
 # de sol fin (deux objets) restent exactement confondus, sans fissure entre eux
 npx --yes @gltf-transform/cli meshopt $S/salle-opt.glb public/models/${P}salle.glb --quantization-volume scene --quantize-position 16 --quantize-texcoord 14 2>&1 | tail -1
+# Lightmaps en KTX2 (lues par le site ; les WebP restent la source) : ≈ 35 s chacune
+node blender/ktx2.mjs public/models/${P}salle-lightmap.webp &
+node blender/ktx2.mjs public/models/${P}salle-lightmap-mobilier.webp
+wait
 ls -la public/models/${P}salle* src/salles/provisoire/${P}*.json
