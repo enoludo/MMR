@@ -11,7 +11,7 @@ Une entrée par session, la plus récente en haut. Le détail technique est dans
 
 ---
 
-## 30/10/2026 — Claude Code (refonte de l'interface des salles : premier écran)
+## 30/10/2026 — Claude Code (refonte de l'interface des salles, musique, écran d'accueil)
 
 - **[à voir]** **Premier écran des salles d'après la nouvelle maquette** (Figma `471:344`, remplace `445:275`) : liens Maladie et Manifeste remplacés par **deux cartouches avec photo** (192 × 192, coins de 12 px, voile sombre en bas) ; Maladie : libellé et nom de la maladie ; Manifeste : libellé et chevron « › » dans un rond (la maquette n'en met pas sur Maladie : le nom de la maladie prend toute la largeur, un essai avec chevron coupait « Acromégalie »). Ordre repris de la maquette : titre, cartouches, « Partager cette œuvre » (verre plus léger), « Avec le soutien de » (14 px). Premier écran dans la première colonne de la grille (560 px), marge de 48 px, 48 px entre les blocs ; cotes contrôlées en 1680 × 1050 (identiques à la maquette au pixel près). Survol : la photo grossit légèrement, le rond du chevron s'éclaire.
 - **[à voir]** **Œuvre précédente / suivante** : deux flèches rondes en bas au centre, comme sur la spirale (même icône).

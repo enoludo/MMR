@@ -1,7 +1,7 @@
 # CLAUDE.md — Musée des Maladies Rares (MMR), site 3D
 
 Contexte de travail pour Claude Code. À lire en entier au début de chaque session.
-Dernière mise à jour : 30/10/2026 (passation avant la refonte de l'interface des salles).
+Dernière mise à jour : 30/10/2026 (passation après la refonte de l'interface des salles, la musique et l'écran d'accueil : voir `PASSATION.md`).
 
 ## Interlocuteur et façon de travailler
 
@@ -38,7 +38,9 @@ Site web simulant une visite de musée en 3D : une collection d'œuvres (accueil
 src/
   main.tsx              routes : / (accueil), /oeuvre/:id (chargée à la demande), /a-propos ; touche M = Leva (bouton « Copier les réglages » en tête : ui/CopieReglages.tsx, JSON par dossier que Ludovic colle dans la conversation)
   oeuvres.ts            la collection : titre, maladie, image, mécène, partenaire, textes, salle, points de vue
-  store.ts              état global minimal (onglet = premier écran ou popup, étape, demande caméra, muet, menu, transition)
+  store.ts              état global minimal (onglet = premier écran ou popup, étape, demande caméra, muet, intro, menu, transition)
+  musique.ts            musique des salles et sons d'interface (Web Audio)
+  chargement.ts         avancement du chargement pour l'écran d'accueil
   transition.ts         transitions spirale ↔ salle (entrer, sortir, capture de la salle) et préchargement des salles
   entree.ts             mouvement d'entrée dans une salle (parallaxe), partagé par l'image de transition et la scène
   outils/capture.ts     (dev) capture de la vue d'entrée d'une salle : image + profondeur
@@ -47,8 +49,9 @@ src/
                         Reflet, Faisceau, Poussiere, pierre.ts (shader de la pierre),
                         Couloir (couloir à fentes, en direct), passage.ts (placement des salles)
   salles/provisoire/    config de la salle : parcours, étapes (points de vue), soleil, matières, portes, lightmaps
-  ui/                   EnTete (header commun), Transition + ToileTransition (zoom carte ↔ salle), InterfaceSalle (premier écran, précédente/suivante),
-                        Popup (popup réutilisable des salles : Popup + blocs Entete, Texte, Chiffres, Lien), icones
+  ui/                   EnTete (header commun), Transition + ToileTransition (zoom carte ↔ salle), InterfaceSalle (premier écran, cartouches, flèches précédente/suivante),
+                        Popup (popup réutilisable des salles : Popup + blocs Entete, Texte, Chiffres, Lien), apparition (cascades et titres),
+                        Intro (écran d'accueil, avec intro/ : logo et Havas), Musique (choix de la musique), icones
   pages/                PageOeuvre, APropos
 blender/                scripts de fabrication 3D (voir README) ; .blend hors Git
 public/models/          GLB et lightmaps optimisés
@@ -93,8 +96,8 @@ Depuis Claude Code, lancer les scripts avec le Blender de l'application : `/Appl
 ## Points ouverts
 
 - **Salle de 40 m (29/10), reportée dans la 3D, à voir avec Ludovic :** plan coté `plans/salle-40.html` (`plans/generer-plan-40.py`). À régler avec lui : contraste, lames, couloirs et impasses (touche M, bouton « Copier les réglages »). Vue d'arrivée, points de vue Maladie/Manifeste et anneaux de la caméra repris tels quels de la salle de 30 m : à revoir dans la salle plus grande.
-- **Refonte de l'interface des salles (30/10), en cours :** premier écran fait d'après Figma `477:973` (cartouches, flèches qui s'ouvrent en carte), à voir avec Ludovic. Reste à voir avec lui : popups (maquette à venir ?), mobile. Repères dans `PASSATION.md` (liens avec la 3D, méthode). Police Geist Light de la maquette remplacée par Google Sans Flex Light.
-- **Transitions spirale ↔ salles (28/10), à voir avec Ludovic :** durées (zoom 1,4 / 1,4 s, fondus 1 / 0,5 s, `TRANSITION_DEFAUT` dans `entree.ts`, propres à chaque salle), raccords des voiles sombres (vignette, éclairage de la carte) et textes lettre par lettre (non vus sur mobile), amplitude de la parallaxe (limitée à 1,6 m de recul par le mur sud), effet sur mobile (le décentrage du premier écran en bas n'est pas pris en compte par la capture), temps d'attente une fois en ligne (le montage de la salle fige l'image ≈ 0,5 s en dev). « Le seuil des proportions » et « La maladie de Huntington » ont une capture ; les autres œuvres ont une photo sans rapport avec la salle provisoire. L'arrivée directe par une adresse garde l'écran de chargement complet, sans mouvement.
+- **Refonte de l'interface des salles (30/10), faite, à voir avec Ludovic :** premier écran `477:973`, popups `471:511` / `477:2158`, animations en cascade, musique, clic, écran d'accueil (détail et statuts dans `JOURNAL.md`, état et suite dans `PASSATION.md`). Reste : mobile (premier écran, popups qui défilent, flèches) avec une maquette mobile. Police Geist Light de la maquette remplacée par Google Sans Flex Light.
+- **Transitions spirale ↔ salles (28/10), à voir avec Ludovic :** durées (zoom 1,4 / 1,4 s, fondus 1 / 0,5 s, `TRANSITION_DEFAUT` dans `entree.ts`, propres à chaque salle), raccords des voiles sombres (vignette, éclairage de la carte) et textes lettre par lettre (non vus sur mobile), amplitude de la parallaxe (limitée à 1,6 m de recul par le mur sud), effet sur mobile (le décentrage du premier écran en bas n'est pas pris en compte par la capture), temps d'attente une fois en ligne (le montage de la salle fige l'image ≈ 0,5 s en dev). « Le seuil des proportions » et « La maladie de Huntington » ont une capture ; les autres œuvres ont une photo sans rapport avec la salle provisoire. L'arrivée directe par une adresse passe par l'écran d'accueil (qui attend la salle), sans mouvement d'entrée.
 - Chiffres du popup Maladie repris du Figma (30/10 : 1/2M, ACVR1, 9/10, 0), à faire valider : « 1/2M » et « ACVR1 » ne correspondent pas à l'acromégalie (ACVR1 est le gène de la FOP). Lien « En savoir plus » (Orphanet) à confirmer.
 - Recadrer les points de vue Maladie (main) et Manifeste (visage) avec le popup ouvert à droite (à reprendre avec la nouvelle interface).
 - Mobile : le popup Maladie défile ; le premier écran pousse l'œuvre vers le haut (à reprendre avec la nouvelle interface).

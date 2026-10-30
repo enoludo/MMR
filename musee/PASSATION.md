@@ -1,89 +1,85 @@
-# Passation — avant la refonte de l'interface des salles
+# Passation — après la refonte de l'interface des salles, la musique et l'écran d'accueil
 
-Rédigée le 30/10/2026 par Claude Code, à la fin de la session « salle de 40 m, Huntington, fluidité ».
-À lire après `CLAUDE.md` (contexte, décisions de Ludovic, architecture détaillée) et le haut de `JOURNAL.md`.
-Remplace la passation du 28/10 (transitions spirale ↔ salles), toujours lisible dans l'historique Git.
-
-**Prochaine étape, choisie par Ludovic : refaire l'interface web des salles.** Celle en place ne lui
-convient pas. Il va montrer une nouvelle maquette Figma : lui demander le lien (ou l'identifiant
-de l'écran) en début de session, avant de toucher au code.
+Rédigée le 30/10/2026 (fin d'après-midi) par Claude Code, à la fin de la session « refonte de l'interface
+des salles ». À lire après `CLAUDE.md` (contexte, décisions de Ludovic, architecture détaillée) et le haut
+de `JOURNAL.md` (détail de chaque changement, avec son statut). Remplace la passation du matin du 30/10
+(« avant la refonte »), toujours lisible dans l'historique Git.
 
 ---
 
 ## 1. Où en est-on
 
-**Ce qui a été fait depuis le 28/10** (détail et statuts dans `JOURNAL.md`) :
-- **Salle de 40 × 40 m** d'après le plan de Ludovic, et une deuxième œuvre modélisée, **« La maladie de
-  Huntington »** (statue de 2,70 m sur socle lumineux, salle bleutée).
-- **Réglages propres à chaque salle** (navigation, transitions, sculpture : touche M, dossiers au nom de la salle).
-- **Passages entre salles** sans saut de caméra ni de couleur, ambiance qui glisse dans le couloir.
-- **Fluidité** (toutes validées ou vues par Ludovic) : résolution adaptative (plancher 1,5), faisceau deux fois
-  moins coûteux, salles voisines préchargées, salle d'arrivée préparée cachée, lightmaps en KTX2, images
-  de transition allégées (version 2880 px, deux œuvres gardées en mémoire), profondeur des captures
-  à pleine résolution, fondu d'arrivée de 0,6 s.
-- **Abandonné :** lissage du contour de l'œuvre pendant la transition (calcul deux fois plus lourd, jugé
-  « pire » par Ludovic sur grand écran Retina). Un léger crénelage du contour reste visible pendant la
-  parallaxe ; ne le reprendre qu'avec une méthode qui ne coûte presque rien.
-- **Retiré :** le message « Faites défiler pour tourner autour de l'œuvre » en bas des salles.
-
-**En ligne :** labo Fluidbook Toolbox `mmr-lab`, https://mmr-lab.labs.cubedesigners.com/ (dernière version).
-Vercel n'est plus mis à jour depuis le 27/10.
+**En ligne :** labo Fluidbook Toolbox `mmr-lab`, https://mmr-lab.labs.cubedesigners.com/ (version du labo
+`0d175e0`, la dernière). Vercel n'est plus mis à jour depuis le 27/10.
 
 **Git :** tout est enregistré et envoyé sur GitHub (`enoludo/MMR`, branche
-`claude/spirale-interactive-gallery-b4mzwd`), jusqu'à cette passation (envoi du 30/10, à la demande de Ludovic).
+`claude/spirale-interactive-gallery-b4mzwd`, commit `9367d29`, puis cette passation).
 
-## 2. L'interface actuelle des salles : ce qu'il y a à refaire
+**Fait pendant la session** (tout est « à voir » dans le journal, sauf le flou des cartouches, validé) :
 
-Maquette de référence jusqu'ici : Figma `BV6AsWeLSbWpCA7AarJGdr`, écrans 445:275 (premier écran),
-447:602 (popup Maladie), 448:911 (popup Manifeste). La nouvelle maquette les remplacera.
+1. **Interface des salles** d'après les nouvelles maquettes Figma :
+   - premier écran `477:973` : titre, cartouches Maladie et Manifeste avec photo (photo = la vue où va la
+     caméra à l'ouverture du popup, `__visite.capturerCartouches(id)`), flou progressif dans les
+     cartouches, soutien, partage ; marge gauche de 96 px ;
+   - en bas : flèches œuvre précédente / suivante qui s'ouvrent au survol en carte avec le visuel de
+     l'œuvre (flou progressif en bas) ;
+   - popups `471:511` (Maladie) et `477:2158` (Manifeste) : 653 px, coins 24, croix transparente, titre
+     48 px, chiffres sur deux colonnes, bouton rouge, marge intérieure régulière de 96 à 24 px ;
+   - popup ouvert : le scroll tourne autour de l'œuvre depuis le point de vue, le regard suit la souris.
+2. **Animations, toutes dans le même esprit** : apparitions et disparitions en cascade (premier écran,
+   popups, header, flèches), titres lettre par lettre plus doux (salles, popups, spirale), cohérentes quel
+   que soit le chemin (popup ouvert → autre œuvre ou spirale). Sorties du texte jouées par le navigateur
+   (Web Animations) et spirale préparée après la sortie du texte, pour une sortie fluide vers la spirale.
+3. **Son** : musique en boucle par salle (spirale, géant, Huntington ; les autres salles reprennent celle
+   de la spirale), fondus enchaînés, bouton son branché et mémorisé, clic à l'ouverture des popups et aux
+   changements de page. Un cliquetis à l'apparition des titres a été essayé puis retiré.
+4. **Écran d'accueil** (intro Figma `118:1180`) : fond noir, logo qui s'allume case par case au rythme du
+   chargement réel, puis la spirale apparaît en fondu, la signature s'écrit, et deux boutons « Entrer avec
+   le son » / « Entrer sans le son » (le clic débloque le son). Logo écrit dans `index.html` : visible à 0,3 s.
+   Prêt en ≈ 3,8 s sur la version compilée (premier chargement).
 
-| Élément | Où | Rôle actuel |
-|---|---|---|
-| Interface de la salle | `src/ui/InterfaceSalle.tsx` | assemble tout ; `choisirOnglet()` ouvre un popup **et** envoie la caméra vers un point de vue |
-| Premier écran (à gauche, sans fond) | `InterfaceSalle`, classe `.salle-accueil` | titre (lettre par lettre), liens Maladie › et Manifeste ›, « Avec le soutien de » (logo), « Partager cette œuvre » |
-| Popups Maladie et Manifeste (à droite) | `src/ui/Popup.tsx` (`Popup`, `PopupEntete`, `PopupTexte`, `PopupChiffres`, `PopupLien`) | réutilisables ; focus clavier, fermeture par la croix, un clic à côté ou Échap |
-| Header commun (spirale et salles) | `src/ui/EnTete.tsx` | logo, élément central (dans une salle : pilule titre + croix = retour à la spirale), son, menu |
-| Œuvre précédente / suivante | `InterfaceSalle`, `.pied` | lance le passage par le couloir (`partirVers`) |
-| Écran de chargement | `InterfaceSalle`, `Chargement` | logo et barre ; barre seule en entrant depuis la spirale |
-| Textes lettre par lettre | `src/ui/apparition.ts` (`useApparition`, GSAP SplitText) | titre et liens du premier écran, à l'entrée et à la sortie des transitions |
-| Icônes | `src/ui/icones.tsx` et `@phosphor-icons/react` | |
-| Styles | `src/style.css`, sections « Éléments communs », « Header », « Salle », « Popup », « Mobile » | valeurs de la maquette (verre, flou 15 px, rayon 24, hauteur 48, marge 24) |
-| Contenus | `src/oeuvres.ts` (`Oeuvre` : `titre`, `maladie`, `maladieTexte`, `manifeste`, `mecene`, `partenaire`, `vues`) | textes encore provisoires (« À venir ») sauf le Seuil |
+## 2. Où trouver quoi
 
-**Liens avec la 3D, à garder en tête quelle que soit la nouvelle maquette :**
-- `store.onglet` (`'info'`, `'maladie'`, `'manifeste'`) : l'interface l'écrit, la caméra le lit. Chaque onglet a
-  un point de vue (`oeuvre.vues` → `salle.etapes`, réglables dans la config de la salle) ; `store.demande` envoie
-  la caméra (`Navigation.tsx`). Retour au premier écran = retour sur le cercle.
-- `scene/Decentrage.tsx` décale le cadrage pour que l'œuvre reste au milieu de l'espace libre : il **mesure**
-  `.salle-accueil` et `.popup--ouvert` dans la page. Si les classes ou la place des panneaux changent,
-  l'adapter.
-- Transitions avec la spirale et passages : classes `.salle-ui--transition` et `.salle-ui--passage` qui
-  effacent l'interface ; le premier écran part et revient lettre par lettre (`useApparition`, `visible`).
-  Le titre central du header sert aussi de bouton de retour (`sortir()`).
-- La vignette sombre `.salle-ui__vignette` est recopiée dans le shader de la transition (`ToileTransition.ts`) :
-  si elle change, changer les deux, sinon un voile saute à la fin de l'entrée.
-- Les panneaux laissent passer le regard et la molette dans leurs zones vides (`pointer-events: none` sur le
-  conteneur, `auto` sur les enfants) : à conserver, sinon la navigation se bloque au-dessus de l'interface.
-- Mobile (moins de 760 px) : premier écran et popup en bas, au-dessus des boutons ; à revoir avec la maquette.
+| Sujet | Fichiers |
+|---|---|
+| Premier écran, cartouches, flèches | `src/ui/InterfaceSalle.tsx` (`Cartouche`, `Fleche`), `style.css` sections « Salle » et « Pied » |
+| Popups | `src/ui/Popup.tsx` (animations GSAP comprises), section « Popup » de `style.css` |
+| Cascades et titres | `src/ui/apparition.ts` (`useApparition` : `cascade`, `delai`, sorties Web Animations) |
+| Tourner autour de l'œuvre au point de vue | `src/scene/Navigation.tsx` (`vueEtape`, `tourEtape`, `TOUR_VERS_AXE`) |
+| Musique et sons | `src/musique.ts` (lecteur), `src/ui/Musique.tsx` (choix), champ `musique` des œuvres, `public/assets/musiques`, `public/assets/sons` ; sons d'origine dans `musee/sons/` (hors Git, voir son `LISEZ-MOI.txt`) |
+| Écran d'accueil | `index.html` (styles, logo inséré par `logoDansLaPage` de `vite.config.ts`), `src/ui/Intro.tsx`, `src/ui/intro/`, `src/chargement.ts`, `store.intro` |
+| Photos des cartouches | `public/assets/captures/<id>-maladie.webp` / `-manifeste.webp`, `capturesCartouches` (`oeuvres.ts`), outil `capturerCartouches` (`outils/capture.ts`) |
 
-## 3. Méthode proposée pour la refonte
+## 3. Points ouverts (détail dans `CLAUDE.md`)
 
-1. Lire la maquette avec les outils Figma (charger la compétence `figma:figma-design-to-code` avant
-   `get_design_context`), écran par écran ; relever la grille, les cotes, les états (ouvert, survol, mobile).
-2. Faire valider à Ludovic la liste des éléments et des comportements (ce qui ouvre quoi, où va la caméra)
-   avant d'écrire le code.
-3. Réutiliser ce qui tient (`Popup` et ses blocs, `useApparition`, `EnTete`) ; remplacer le reste.
-4. Contrôler les cotes en 1680 × 1050 comme jusqu'ici, puis en 1440 × 900, en grand écran et sur mobile ;
-   montrer des captures côte à côte avec la maquette.
-5. Vérifier qu'aucune transition ne casse : entrée et retour avec la spirale, passage par le couloir,
-   ouverture et fermeture des popups (la caméra et le décentrage suivent).
+- **À faire écouter et regarder à Ludovic** : volume de la musique (`VOLUME` 0,6) et des clics, durées des
+  fondus, raccords des boucles ; l'écran d'accueil en ligne.
+- **Écran d'accueil** : le logo avance par paliers, car deux tâches figent encore la page un instant (la
+  construction de la spirale, 0,3 s, et l'envoi des images des cartes à la carte graphique, deux fois
+  0,35 s). Piste : les étaler image par image, ou décoder les images hors de la page (worker).
+- **Mobile** : premier écran, popups (qui défilent) et flèches à reprendre avec une maquette mobile.
+- **Chiffres du popup Maladie** à faire valider (ACVR1 n'est pas le gène de l'acromégalie), lien Orphanet.
+- **Points de vue** Maladie (main) et Manifeste (visage) à recadrer avec le popup ouvert à droite.
+- Les autres œuvres n'ont ni capture, ni photos de cartouches, ni musique propre, ni titre de manifeste.
+- Bundle principal de 1,3 Mo à découper ; vue Grille à faire.
 
 ## 4. Rappels pratiques
 
-- **Serveur de développement :** `npm run dev` (http://localhost:5173 ; 5175 quand le port est pris).
+- **Serveur de développement :** `npm run dev` (http://localhost:5173 ; 5176 quand le port est pris).
 - **Vérifier avant d'annoncer :** `npx tsc --noEmit`, `npm run build`, un coup d'œil dans le navigateur.
+  Pour les performances, mesurer sur la version compilée (`npm run build` puis `npx vite preview`).
+- **Panneau du navigateur intégré** : masqué ou en arrière-plan, il fige les animations et fausse les
+  mesures (le remettre au premier plan). **Ludovic teste souvent en même temps** dans ce panneau : ses
+  clics et scrolls se mêlent aux mesures.
 - **Mettre en ligne sur le labo :** `npm run build`, copier `dist/` sans `.htaccess` ni les lightmaps WebP,
   ajouter une copie de `index.html` dans `oeuvre/<id>/` pour chaque œuvre et dans `a-propos/`, zipper, puis
-  `lab_upload_zip` (labo `mmr-lab`, `clean: true`). Ludovic le demande à chaque fois (« pousse sur toolbox »).
-- **Ludovic :** répondre en français, court ; montrer des captures avant/après ; ne marquer « validé » dans le
-  journal que sur son accord explicite ; enregistrer dans Git ou mettre en ligne seulement à sa demande.
+  `lab_upload_zip` (labo `mmr-lab`, `clean: true`, envoi par l'adresse signée). Le labo a refusé un premier
+  envoi le 30/10 (connexion à sa machine) : réessayer. GitHub a aussi renvoyé deux fois une erreur interne
+  avant d'accepter : réessayer.
+- **Nouveau son ou nouvelle musique :** Ludovic dépose le fichier dans `musee/sons/` ; le convertir avec
+  `afconvert` (AAC pour les musiques, WAV mono pour les sons courts), couper silence et fondu de fin,
+  aligner le volume (≈ −18 dB), passer l'adresse par `versionne()`.
+- **Ludovic :** répondre en français, court ; montrer des captures ; ne marquer « validé » que sur son
+  accord explicite ; enregistrer dans Git ou mettre en ligne seulement à sa demande (« enregistre, git,
+  pousse sur toolbox »). Quand il dit « les clics », vérifier de quel son il parle (clic des boutons ou
+  cliquetis : malentendu le 30/10).
