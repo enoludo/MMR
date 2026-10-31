@@ -3,6 +3,7 @@ import { useControls } from 'leva'
 import * as THREE from 'three'
 import type { SalleConfig } from '../salles/types'
 import { GLSL_TABLE_LAMES, tableLames } from './lames'
+import { GLSL_SORTIE, uSortie } from './Effets'
 
 /**
  * Faisceau de soleil visible dans l'air (lumière volumétrique simplifiée).
@@ -33,24 +34,31 @@ export function Faisceau({ config }: { config: SalleConfig }) {
     const pente = new THREE.Vector2(dir.x / -dir.y, dir.z / -dir.y)
     const bas = new THREE.Vector3(haut.x + pente.x * haut.y, 0, haut.z + pente.y * haut.y)
 
-    // Prisme englobant (légèrement agrandi), dessiné par ses faces arrière
-    const g = new THREE.BoxGeometry(ouverture[0] * 1.27, 1, ouverture[1] * 1.27)
+    // Prisme englobant (légèrement agrandi), dessiné par ses faces arrière ; cylindre pour un oculus rond
+    // (un pavé déborderait d'une coupole par ses angles)
+    const rond = config.soleil.forme === 'rond'
+    const g = rond
+      ? new THREE.CylinderGeometry(1, 1, 1, 48).scale((ouverture[0] * 1.27) / 2 / Math.cos(Math.PI / 48), 1, (ouverture[1] * 1.27) / 2 / Math.cos(Math.PI / 48))
+      : new THREE.BoxGeometry(ouverture[0] * 1.27, 1, ouverture[1] * 1.27)
+    const plafond = config.soleil.hautVolume ?? haut.y - 0.05
     const p = g.attributes.position as THREE.BufferAttribute
     for (let i = 0; i < p.count; i++) {
       const t = p.getY(i) + 0.5 // 0 = sol, 1 = plafond
       const c = bas.clone().lerp(haut, t)
       // Le haut s'arrête un peu sous le plafond : au même niveau, le volume et le plafond se
       // disputaient l'affichage (arête dure sur le plafond autour du puits)
-      p.setXYZ(i, p.getX(i) + c.x, THREE.MathUtils.clamp(c.y, 0.02, haut.y - 0.05), p.getZ(i) + c.z)
+      p.setXYZ(i, p.getX(i) + c.x, THREE.MathUtils.clamp(c.y, 0.02, plafond), p.getZ(i) + c.z)
     }
     g.computeBoundingSphere()
 
     const uniforms = {
+      ...uSortie,
       uCouleur: { value: new THREE.Color(couleur) },
       uIntensite: { value: 0 },
       uHaut: { value: haut },
       uPente: { value: pente },
       uDemi: { value: new THREE.Vector2(ouverture[0] / 2, ouverture[1] / 2) },
+      uRond: { value: config.soleil.forme === 'rond' ? 1 : 0 },
       ...tableFaisceau(config.soleil),
     }
     return { geometrie: g, uniforms }
@@ -70,11 +78,13 @@ export function Faisceau({ config }: { config: SalleConfig }) {
             gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
           }`,
         fragmentShader: /* glsl */ `
+          ${GLSL_SORTIE}
           uniform vec3 uCouleur;
           uniform float uIntensite;
           uniform vec3 uHaut;
           uniform vec2 uPente;
           uniform vec2 uDemi;
+          uniform float uRond;
           varying vec3 vMonde;
           varying vec3 vCamera;
           ${GLSL_TABLE_LAMES}
@@ -108,7 +118,8 @@ export function Faisceau({ config }: { config: SalleConfig }) {
             float somme = 0.0;
             for (int i = 0; i < N; i++) {
               vec3 q = a + d * (entree + (float(i) + 0.5) * pas);
-              float bord = max(abs(q.x) / uDemi.x, abs(q.z) / uDemi.y); // 1 = bord du puits
+              // 1 = bord du puits (carré, ou rond pour l'oculus de la rotonde)
+              float bord = uRond > 0.5 ? length(q.xz / uDemi) : max(abs(q.x) / uDemi.x, abs(q.z) / uDemi.y);
               float coeur = (1.0 - smoothstep(0.6, 1.22, bord)) * lamesTable(q); // bords flous, bandes des lames
               float h = q.y / uHaut.y;
               // plus dense vers le bas, et s'efface juste sous le plafond
@@ -117,7 +128,7 @@ export function Faisceau({ config }: { config: SalleConfig }) {
             }
             float longueur = somme * pas * lMonde;
             float lum = 1.0 - exp(-longueur * uIntensite * 6.0);
-            gl_FragColor = vec4(uCouleur * lum, 1.0);
+            gl_FragColor = vec4(versSortie(uCouleur * lum), 1.0);
           }`,
         transparent: true,
         depthWrite: false,

@@ -1,4 +1,5 @@
 import type { ReglagesTransition } from '../entree'
+import type { ReglagesEffets } from '../scene/Effets'
 export type Vec3 = [number, number, number]
 
 /** Étape de la visite : un point de vue particulier, hors du cercle, avec un texte. */
@@ -29,6 +30,12 @@ export interface Parcours {
   rayonProche: number
   /** Hauteur de l'œil sur le cercle */
   hauteurYeux: number
+  /**
+   * Vue d'arrivée réglée en vue libre (salles/pointsDeVue.ts) : hauteur de l'œil (m) et hauteur du
+   * point regardé sur l'axe de l'œuvre (m). Par défaut, hauteurYeux et le regard de la transition.
+   */
+  hauteurLointain?: number
+  regardInitial?: number
   /** Angle de départ (radians) : 0 = côté +Z (sud), où l'on entre */
   angleDepart: number
   /** Hauteur du point regardé sur l'axe : souris en haut → bas, souris en bas → haut (inversé) */
@@ -49,6 +56,12 @@ export interface Porte {
   direction: Vec3
   largeur: number
   hauteur: number
+  /**
+   * Points de passage dans la salle pour aller à la porte (repère de la salle, du centre vers la
+   * porte, sans le seuil) : quand l'axe de la porte ne suffit pas (porte au fond d'un passage en
+   * biais, comme dans la rotonde). Sinon, un point à quelques mètres dans l'axe de la porte.
+   */
+  chemin?: Vec3[]
   /**
    * Couloir derrière la porte : côté des fentes en partant de la salle (gauche par défaut), et
    * fente zénithale le long de la paroi opposée, entre deux distances au seuil (m).
@@ -71,8 +84,12 @@ export interface SalleConfig {
   modele: string
   /** Lumières précalculées dans Blender (voir blender/lightmap.py), par atlas */
   lightmaps: Record<string, { image: string; echelle: number; k: number }>
-  /** Matières (noms des matériaux Blender) : couleur, et atlas de lightmap utilisé. Le grain est procédural. */
-  matieres: Record<string, { couleur: string; lightmap: string }>
+  /**
+   * Matières (noms des matériaux Blender) : couleur, et atlas de lightmap utilisé. Le grain est procédural.
+   * Une matière `lumineuse` (paroi lumineuse des fentes de la rotonde) n'a pas de lightmap : sa couleur
+   * multipliée par cette intensité, comme l'émission de Blender.
+   */
+  matieres: Record<string, { couleur: string; lightmap?: string; lumineuse?: number }>
   /** `echelle` : agrandissement du modèle (le même que ECHELLE_OEUVRE dans blender/salle.py) */
   /** `reflet` : false pour une œuvre sur socle (pas de reflet au sol) */
   sculpture: {
@@ -86,6 +103,8 @@ export interface SalleConfig {
   }
   /** Allers-retours avec la spirale : réglages propres à la salle (sinon ceux par défaut, voir entree.ts) */
   transition?: Partial<ReglagesTransition>
+  /** Effets d'image (rendu photographique) : réglages propres à la salle (sinon ceux par défaut, voir scene/Effets.tsx) */
+  effets?: Partial<ReglagesEffets>
   /**
    * Portes de la salle : une entrée et une sortie. « Œuvre suivante » part par la sortie et
    * arrive par l'entrée de la salle suivante ; « Œuvre précédente », l'inverse.
@@ -104,6 +123,13 @@ export interface SalleConfig {
      */
     puits: Vec3
     ouverture: [number, number]
+    /** Forme du puits : carré (par défaut) ou rond (oculus de la rotonde : `ouverture` = diamètre) */
+    forme?: 'carre' | 'rond'
+    /**
+     * Haut du volume du faisceau dans l'air (m), s'il doit s'arrêter sous le puits : sous une coupole,
+     * un volume qui la traverse est coupé par elle (bord net en V). Par défaut, le haut du puits.
+     */
+    hautVolume?: number
     /** Taille apparente du soleil (°) : flou des bords de la lumière (SOLEIL_ANGLE dans blender/salle.py) */
     angle: number
     /**
@@ -122,6 +148,11 @@ export interface SalleConfig {
    * l'œuvre (ciel en haut, rebonds en bas) et lumière diffuse des couloirs. Par défaut : chaude.
    */
   ambiance?: { ciel: string; sol: string; couloir: string }
+  /**
+   * Obstacles à contourner sur le trajet vers les portes (colonnes) : centre [x, z] et rayon, marge
+   * comprise. Les bancs n'en sont pas : la caméra passe au-dessus.
+   */
+  obstacles?: { centre: [number, number]; rayon: number }[]
   /** Ouvertures sur le ciel (vues depuis l'intérieur) : centre et taille [x, z] */
   ciel: { centre: Vec3; taille: [number, number] }[]
 }

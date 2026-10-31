@@ -2,6 +2,17 @@ import * as THREE from 'three'
 import { resolutionMax } from '../resolution'
 import { FORMAT_CAPTURE, entree, type ReglagesTransition } from '../entree'
 import type { ReglagesCapture } from '../ui/ToileTransition'
+import { rendu } from '../scene/Effets'
+
+/** L'image telle qu'à l'écran : avec les effets d'image s'ils sont actifs (Effets.tsx), sans le grain */
+function dessiner(gl: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera) {
+  rendu.capture = true
+  if (rendu.image) {
+    rendu.redimensionner?.()
+    rendu.image()
+  } else gl.render(scene, camera)
+  rendu.capture = false
+}
 
 /**
  * Outil de développement : capture la « vue d'entrée » d'une salle (voir entree.ts), image et
@@ -12,7 +23,9 @@ import type { ReglagesCapture } from '../ui/ToileTransition'
  * `await __visite.capturer('le-seuil-des-proportions')`. Les fichiers arrivent dans
  * public/assets/captures (via vite.config.ts) : <nom>.webp (image dessinée en double
  * résolution, 5120 × 2880, nette pendant le zoom de la transition) et <nom>-profondeur.png à la
- * même résolution, leur version légère <nom>-2880.webp et <nom>-profondeur-2880.png, <nom>.json.
+ * même résolution, leur version légère <nom>-2880.webp et <nom>-profondeur-2880.png, <nom>.json,
+ * et la vignette des flèches œuvre précédente / suivante, <nom>-vignette.webp (768 × 432 : la vue
+ * initiale, voir capturerVignette).
  */
 
 /** Largeur de la version légère (image et profondeur), voir versionLegere (version.ts) */
@@ -87,12 +100,13 @@ export async function capturer({
     // (à partir de la résolution pleine : la résolution adaptative a pu la baisser)
     const ratio = gl.getPixelRatio()
     gl.setPixelRatio(resolutionMax() * 2)
-    gl.render(scene, camera)
+    dessiner(gl, scene, camera)
     const image = document.createElement('canvas')
     image.width = gl.domElement.width
     image.height = gl.domElement.height
     image.getContext('2d')!.drawImage(gl.domElement, 0, 0)
     gl.setPixelRatio(ratio)
+    rendu.redimensionner?.()
 
     // Profondeur, sans la poussière ni le faisceau (transparents), sans lissage des bords
     const cachees: THREE.Object3D[] = []
@@ -150,11 +164,60 @@ export async function capturer({
     await envoyer(`${nom}-profondeur.png`, await enBlob(prof, 'image/png'))
     await envoyer(`${nom}-profondeur-${LEGERE}.png`, await enBlob(profLegere, 'image/png'))
     await envoyer(`${nom}.json`, JSON.stringify(reglages, null, 2))
+    await envoyerVignette(gl, scene, camera, nom)
     return { image: `${image.width} × ${image.height}`, profondeur: `${prof.width} × ${prof.height}`, reglages }
   } finally {
     entree.fige = null
     etat.enEntree = false
   }
+}
+
+/**
+ * Vignette des flèches œuvre précédente / suivante : la vue principale de la salle (vue initiale, celle
+ * où l'on arrive), telle qu'à l'écran, sans le décalage du premier écran. Refaite avec les captures et
+ * chaque fois que la position initiale est enregistrée en vue libre (ui/VueLibre.tsx) ; canvas en 16:9.
+ */
+export async function capturerVignette({
+  gl,
+  scene,
+  camera,
+  etat,
+  nom,
+}: {
+  gl: THREE.WebGLRenderer
+  scene: THREE.Scene
+  camera: THREE.PerspectiveCamera
+  etat: { enEntree: boolean }
+  nom: string
+}) {
+  const { width, height } = gl.domElement
+  if (Math.abs(width / height - FORMAT_CAPTURE) > 0.01) throw new Error(`le canvas doit être en 16:9 (${width} × ${height})`)
+  etat.enEntree = true
+  try {
+    await envoyerVignette(gl, scene, camera, nom)
+  } finally {
+    entree.fige = null
+    etat.enEntree = false
+  }
+}
+
+/** La caméra au bout du mouvement d'entrée (la vue initiale), puis l'image réduite (mouvement d'entrée en cours) */
+async function envoyerVignette(gl: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera, nom: string) {
+  entree.fige = 1
+  await images(4)
+  dessiner(gl, scene, camera)
+  await envoyer(`${nom}-vignette.webp`, await enBlob(vignette(gl.domElement), 'image/webp', 0.88))
+}
+
+/** Vignette des flèches (carte de 256 × 144 px à l'écran, ×3) : l'image réduite */
+export function vignette(image: CanvasImageSource & { width: number; height: number }) {
+  const c = document.createElement('canvas')
+  c.width = 768
+  c.height = 432
+  const ctx = c.getContext('2d')!
+  ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(image, 0, 0, c.width, c.height)
+  return c
 }
 
 /** Côté des photos des cartouches (192 px à l'écran, ×3) */
@@ -183,7 +246,7 @@ export async function capturerCartouches({
   scene: THREE.Scene
   camera: THREE.PerspectiveCamera
   /** État de la navigation (Navigation.tsx) */
-  etat: { mode: string }
+  etat: { mode: string; immobile: boolean }
   etapes: { id: string }[]
   vues: Partial<Record<string, string | null>>
   aller: (i: number) => void
@@ -191,29 +254,35 @@ export async function capturerCartouches({
   nom: string
 }) {
   const fichiers: string[] = []
-  for (const onglet of ['maladie', 'manifeste']) {
-    const i = etapes.findIndex((e) => e.id === vues[onglet])
-    if (i < 0) throw new Error(`pas de point de vue pour ${onglet}`)
-    aller(i)
-    // Arrivée au point de vue, puis le temps que le regard et le reflet se posent
-    while (etat.mode !== 'etape') await images(1)
-    await images(30)
+  etat.immobile = true
+  try {
+    for (const onglet of ['maladie', 'manifeste']) {
+      const i = etapes.findIndex((e) => e.id === vues[onglet])
+      if (i < 0) throw new Error(`pas de point de vue pour ${onglet}`)
+      aller(i)
+      // Arrivée au point de vue, puis le temps que le regard et le reflet se posent
+      while (etat.mode !== 'etape') await images(1)
+      await images(30)
 
-    const ratio = gl.getPixelRatio()
-    gl.setPixelRatio(resolutionMax())
-    gl.render(scene, camera)
-    const { width, height } = gl.domElement
-    const cote = Math.min(width, height)
-    const photo = document.createElement('canvas')
-    photo.width = photo.height = COTE_CARTOUCHE
-    const ctx = photo.getContext('2d')!
-    ctx.imageSmoothingQuality = 'high'
-    ctx.drawImage(gl.domElement, (width - cote) / 2, (height - cote) / 2, cote, cote, 0, 0, COTE_CARTOUCHE, COTE_CARTOUCHE)
-    gl.setPixelRatio(ratio)
+      const ratio = gl.getPixelRatio()
+      gl.setPixelRatio(resolutionMax())
+      dessiner(gl, scene, camera)
+      const { width, height } = gl.domElement
+      const cote = Math.min(width, height)
+      const photo = document.createElement('canvas')
+      photo.width = photo.height = COTE_CARTOUCHE
+      const ctx = photo.getContext('2d')!
+      ctx.imageSmoothingQuality = 'high'
+      ctx.drawImage(gl.domElement, (width - cote) / 2, (height - cote) / 2, cote, cote, 0, 0, COTE_CARTOUCHE, COTE_CARTOUCHE)
+      gl.setPixelRatio(ratio)
+      rendu.redimensionner?.()
 
-    const fichier = `${nom}-${onglet}.webp`
-    await envoyer(fichier, await enBlob(photo, 'image/webp', 0.88))
-    fichiers.push(fichier)
+      const fichier = `${nom}-${onglet}.webp`
+      await envoyer(fichier, await enBlob(photo, 'image/webp', 0.88))
+      fichiers.push(fichier)
+    }
+  } finally {
+    etat.immobile = false
   }
   retour()
   return fichiers

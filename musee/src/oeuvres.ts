@@ -1,7 +1,9 @@
 import type { SalleConfig } from './salles/types'
-import { salleProvisoire, salleProvisoireBleue } from './salles/provisoire/config'
+import { salleProvisoire } from './salles/provisoire/config'
+import { salleRotonde } from './salles/rotonde/config'
+import { avecPointsDeVue } from './salles/pointsDeVue'
 import { reglagesTransition } from './entree'
-import { versionLegere, versionne } from './version'
+import { existe, versionLegere, versionne } from './version'
 
 /**
  * Ce qu'affiche la salle (maquette Figma, écrans 445:275, 447:602, 448:911) :
@@ -32,6 +34,8 @@ export interface Oeuvre {
   image: string
   /** Visuel de l'œuvre, sur la carte « Œuvre suivante » des salles (à défaut, l'image de la carte) */
   vignette?: string
+  /** Vignette des flèches précédente / suivante tirée de la capture de la vue initiale (<vueEntree>-vignette.webp), si elle existe */
+  vignetteVue?: string
   /** Musique de la salle, en boucle (ui/Musique.tsx ; à défaut, celle de la spirale) */
   musique?: string
   /**
@@ -120,7 +124,8 @@ export const oeuvres: Oeuvre[] = [
     cartouches: capturesCartouches('la-maladie-de-huntington'),
     maladieTexte: maladieAVenir('Maladie de Huntington'),
     manifeste: A_VENIR,
-    salle: salleProvisoireBleue, // ambiance bleutée, comme sa vignette
+    // Rotonde (31/10, essais) ; pour revenir à la salle carrée bleutée : salleProvisoireBleue (provisoire/config.ts)
+    salle: salleRotonde,
     vues: VUES_PROVISOIRES,
   },
   {
@@ -164,6 +169,15 @@ export const oeuvres: Oeuvre[] = [
     vues: VUES_PROVISOIRES,
   },
 ]
+
+// Points de vue réglés en vue libre (touche V, salles/pointsDeVue.ts) : ils remplacent ceux des configs
+for (const o of oeuvres) o.salle = avecPointsDeVue(o.salle, o.vues)
+
+// Flèches précédente / suivante : la vue initiale de la salle quand elle a été capturée (outils/capture.ts)
+for (const o of oeuvres) {
+  const v = o.vueEntree && `${o.vueEntree}-vignette.webp`
+  if (v && existe(v)) o.vignetteVue = versionne(v)
+}
 
 export const lienOeuvre = (o: Oeuvre) => `/oeuvre/${o.id}`
 

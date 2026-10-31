@@ -166,7 +166,7 @@ export function InterfaceSalle({ oeuvre }: { oeuvre: Oeuvre }) {
 function Fleche({ oeuvre, sens, desactivee }: { oeuvre: Oeuvre; sens: Sens; desactivee: boolean }) {
   return (
     <button type="button" className={`fleche fleche--${sens}`} disabled={desactivee} onClick={() => partirVers(oeuvre, sens)}>
-      <img className="fleche__image" src={oeuvre.vignette ?? oeuvre.image} alt="" />
+      <img className="fleche__image" src={oeuvre.vignetteVue ?? oeuvre.vignette ?? oeuvre.image} alt="" />
       <span className="fleche__libelle">
         <span className="fleche__texte">{sens === 'suivante' ? 'Œuvre suivante' : 'Œuvre précédente'}</span>
         <IconeFleche suivant={sens === 'suivante'} />

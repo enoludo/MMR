@@ -480,3 +480,33 @@ button { font: inherit; color: inherit; }
   font-size: 14px;
   pointer-events: none;
 }
+
+/* Vue libre (touche V, développement : ui/VueLibre.tsx) — l'interface de la salle s'efface */
+html.vue-libre .salle-ui > :not(.salle-ui__vignette) { display: none; }
+.vue-libre {
+  position: fixed; z-index: 30; left: 24px; top: 96px; width: 420px; padding: 16px 20px;
+  border-radius: 16px; background: rgba(10, 14, 20, .78); color: #fff; font-size: 13px; line-height: 1.4;
+  -webkit-backdrop-filter: blur(15px); backdrop-filter: blur(15px);
+}
+.vue-libre p { margin: 0 0 10px; }
+.vue-libre__titre { font-weight: 600; font-size: 15px; }
+.vue-libre__aide, .vue-libre__note { color: rgba(255, 255, 255, .65); }
+.vue-libre__ligne { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid rgba(255, 255, 255, .12); }
+.vue-libre__ligne span { flex: 1; display: flex; flex-direction: column; }
+.vue-libre__ligne small { color: rgba(255, 255, 255, .55); }
+.vue-libre button {
+  font: inherit; color: #fff; padding: 6px 12px; border-radius: 999px; cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, .3); background: rgba(255, 255, 255, .08);
+}
+.vue-libre button.vue-libre__principal { background: #d93e34; border-color: #d93e34; }
+.vue-libre__case { display: flex; gap: 8px; align-items: center; margin: 10px 0; cursor: pointer; }
+.vue-libre__flou { display: flex; gap: 4px; align-items: center; cursor: pointer; color: rgba(255, 255, 255, .8); }
+.vue-libre__reglages { display: flex; flex-direction: column; gap: 4px; padding: 0 0 8px 12px; }
+.vue-libre__reglages label { display: grid; grid-template-columns: 1fr 120px 36px; gap: 8px; align-items: center; color: rgba(255, 255, 255, .8); }
+.vue-libre__reglages output { text-align: right; font-variant-numeric: tabular-nums; }
+.vue-libre__message { color: #9fe0a8; }
+.vue-libre__popup {
+  position: fixed; z-index: 29; top: 15%; bottom: 15%; right: min(96px, 5.714vw); width: clamp(400px, 38.87vw, 653px);
+  border-radius: 24px; border: 1px dashed rgba(255, 255, 255, .5); background: rgba(255, 255, 255, .06);
+  display: grid; place-items: center; color: rgba(255, 255, 255, .6); pointer-events: none;
+}

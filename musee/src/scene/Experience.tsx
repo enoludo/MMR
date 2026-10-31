@@ -7,6 +7,8 @@ import { Eclairage, Salle, prechargerSalle } from './Salle'
 import { Navigation } from './Navigation'
 import { ReglagesTransitionSalle } from '../ui/Transition'
 import { Decentrage } from './Decentrage'
+import { VolLibre } from './VolLibre'
+import { Effets, ReglagesEffetsSalle, rendu as renduEffets } from './Effets'
 import { Couloir } from './Couloir'
 import { ORIGINE, groupesSalles, placementArrivee, portesDuPassage, type Placement } from './passage'
 import { store, useEtat, type SalleVisitee } from '../store'
@@ -45,8 +47,10 @@ export function Experience() {
     exposition: { value: 3.4, min: 0.5, max: 15, step: 0.1 },
     focale: { value: 55, min: 30, max: 90, step: 1, label: 'champ de vision (°)' },
     plancher: { value: qualite.plancher, min: 1, max: 2, step: 0.25, label: 'résolution minimale' },
+    passage: { value: qualite.passage, min: 0.4, max: 1, step: 0.05, label: 'résolution pendant les passages (×)' },
   })
   qualite.plancher = rendu.plancher
+  qualite.passage = rendu.passage
   // Le Canvas reçoit la résolution en cours : avec la résolution pleine, chaque rendu (début d'un
   // passage…) la remettait au maximum et réallouait tout le canvas (≈ 0,25 s figée)
   const resolution = useMemo(() => new ResolutionAdaptative(() => {}), [])
@@ -64,7 +68,8 @@ export function Experience() {
       className="canvas3d"
       dpr={resolution.ratio}
       camera={{ fov: rendu.focale, near: 0.05, far: 150, position: [0, 0, 0] }}
-      gl={{ antialias: true, powerPreference: 'high-performance' }}
+      // Anticrénelage dans les effets (SMAA, Effets.tsx) : celui du canvas, plus coûteux sur grand écran, ne servirait plus
+      gl={{ antialias: false, powerPreference: 'high-performance' }}
       onCreated={({ gl }) => {
         gl.toneMapping = THREE.ACESFilmicToneMapping
         // Hors développement, pas de lecture des journaux de compilation : chacune attend la
@@ -101,7 +106,10 @@ export function Experience() {
       <Eclairage config={salle} />
       <Navigation config={salle} configArrivee={arrivee?.config ?? null} focale={rendu.focale} />
       <ReglagesTransitionSalle key={salle.id} config={salle} />
+      <ReglagesEffetsSalle key={`effets-${salle.id}`} config={salle} />
       <Decentrage />
+      {import.meta.env.DEV && <VolLibre />}
+      <Effets />
     </Canvas>
   )
 }
@@ -249,10 +257,14 @@ function PreparationPassage({ cle, children }: { cle: number; children: ReactNod
         g.visible = true
         const ombres = gl.shadowMap.autoUpdate
         gl.shadowMap.autoUpdate = false
+        // Dans le tampon des effets d'image s'ils sont actifs : les matières y sont compilées pour lui
+        const avant = gl.getRenderTarget()
+        if (renduEffets.cible) gl.setRenderTarget(renduEffets.cible)
         gl.setScissorTest(true)
         gl.setScissor(0, 0, 1, 1)
         gl.render(scene, camera)
         gl.setScissorTest(false)
+        gl.setRenderTarget(avant)
         gl.shadowMap.autoUpdate = ombres
         g.visible = false
         objets.forEach((x) => (x.visible = x.userData.visiblePreparation))
@@ -304,7 +316,8 @@ function PrechargementVoisines() {
 function Resolution({ resolution }: { resolution: ResolutionAdaptative }) {
   resolution.appliquer = useThree((s) => s.setDpr)
   useFrame((_, dt) => {
-    const { transition, salleAffichee, salle } = store.get()
+    const { transition, salleAffichee, salle, passage } = store.get()
+    resolution.passage(!!passage)
     resolution.image(dt, !!transition || !salle || salle.cle !== salleAffichee)
   })
   return null
@@ -316,7 +329,9 @@ function Capture() {
   useEffect(() => {
     captureSalle.courante = () => {
       // Le tampon de dessin est vidé après chaque affichage : on redessine juste avant de le copier
-      gl.render(scene, camera)
+      // (avec les effets d'image, comme à l'écran)
+      if (renduEffets.image) renduEffets.image()
+      else gl.render(scene, camera)
       const c = document.createElement('canvas')
       c.width = gl.domElement.width
       c.height = gl.domElement.height

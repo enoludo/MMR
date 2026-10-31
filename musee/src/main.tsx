@@ -66,6 +66,12 @@ function App() {
     const clavier = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement) return
       if (e.key === 'm' || e.key === 'M') store.set({ dev: !store.get().dev })
+      // Touche V (développement, dans une salle) : vue libre, pour régler les points de vue (ui/VueLibre.tsx)
+      if (import.meta.env.DEV && (e.key === 'v' || e.key === 'V') && store.get().salle && !store.get().passage && !store.get().captures) {
+        const libre = !store.get().libre
+        store.set({ libre })
+        document.documentElement.classList.toggle('vue-libre', libre)
+      }
     }
     window.addEventListener('keydown', clavier)
     return () => window.removeEventListener('keydown', clavier)

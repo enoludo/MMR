@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import type { Porte, SalleConfig, Vec3 } from '../salles/types'
-import type { Sens } from '../store'
+import { store, type SalleVisitee, type Sens } from '../store'
+import { oeuvres } from '../oeuvres'
 
 /**
  * Passage d'une salle à l'autre, par une porte et un couloir.
@@ -64,4 +65,31 @@ export function placementCouloir(porte: Porte): Placement {
     rotationY: cap(porte.direction) - Math.PI,
     miroir: porte.couloir?.fentes === 'droite',
   }
+}
+
+/* Salles de la visite lues dans l'état, à chaque image (Salle.Eclairage, Effets) */
+export const salleActuelle = () => {
+  const v = store.get().salle
+  return v ? groupesSalles.get(v.cle) : undefined
+}
+export const salleArrivee = () => {
+  const v = store.get().passage
+  return v ? groupesSalles.get(v.cle) : undefined
+}
+const configDe = (v: SalleVisitee | null) => (v ? (oeuvres.find((o) => o.id === v.oeuvre) ?? oeuvres[0]).salle : undefined)
+/** Config de la salle où l'on est et de la salle d'arrivée, lues dans l'état (à jour dans l'image même de l'arrivée) */
+export const configActuelle = () => configDe(store.get().salle)
+export const configArriveeLue = () => configDe(store.get().passage)
+/**
+ * Pendant un passage, part de la salle d'arrivée dans ce qui glisse d'une salle à l'autre (ambiance de
+ * l'œuvre, effets d'image) : 0 dans la salle quittée, 1 dans la salle d'arrivée, selon la distance de
+ * la caméra à chacune ; 0 hors passage.
+ */
+export function poidsArrivee(camera: THREE.Camera) {
+  const ga = salleActuelle()
+  const gb = salleArrivee()
+  if (!ga || !gb || !configArriveeLue()) return 0
+  const da = camera.position.distanceTo(ga.position)
+  const db = camera.position.distanceTo(gb.position)
+  return THREE.MathUtils.smoothstep((da - db) / 30 + 0.5, 0, 1)
 }

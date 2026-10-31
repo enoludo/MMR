@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Experience } from '../scene/Experience'
 import { InterfaceSalle } from '../ui/InterfaceSalle'
+import { VueLibre } from '../ui/VueLibre'
 import { lienOeuvre, oeuvres } from '../oeuvres'
 import { nouvelleCle, store, useEtat } from '../store'
 
@@ -60,6 +61,7 @@ export function PageOeuvre({ id }: { id: string }) {
         <Experience />
       </div>
       <InterfaceSalle oeuvre={affichee} />
+      {import.meta.env.DEV && <VueLibre oeuvre={affichee} />}
     </div>
   )
 }

@@ -148,7 +148,14 @@ export function PasseReflet({
     const ombres = gl.shadowMap.autoUpdate
     scene.background = null
     gl.shadowMap.autoUpdate = false
-    for (const m of materiaux) m.side = THREE.BackSide
+    // three ne refait pas le choix du programme quand seule la face change (`side` n'est pas surveillé) :
+    // sans needsUpdate, la version retournée (normales inversées) restait pour l'image normale dès que
+    // les deux passes ont les mêmes réglages de rendu (effets d'image actifs) ; le soleil passait alors
+    // sur le dos de l'œuvre (vu par Ludovic le 31/10). Les deux programmes restent en cache : pas de compilation.
+    for (const m of materiaux) {
+      m.side = THREE.BackSide
+      m.needsUpdate = true
+    }
     uSculpture.uReflet.value = 1
     masquees.length = 0
     for (const o of sculptures) {
@@ -166,7 +173,10 @@ export function PasseReflet({
 
     for (const o of masquees) o.visible = true
     uSculpture.uReflet.value = 0
-    for (const m of materiaux) m.side = THREE.FrontSide
+    for (const m of materiaux) {
+      m.side = THREE.FrontSide
+      m.needsUpdate = true
+    }
     gl.shadowMap.autoUpdate = ombres
     scene.background = fondScene
     gl.setClearColor(fond, alpha)

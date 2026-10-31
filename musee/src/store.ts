@@ -75,6 +75,10 @@ type Etat = {
   /** Menu principal ouvert */
   menu: boolean
   dev: boolean
+  /** Vue libre (touche V, développement) : on se déplace librement pour régler les points de vue */
+  libre: boolean
+  /** Captures en cours depuis la vue libre : la touche V attend qu'elles soient finies */
+  captures: boolean
 }
 
 /** Choix du visiteur gardé dans le navigateur (absent en navigation privée : son remis) */
@@ -108,6 +112,8 @@ let etat: Etat = {
   intro: 'chargement',
   menu: false,
   dev: false,
+  libre: false,
+  captures: false,
 }
 const abonnes = new Set<() => void>()
 

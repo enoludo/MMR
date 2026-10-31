@@ -5,6 +5,9 @@
  */
 declare const __EMPREINTES__: Record<string, string>
 
+/** Le fichier existe dans public/models ou public/assets (au démarrage du serveur, en développement) */
+export const existe = (url: string) => !!__EMPREINTES__[url]
+
 export const versionne = (url: string) => {
   const e = __EMPREINTES__[url]
   return e ? `${url}?v=${e}` : url

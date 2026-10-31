@@ -7,6 +7,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import type { Porte, SalleConfig } from '../salles/types'
 import { GLSL_PIERRE, textureBruit } from './pierre'
 import { LONGUEUR_COULOIR, matricePlacement, placementCouloir } from './passage'
+import { GLSL_SORTIE, uSortie } from './Effets'
 
 /**
  * Couloir entre deux salles, derrière la porte (références : references/couloir).
@@ -109,9 +110,10 @@ export function Couloir({
 
   const uniforms = useMemo(
     () => ({
-      uGrain: { value: 0.05 },
-      uVoile: { value: 0.035 },
-      uNuances: { value: 0.07 },
+      // Texture de la pierre : celle des salles (réduite de moitié le 31/10, Salle.tsx)
+      uGrain: { value: 0.025 },
+      uVoile: { value: 0.0175 },
+      uNuances: { value: 0.035 },
       uBruit: { value: textureBruit },
       uK: { value: atlas.k },
       uSoleilDir: { value: new THREE.Vector3() },
@@ -303,7 +305,7 @@ export function Couloir({
   const rayons = useMemo(
     () =>
       new THREE.ShaderMaterial({
-        uniforms,
+        uniforms: { ...uniforms, ...uSortie },
         vertexShader: /* glsl */ `
           varying vec3 vLocal;
           varying vec3 vCamera;
@@ -314,6 +316,7 @@ export function Couloir({
           }`,
         fragmentShader: /* glsl */ `
           ${GLSL_FENTES}
+          ${GLSL_SORTIE}
           uniform vec3 uSoleil;
           uniform vec3 uSoleil2;
           uniform vec3 uZenithSoleil;
@@ -363,7 +366,7 @@ export function Couloir({
             float lum = (1.0 - exp(-longueur * uBrume)) * (0.5 + 1.5 * face);
             float faceZ = pow(max(dot(normalize(d), -uZenithDir), 0.0), 3.0);
             float lumZ = (1.0 - exp(-sommeZ * pas * length(d) * uBrume)) * (0.5 + 1.5 * faceZ);
-            gl_FragColor = vec4(teinte * lum + teinteZ * lumZ, 1.0);
+            gl_FragColor = vec4(versSortie(teinte * lum + teinteZ * lumZ), 1.0);
           }`,
         transparent: true,
         depthWrite: false,

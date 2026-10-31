@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import type * as THREE from 'three'
-import { useEtat } from '../store'
+import { store, useEtat } from '../store'
+import { volLibre } from './VolLibre'
 
 /**
  * Décentre l'image pour que l'œuvre reste au milieu de l'espace laissé libre par
@@ -43,7 +44,12 @@ export function Decentrage() {
 
   useFrame((_, delta) => {
     const a = actuel.current
-    const c = cible.current
+    // Vue libre : décalée comme avec un popup ouvert sur ordinateur (bord et largeur de .popup, style.css), si demandé
+    const vw = window.innerWidth / 100
+    const popup = Math.min(96, 5.714 * vw) + Math.min(653, Math.max(400, 38.87 * vw))
+    // Captures (ui/VueLibre.tsx) : jamais décalées, quelle que soit la taille de la fenêtre
+    const { libre, captures } = store.get()
+    const c = libre ? { x: volLibre.popup ? -popup / 2 : 0, y: 0 } : captures ? { x: 0, y: 0 } : cible.current
     const k = 1 - Math.exp(-4 * Math.min(delta, 0.1))
     a.x += (c.x - a.x) * k
     a.y += (c.y - a.y) * k

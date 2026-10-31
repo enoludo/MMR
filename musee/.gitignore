@@ -27,3 +27,13 @@ blender/sculpture-huntington/huntington-raw.glb
 # Sons d'origine (re-téléchargeables) : seules leurs versions compressées (public/assets/musiques) sont suivies
 sons/*.mp3
 sons/*.wav
+
+# Aperçu de la rotonde (recalculable : blender/apercu-rotonde.py)
+blender/rotonde-apercu.blend
+
+# Rotonde de Huntington : calculs de lumière bruts (recalculables avec rotonde.py)
+blender/salle-rotonde/*.exr
+blender/salle-rotonde/*.blend1
+
+# Rotonde : sortie intermédiaire du lissage (blender/lissage.py)
+blender/salle-rotonde/lightmap-lisse.exr

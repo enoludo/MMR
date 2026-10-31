@@ -6,8 +6,11 @@
  * moment, on remonte. L'interface (textes, boutons) n'est pas touchée.
  */
 
-/** Réglable touche M, « Rendu » : résolution minimale (2 = Retina pleine, 1 = un pixel par point) */
-export const qualite = { plancher: 1.5 }
+/**
+ * Réglables touche M, « Rendu » : résolution minimale (2 = Retina pleine, 1 = un pixel par point) ;
+ * part de la résolution gardée pendant un passage entre salles (1 = pas de baisse)
+ */
+export const qualite = { plancher: 1.5, passage: 0.65 }
 
 /** Résolution pleine : celle de l'écran, plafonnée à 2 */
 export const resolutionMax = () => Math.min(window.devicePixelRatio || 1, 2)
@@ -30,11 +33,18 @@ export class ResolutionAdaptative {
   private stable = 0
   private remontee = false
   private essais = 0
+  /** Résolution d'avant le passage en cours, rendue à l'arrivée */
+  private avantPassage: number | null = null
 
   constructor(public appliquer: (ratio: number) => void) {}
 
   /** À chaque image, avec sa durée (s) ; `pause` pendant un chargement ou une transition */
   image(dt: number, pause = false) {
+    // Passage : résolution baissée exprès, sous le plancher, et images plus lourdes (deux salles)
+    if (this.avantPassage !== null) {
+      this.duree = this.images = 0
+      return
+    }
     const max = resolutionMax()
     const plancher = Math.min(max, qualite.plancher)
     // Plancher changé (touche M) ou fenêtre déplacée sur un autre écran
@@ -65,6 +75,23 @@ export class ResolutionAdaptative {
         this.changer(Math.min(max, this.ratio + 0.25))
       }
     } else this.stable = 0
+  }
+
+  /**
+   * Passage entre salles : la caméra traverse le couloir assez vite pour qu'une image moins fine ne
+   * se voie pas, et les deux salles sont dessinées. Chaque changement de résolution réalloue le
+   * canvas et les images des effets (≈ 0,15 s figée) : on baisse au départ, quand la salle d'arrivée
+   * se prépare (l'image est déjà retenue), et on remonte une fois arrivé.
+   */
+  passage(actif: boolean) {
+    if (actif && this.avantPassage === null && qualite.passage < 1) {
+      this.avantPassage = this.ratio
+      this.changer(Math.round(this.ratio * qualite.passage * 100) / 100)
+    } else if (!actif && this.avantPassage !== null) {
+      const ratio = this.avantPassage
+      this.avantPassage = null
+      this.changer(ratio)
+    }
   }
 
   private changer(ratio: number) {

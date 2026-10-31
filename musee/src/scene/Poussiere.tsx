@@ -4,6 +4,7 @@ import { useControls } from 'leva'
 import * as THREE from 'three'
 import type { SalleConfig } from '../salles/types'
 import { GLSL_LAMES, uniformsLames } from './lames'
+import { GLSL_SORTIE, uSortie } from './Effets'
 
 const MAX = 16000 // grains réservés (8000 avant le 29/10) ; le réglage « densité » n’en affiche qu’une partie
 
@@ -44,10 +45,12 @@ export function Poussiere({ config }: { config: SalleConfig }) {
     g.boundingSphere = new THREE.Sphere(new THREE.Vector3(puits[0], puits[1] / 2, puits[2]), 30)
 
     const uniforms = {
+      ...uSortie,
       uTemps: { value: 0 },
       uHaut: { value: new THREE.Vector3(...puits) },
       uPente: { value: new THREE.Vector2(dir.x / -dir.y, dir.z / -dir.y) },
       uDemi: { value: demi },
+      uRond: { value: config.soleil.forme === 'rond' ? 1 : 0 },
       uCouleur: { value: new THREE.Color(couleur) },
       uTaille: { value: 1 },
       uVitesse: { value: 1 },
@@ -66,6 +69,7 @@ export function Poussiere({ config }: { config: SalleConfig }) {
           attribute float aGraine;
           uniform float uTemps, uTaille, uVitesse, uEchelle;
           uniform vec2 uDemi;
+          uniform float uRond;
           uniform vec3 uHaut;
           uniform vec2 uPente;
           varying float vEclat;
@@ -87,7 +91,7 @@ export function Poussiere({ config }: { config: SalleConfig }) {
             q.y = mod(q.y, uHaut.y);
 
             // éclairé seulement dans le faisceau (bords doux), et pas collé au sol ni au plafond
-            float bord = max(abs(q.x) / uDemi.x, abs(q.z) / uDemi.y);
+            float bord = uRond > 0.5 ? length(q.xz / uDemi) : max(abs(q.x) / uDemi.x, abs(q.z) / uDemi.y);
             float h = q.y / uHaut.y;
             float lumiere = (1.0 - smoothstep(0.65, 1.15, bord)) * lames(q) * smoothstep(0.0, 0.04, h) * (1.0 - smoothstep(0.9, 1.0, h));
             // scintillement : le grain tourne et accroche la lumière par instants
@@ -109,13 +113,14 @@ export function Poussiere({ config }: { config: SalleConfig }) {
             if (vEclat < 0.002) gl_PointSize = 0.0;
           }`,
         fragmentShader: /* glsl */ `
+          ${GLSL_SORTIE}
           uniform vec3 uCouleur;
           uniform float uBrillance;
           varying float vEclat;
           void main() {
             float d = length(gl_PointCoord - 0.5) * 2.0;
             float a = pow(max(1.0 - d, 0.0), 1.8);
-            gl_FragColor = vec4(uCouleur * vEclat * a * uBrillance * 1.6, 1.0);
+            gl_FragColor = vec4(versSortie(uCouleur * vEclat * a * uBrillance * 1.6), 1.0);
           }`,
         transparent: true,
         depthWrite: false,

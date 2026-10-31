@@ -1,0 +1,118 @@
+{
+  "rotonde": {
+    "initiale": {
+      "position": [
+        -1.278,
+        1.7,
+        3.536
+      ],
+      "cible": [
+        0,
+        2.16,
+        0
+      ]
+    },
+    "maladie": {
+      "position": [
+        0.888,
+        1.7,
+        1.957
+      ],
+      "cible": [
+        -0.03,
+        2.899,
+        0.014
+      ]
+    },
+    "manifeste": {
+      "position": [
+        10.5,
+        1.7,
+        3.799
+      ],
+      "cible": [
+        0.009,
+        1.723,
+        -0.026
+      ]
+    },
+    "flou": {
+      "initiale": {
+        "actif": false,
+        "flou": 3,
+        "nettete": 1.5,
+        "miseAuPoint": 0
+      },
+      "maladie": {
+        "actif": true,
+        "flou": 4.6,
+        "nettete": 4,
+        "miseAuPoint": 2.8
+      },
+      "manifeste": {
+        "actif": false,
+        "flou": 1.6,
+        "nettete": 1.5,
+        "miseAuPoint": 0
+      }
+    }
+  },
+  "provisoire": {
+    "initiale": {
+      "position": [
+        0.133,
+        1.7,
+        12.83
+      ],
+      "cible": [
+        0.215,
+        4.212,
+        0.001
+      ]
+    },
+    "flou": {
+      "maladie": {
+        "actif": true,
+        "flou": 4.6,
+        "nettete": 6.3,
+        "miseAuPoint": 4.7
+      },
+      "manifeste": {
+        "actif": true,
+        "flou": 3.4,
+        "nettete": 6.1,
+        "miseAuPoint": 9
+      },
+      "initiale": {
+        "actif": false,
+        "flou": 3,
+        "nettete": 1.5,
+        "miseAuPoint": 0
+      }
+    },
+    "maladie": {
+      "position": [
+        -2.682,
+        1.7,
+        3.853
+      ],
+      "cible": [
+        -1.701,
+        3.889,
+        -0.393
+      ]
+    },
+    "manifeste": {
+      "position": [
+        3.437,
+        1.7,
+        -7.382
+      ],
+      "cible": [
+        0.335,
+        5.042,
+        0.138
+      ]
+    }
+  }
+}

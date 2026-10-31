@@ -7,9 +7,7 @@ import type { SalleConfig } from '../salles/types'
 import { Faisceau, tableFaisceau } from './Faisceau'
 import { Poussiere } from './Poussiere'
 import { MAX_PORTES, appliquerPierre, creerUniformsSalle, reglerPierre } from './pierre'
-import { store, type SalleVisitee } from '../store'
-import { oeuvres } from '../oeuvres'
-import { groupesSalles } from './passage'
+import { configActuelle, configArriveeLue, groupesSalles, poidsArrivee, salleActuelle, salleArrivee } from './passage'
 import { prechargerLightmaps, useLightmaps } from './lightmaps'
 import { CALQUE_REFLET, PasseReflet, creerUniformsReflet, preparerSculpture, type UniformsSculpture } from './Reflet'
 
@@ -37,11 +35,13 @@ export function Salle({ config }: { config: SalleConfig }) {
   const nomsLightmaps = Object.keys(config.lightmaps)
   const textures = useLightmaps(nomsLightmaps.map((n) => config.lightmaps[n].image))
 
+  // Texture de la pierre réduite de moitié le 31/10 (demande de Ludovic : 0,05 / 0,035 / 0,07 avant),
+  // comme dans les couloirs (Couloir.tsx)
   const r = useControls('Salle', {
     lumiere: { value: 1, min: 0.2, max: 3, step: 0.01, label: 'lumière' },
-    grain: { value: 0.05, min: 0, max: 0.3, step: 0.005, label: 'grain fin' },
-    voile: { value: 0.035, min: 0, max: 0.3, step: 0.005, label: 'voile' },
-    nuances: { value: 0.07, min: 0, max: 0.4, step: 0.005, label: 'nuances' },
+    grain: { value: 0.025, min: 0, max: 0.3, step: 0.005, label: 'grain fin' },
+    voile: { value: 0.0175, min: 0, max: 0.3, step: 0.005, label: 'voile' },
+    nuances: { value: 0.035, min: 0, max: 0.4, step: 0.005, label: 'nuances' },
   })
 
   // Repère de la salle et portes, communs à ses matières
@@ -78,7 +78,13 @@ export function Salle({ config }: { config: SalleConfig }) {
       parNom[n] = textures[i] // encodage logarithmique, décodé dans le shader (voir lightmaps.ts)
     })
     const m: Record<string, THREE.MeshBasicMaterial> = {}
-    for (const [nom, { couleur, lightmap }] of Object.entries(config.matieres)) {
+    for (const [nom, { couleur, lightmap, lumineuse }] of Object.entries(config.matieres)) {
+      if (lumineuse !== undefined || !lightmap) {
+        // Paroi lumineuse (fentes de la rotonde) : sans lightmap ni grain, comme l'émission de Blender
+        m[nom] = new THREE.MeshBasicMaterial({ color: new THREE.Color(couleur).multiplyScalar(lumineuse ?? 1) })
+        m[nom].name = nom
+        continue
+      }
       m[nom] = new THREE.MeshBasicMaterial({ lightMap: parNom[lightmap], color: couleur })
       m[nom].name = nom // garde le nom : l'effet ci-dessous peut repasser sur un matériau déjà remplacé
       m[nom].userData.lightmap = config.lightmaps[lightmap]
@@ -96,6 +102,7 @@ export function Salle({ config }: { config: SalleConfig }) {
 
   useEffect(() => {
     for (const m of Object.values(materiaux)) {
+      if (!m.userData.lightmap) continue
       // MeshBasicMaterial divise la lightmap par π : on compense
       m.lightMapIntensity = m.userData.lightmap.echelle * Math.PI * r.lumiere
       reglerPierre(m, r)
@@ -315,14 +322,7 @@ export function Eclairage({ config }: { config: SalleConfig }) {
     if (!h) return
     const ca = configActuelle() ?? config
     const cb = configArriveeLue()
-    const ga = salleActuelle()
-    const gb = salleArrivee()
-    let w = 0
-    if (ga && gb && cb) {
-      const da = camera.position.distanceTo(ga.position)
-      const db = camera.position.distanceTo(gb.position)
-      w = THREE.MathUtils.smoothstep((da - db) / 30 + 0.5, 0, 1)
-    }
+    const w = poidsArrivee(camera)
     const amb = (c: SalleConfig | null | undefined) => c?.ambiance ?? AMBIANCE_CHAUDE
     h.color.copy(tmp.a.set(amb(ca).ciel)).lerp(tmp.b.set(amb(cb).ciel), w)
     h.groundColor.copy(tmp.a.set(amb(ca).sol)).lerp(tmp.b.set(amb(cb).sol), w)
@@ -344,18 +344,6 @@ export function Eclairage({ config }: { config: SalleConfig }) {
 /** Ambiance par défaut des salles : ciel froid en haut, rebonds chauds sur la pierre en bas */
 const AMBIANCE_CHAUDE = { ciel: '#a9bde0', sol: '#76675a', couloir: '#ffe1c2' }
 
-const salleActuelle = () => {
-  const v = store.get().salle
-  return v ? groupesSalles.get(v.cle) : undefined
-}
-const salleArrivee = () => {
-  const v = store.get().passage
-  return v ? groupesSalles.get(v.cle) : undefined
-}
-const configDe = (v: SalleVisitee | null) => (v ? (oeuvres.find((o) => o.id === v.oeuvre) ?? oeuvres[0]).salle : undefined)
-/** Config de la salle où l'on est et de la salle d'arrivée, lues dans l'état (à jour dans l'image même de l'arrivée) */
-const configActuelle = () => configDe(store.get().salle)
-const configArriveeLue = () => configDe(store.get().passage)
 
 /**
  * Le soleil du puits, pour la sculpture : un spot lointain dans l'axe du soleil, à découpe
@@ -368,33 +356,28 @@ function Soleil({
   suivre,
   lire,
 }: {
-  /** Géométrie du soleil (puits, direction, lames) : la même pour toutes les salles */
+  /** Salle par défaut, quand `lire` n'en donne pas */
   config: SalleConfig
   force: number
   suivre: () => THREE.Group | undefined
-  /** Config de la salle suivie, lue à chaque image : force et couleur de son soleil (ambiance propre à la salle) */
+  /**
+   * Config de la salle suivie, lue à chaque image : géométrie (puits, direction, lames), force et
+   * couleur de son soleil. Les salles n'ont plus toutes le même soleil (rotonde) : celui de la salle
+   * d'arrivée doit être le sien dès le passage, sinon il changeait d'un coup à l'arrivée (31/10).
+   */
   lire: () => SalleConfig | undefined
 }) {
   const groupe = useRef<THREE.Group>(null)
   const { spot, cible, distance } = useMemo(() => {
-    const dir = new THREE.Vector3(...config.soleil.direction).normalize()
-    const puits = new THREE.Vector3(...config.soleil.puits)
     // Lointain, pour que ses rayons soient presque parallèles : la découpe (puits, lames) garde
     // ainsi sa taille du plafond jusqu'au sol, comme dans le précalcul
     const distance = 300
-    const spot = new THREE.SpotLight(config.soleil.couleur)
-    spot.position.copy(puits).addScaledVector(dir, -distance)
+    const spot = new THREE.SpotLight()
     const cible = new THREE.Object3D()
-    cible.position.copy(puits).addScaledVector(dir, puits.y / -dir.y)
     spot.target = cible
-    // Cône juste assez large pour contenir la section du faisceau ; sa découpe vient de la « map »
-    const [ox, oz] = config.soleil.ouverture
-    const demi = (Math.max(ox, oz) / 2) * Math.SQRT2 * 1.3
-    spot.angle = Math.atan(demi / distance)
     spot.penumbra = 0
     spot.decay = 2
     spot.distance = 0
-    spot.map = decoupe(config.soleil, demi)
     spot.castShadow = true
     spot.shadow.mapSize.set(2048, 2048)
     spot.shadow.radius = 6 // bord de l'ombre adouci (ombres filtrées, voir Experience)
@@ -405,10 +388,29 @@ function Soleil({
     spot.shadow.camera.up.set(0, 0, 1)
     spot.layers.enable(CALQUE_REFLET) // éclaire aussi la sculpture dans la passe de reflet
     return { spot, cible, distance }
-    // Géométrie seulement : une salle qui ne change que la couleur du soleil garde le même spot (pas
-    // de nouvelle ombre ni de découpe recalculée au moment de l'arrivée)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [config.soleil.direction, config.soleil.puits, config.soleil.ouverture, config.soleil.lames])
+  }, [])
+
+  // Géométrie du soleil de la salle suivie, refaite seulement quand elle change (même spot et même ombre :
+  // une salle qui ne change que la couleur du soleil, ou la même salle, ne recalcule rien)
+  const geometrie = useRef<SalleConfig['soleil'] | null>(null)
+  const placer = (soleil: SalleConfig['soleil']) => {
+    const g = geometrie.current
+    if (g && g.direction === soleil.direction && g.puits === soleil.puits && g.ouverture === soleil.ouverture && g.lames === soleil.lames)
+      return
+    geometrie.current = soleil
+    const dir = new THREE.Vector3(...soleil.direction).normalize()
+    const puits = new THREE.Vector3(...soleil.puits)
+    spot.position.copy(puits).addScaledVector(dir, -distance)
+    cible.position.copy(puits).addScaledVector(dir, puits.y / -dir.y)
+    // Cône juste assez large pour contenir la section du faisceau ; sa découpe vient de la « map »
+    const [ox, oz] = soleil.ouverture
+    const demi = (Math.max(ox, oz) / 2) * Math.SQRT2 * 1.3
+    spot.angle = Math.atan(demi / distance)
+    let map = decoupes.get(soleil)
+    if (!map) decoupes.set(soleil, (map = decoupe(soleil, demi)))
+    spot.map = map
+  }
+  if (!geometrie.current) placer(config.soleil)
 
   useFrame(() => {
     const g = suivre()
@@ -418,6 +420,7 @@ function Soleil({
     }
     // Même éclairement que le soleil de Blender : I = E × d² ; éteint (et non retiré) sans salle
     const c = lire() ?? config
+    placer(c.soleil)
     spot.intensity = g ? c.soleil.force * distance * distance * force : 0
     spot.color.set(c.soleil.couleur)
   }, -1.8) // après le recalage de l'arrivée (navigation), avant la passe de reflet
@@ -429,6 +432,9 @@ function Soleil({
     </group>
   )
 }
+
+/** Découpe de chaque soleil, faite une fois (partagée par les deux soleils : salle actuelle, salle d'arrivée) */
+const decoupes = new WeakMap<SalleConfig['soleil'], THREE.CanvasTexture>()
 
 /**
  * Texture de découpe du soleil, vue depuis lui : la section du faisceau au plafond, et les
@@ -448,7 +454,13 @@ function decoupe(soleil: SalleConfig['soleil'], demi: number) {
   ctx.filter = 'blur(48px)' // bords de la tache de soleil adoucis (soleil voilé, comme le précalcul)
   ctx.fillStyle = '#fff'
   const [ox, oz] = soleil.ouverture
-  ctx.fillRect(colonne(cx + ox / 2), ligne(cz + oz / 2), (n * ox) / (2 * demi), (n * oz) / (2 * demi))
+  if (soleil.forme === 'rond') {
+    ctx.beginPath()
+    ctx.ellipse(colonne(cx), ligne(cz), (n * ox) / (4 * demi), (n * oz) / (4 * demi), 0, 0, 2 * Math.PI)
+    ctx.fill()
+  } else {
+    ctx.fillRect(colonne(cx + ox / 2), ligne(cz + oz / 2), (n * ox) / (2 * demi), (n * oz) / (2 * demi))
+  }
   const l = soleil.lames
   if (l) {
     // Ombres des lames (entre deux vides), ramenées au plafond le long du soleil

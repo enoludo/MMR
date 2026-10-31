@@ -1,6 +1,6 @@
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
-import { mkdir, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
@@ -41,6 +41,32 @@ function enregistrementCaptures(): Plugin {
         await mkdir(dossier, { recursive: true })
         await writeFile(path.join(dossier, nom), Buffer.concat(morceaux))
         res.end('ok')
+      })
+      // Points de vue réglés en vue libre (src/ui/VueLibre.tsx) : src/salles/points-de-vue.json
+      serveur.middlewares.use('/__points-de-vue', async (req, res) => {
+        const morceaux: Buffer[] = []
+        for await (const m of req) morceaux.push(m as Buffer)
+        try {
+          const { salle, nom, point, flou } = JSON.parse(Buffer.concat(morceaux).toString())
+          const nombres = (v: unknown) => Array.isArray(v) && v.length === 3 && v.every((x) => Number.isFinite(x))
+          // Un point de vue, ou seulement sa profondeur de champ
+          const flouValide = typeof flou?.actif === 'boolean' &&
+            ['flou', 'nettete', 'miseAuPoint'].every((k) => Number.isFinite(flou[k]))
+          if (req.method !== 'POST' || !/^[a-z0-9-]+$/.test(salle) || !['initiale', 'maladie', 'manifeste'].includes(nom) ||
+            (!flouValide && (!nombres(point?.position) || !nombres(point?.cible)))) throw new Error('point de vue refusé')
+          const fichier = path.resolve(__dirname, 'src/salles/points-de-vue.json')
+          const tous = JSON.parse(await readFile(fichier, 'utf8'))
+          const arrondi = (v: number[]) => v.map((x) => Math.round(x * 1000) / 1000)
+          const { actif, flou: taille, nettete, miseAuPoint } = flou ?? {}
+          tous[salle] = flouValide
+            ? { ...tous[salle], flou: { ...tous[salle]?.flou, [nom]: { actif, flou: taille, nettete, miseAuPoint } } }
+            : { ...tous[salle], [nom]: { position: arrondi(point.position), cible: arrondi(point.cible) } }
+          await writeFile(fichier, JSON.stringify(tous, null, 2) + '\n')
+          res.end('ok')
+        } catch (e) {
+          res.statusCode = 400
+          res.end(String(e))
+        }
       })
     },
   }

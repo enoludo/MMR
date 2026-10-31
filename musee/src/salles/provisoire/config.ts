@@ -68,6 +68,15 @@ export const salleProvisoire: SalleConfig = {
     },
   ],
 
+  // Les 4 colonnes carrées de 3 m (de 13 à 16 m du centre), avec 0,5 m de marge, pour le trajet vers les portes
+  obstacles: [
+    { centre: [14.5, 14.5], rayon: 2.6 }, { centre: [-14.5, 14.5], rayon: 2.6 },
+    { centre: [14.5, -14.5], rayon: 2.6 }, { centre: [-14.5, -14.5], rayon: 2.6 },
+  ],
+
+  // Courbe de couleurs ACES, celle d'avant les effets : AgX était trop pâle pour Ludovic (31/10)
+  effets: { courbe: 'aces' },
+
   // Parcours : cercle invisible autour de l'œuvre (rayon réglable avec la touche M)
   parcours: {
     centre: [0, 0],
