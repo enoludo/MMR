@@ -1,7 +1,7 @@
 # CLAUDE.md — Musée des Maladies Rares (MMR), site 3D
 
 Contexte de travail pour Claude Code. À lire en entier au début de chaque session.
-Dernière mise à jour : 30/10/2026 (passation après la refonte de l'interface des salles, la musique et l'écran d'accueil : voir `PASSATION.md`).
+Dernière mise à jour : 01/11/2026 (passation avant de reprendre l'animation des titres de la spirale : voir `PASSATION.md`).
 
 ## Interlocuteur et façon de travailler
 
@@ -97,6 +97,7 @@ Depuis Claude Code, lancer les scripts avec le Blender de l'application : `/Appl
 
 ## Points ouverts
 
+- **Prochaine tâche (01/11, demande de Ludovic) : sortie des titres de la spirale.** Au changement de carte, les lettres du titre partent vers le haut une à une pendant que celles du titre suivant montent du bas, presque en même temps (`Overlay.js`, détail dans `PASSATION.md`).
 - **Une architecture par œuvre (30/10–31/10) :** première variante, la rotonde de « La maladie de Huntington », en ligne dans le site depuis le 31/10 (`src/salles/rotonde/config.ts`, `blender/rotonde.py` puis `chaine.sh RES rotonde` ; plan coté et aperçu `plans/salle-rotonde.html`, `blender/apercu-rotonde.py`). Mêmes portes et couloirs que la salle provisoire. Revenir à l'ancienne salle : `salleProvisoireBleue` dans `oeuvres.ts` (et les captures de Huntington sous l'étiquette Git `huntington-avant-rotonde`). À voir avec Ludovic : bruit de la lumière sur les colonnes, approche de la porte d'entrée (pan coupé), lumière de l'œuvre.
 - **Effets d'image (31/10), à choisir avec Ludovic :** tout garder (−25 % d'images/s sans profondeur de champ, −35 % avec), AgX seul (gratuit) ; réglages par salle en place ; profondeur de champ coupée partout, à régler par Ludovic vue par vue (touche V). Transitions avec la spirale et captures à revérifier si on les garde.
 - **Salle de 40 m (29/10), reportée dans la 3D, à voir avec Ludovic :** plan coté `plans/salle-40.html` (`plans/generer-plan-40.py`). À régler avec lui : contraste, lames, couloirs et impasses (touche M, bouton « Copier les réglages »). Vue d'arrivée, points de vue Maladie/Manifeste et anneaux de la caméra repris tels quels de la salle de 30 m : à revoir dans la salle plus grande.
