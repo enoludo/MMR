@@ -13,14 +13,14 @@ import { prechargerImages } from './ui/ToileTransition'
 export const captureSalle: { courante: (() => HTMLCanvasElement | null) | null } = { courante: null }
 
 /** Entrée : cadre de la carte cliquée à l'écran, mis à jour par la spirale qui la recentre (Accueil) */
-export const carteVivante: { cadre: Cadre | null } = { cadre: null }
+export const carteVivante: { cadre: Cadre | null; zoom: number } = { cadre: null, zoom: 0 }
 
 /** Depuis la spirale : la carte `carte` (à l'écran) grandit jusqu'à remplir l'écran, puis la salle apparaît. */
-export function entrer(oeuvre: string, carte: Cadre) {
+export function entrer(oeuvre: string, carte: Cadre, retenue = false) {
   if (store.get().transition) return
   carteVivante.cadre = null
   prechargerOeuvre(oeuvre)
-  store.set({ transition: { sens: 'entree', oeuvre, phase: 'preparation', carte, image: null } })
+  store.set({ transition: { sens: 'entree', oeuvre, phase: 'preparation', carte, image: null, retenue } })
 }
 
 /**

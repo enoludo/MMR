@@ -15,6 +15,8 @@ const PART_DU_TEMPS = 0.6
 const ATTENTE_MAX = 25
 /** Durée de la sortie : cascade des éléments, puis le voile s'efface (s) */
 const DUREE_SORTIE = 1.6
+/** Durée de l'arrivée du header après cet écran (ms) : délai et fondu de .intro-depart .entete (style.css) */
+const ARRIVEE_HEADER = 1500
 /** Largeur du logo dans son SVG, pour dévoiler la signature */
 const LARGEUR_LOGO = 632.5
 
@@ -86,6 +88,11 @@ export function Intro() {
     racine.classList.toggle('intro--pret', intro === 'pret' || intro === 'sortie')
     racine.classList.toggle('intro--sortie', intro === 'sortie')
     document.documentElement.classList.toggle('intro-active', intro === 'chargement' || intro === 'pret')
+    // Le header arrive en fondu, avec un délai (style.css) : seulement à la sortie de cet écran
+    if (intro === 'sortie') {
+      document.documentElement.classList.add('intro-depart')
+      setTimeout(() => document.documentElement.classList.remove('intro-depart'), ARRIVEE_HEADER)
+    }
     if (intro === null) racine.remove()
   }, [intro, racine])
 

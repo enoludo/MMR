@@ -34,6 +34,11 @@ export type Transition = {
   carte: Cadre | null
   /** Sortie : la salle telle qu'on la quitte */
   image: HTMLCanvasElement | null
+  /**
+   * Entrée depuis la grille : le zoom attend que la grille soit assez rangée en spirale
+   * (Accueil.tsx lève la retenue), pour que les deux mouvements se chevauchent
+   */
+  retenue?: boolean
 }
 
 /**
@@ -63,6 +68,8 @@ type Etat = {
   sallePrete: number | null
   /** Œuvre sur laquelle la spirale se recentre à son retour (dernière salle visitée ou carte centrée) */
   derniereOeuvre: string | null
+  /** Page d'accueil : spirale ou grille (sélecteur du header), gardée au retour d'une salle */
+  vueAccueil: 'spirale' | 'grille'
   /** Ce qu'affiche la salle : le premier écran (info) ou un popup (maladie, manifeste) */
   onglet: Onglet
   /** Son coupé (bouton du header), gardé d'une visite à l'autre (ui/Musique.tsx) */
@@ -105,6 +112,7 @@ let etat: Etat = {
   salleAffichee: null,
   sallePrete: null,
   derniereOeuvre: null,
+  vueAccueil: 'spirale',
   arrive: false,
   demande: null,
   onglet: 'info',

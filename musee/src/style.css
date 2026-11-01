@@ -76,8 +76,10 @@ button { font: inherit; color: inherit; }
 
 /* --- Header ----------------------------------------------------------- */
 /* Sous l'écran d'accueil (ui/Intro.tsx), le header et les flèches attendent ; ils arrivent avec la visite */
-.entete, .accueil__fleches, .pied { transition: opacity 0.8s ease 0.5s, visibility 0s 0.5s; }
-.intro-active .entete, .intro-active .accueil__fleches, .intro-active .pied { opacity: 0; visibility: hidden; transition: none; }
+/* Le délai ne joue qu'à la sortie de l'écran d'accueil (html.intro-depart, ui/Intro.tsx) : ailleurs, le
+   header de la salle doit remplacer celui de la spirale dans la même image (01/11, saut vu par Ludovic) */
+.intro-depart .entete { transition: opacity 0.8s ease 0.5s, visibility 0s 0.5s; }
+.intro-active .entete, .intro-active .accueil__fleches, .intro-active .pied, .intro-active .recherche { opacity: 0; visibility: hidden; transition: none; }
 
 .entete {
   position: fixed; top: var(--marge); left: var(--marge); right: var(--marge); z-index: 30;
@@ -130,6 +132,8 @@ button { font: inherit; color: inherit; }
 }
 /* Masques de lettres (SplitText) : de la marge pour les accents, compensée (voir README de la galerie) */
 .accueil__titre .char-mask, .salle-accueil__titre .char-mask, .popup__titre .char-mask { padding-block: 0.25em 0.15em; margin-block: -0.25em -0.15em; }
+/* Titre qui part au changement de carte (Overlay.js, faireSortir) : figé là où il était */
+.accueil__titre--sortie { position: absolute; max-width: none; pointer-events: none; text-align: center; }
 /* Un mot ne se coupe jamais entre deux lettres (il dépasse plutôt, comme le texte non découpé) */
 .accueil__titre .word, .salle-accueil__titre .word, .popup__titre .word { white-space: nowrap; }
 .accueil__cta {
@@ -141,6 +145,64 @@ button { font: inherit; color: inherit; }
   opacity: 0; /* affiché par Overlay.js, une fois son texte posé */
 }
 .accueil__cta:hover { background: #ececec; }
+
+/* Vue Grille (gallery/Grille.js, maquette Figma 58:207) : les cartes 3D se rangent en grille, leurs
+   titres et étiquettes (HTML) se posent dessous ; flèches et bouton « Découvrir » de la spirale retirés */
+.accueil--grille .accueil__cta { pointer-events: none; }
+.accueil--grille .accueil__toile, .accueil--grille .accueil__toile:active { cursor: default; }
+.grille { position: fixed; inset: 0; z-index: 10; pointer-events: none; overflow: hidden; visibility: hidden; }
+.grille--active { visibility: visible; }
+.accueil--transition .grille { opacity: 0; transition: opacity 0.3s ease; }
+.grille__legende {
+  position: absolute; left: 0; top: 0; display: flex; flex-direction: column; gap: 16px;
+  color: #fff; text-decoration: none; pointer-events: auto; will-change: transform, opacity;
+}
+.grille__titre {
+  margin: 0; font-family: var(--titre); font-weight: 400; font-size: 24px; line-height: 24px;
+  text-transform: uppercase;
+}
+.grille__etiquettes { display: flex; flex-wrap: wrap; gap: 4px; }
+.grille__etiquette {
+  display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.6);
+  font-size: 10px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase;
+}
+.grille__etiquette--mecene { background: rgba(217, 62, 52, 0.15); color: #e0645b; }
+/* Recherche et filtres de la vue Grille (« SearchBar » 58:455) : en bas, centrés, à 24 px du bord ;
+   champ de 339 px, filtres à leur largeur, 12 px entre eux */
+.recherche {
+  position: fixed; left: 50%; bottom: var(--marge); z-index: 11; transform: translateX(-50%);
+  display: flex; gap: 12px; width: max-content; max-width: calc(100vw - 2 * var(--marge));
+  transition: opacity 0.3s ease;
+}
+.accueil--transition .recherche { opacity: 0; pointer-events: none; }
+/* Masque de chaque bouton des flèches et de la recherche : ils y entrent par le bas et en sortent
+   par le haut (Accueil.tsx) ; 4 px de marge pour le contour du clavier */
+.masque { display: flex; flex: none; overflow: clip; overflow-clip-margin: 4px; }
+.masque--champ { flex: 0 1 auto; }
+.recherche__champ, .recherche__filtre {
+  display: flex; align-items: center; flex: none; height: var(--haut); padding: 0 12px 0 24px;
+  border-radius: var(--rayon); border: 0; cursor: pointer;
+  background: var(--verre); -webkit-backdrop-filter: var(--flou); backdrop-filter: var(--flou);
+  font-size: 14px; line-height: 1; white-space: nowrap;
+  transition: background-color 0.2s ease;
+}
+.recherche__champ:hover, .recherche__filtre:hover, .recherche__champ:focus-within { background: rgba(255, 255, 255, 0.3); }
+.recherche__champ { flex: 0 1 auto; width: 339px; justify-content: space-between; cursor: text; }
+.recherche__saisie {
+  appearance: none; flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; outline: 0;
+  background: transparent; color: inherit; font: inherit;
+}
+.recherche__saisie::placeholder { color: #fff; opacity: 1; }
+.recherche__saisie::-webkit-search-cancel-button { display: none; }
+/* Icône dans son emplacement de 10 px de marge (loupe 16 px, flèche 12 px) */
+.recherche__icone { display: grid; place-items: center; flex: none; padding: 10px; }
+.recherche__saisie:focus-visible { outline: 0; }
+@media (max-width: 640px) {
+  .recherche { flex-wrap: wrap; justify-content: center; width: calc(100vw - 2 * var(--marge)); }
+  .masque--champ { flex: 1 1 100%; }
+  .recherche__champ { width: 100%; }
+}
 
 /* Transitions vers les salles (ui/Transition.tsx) : la spirale, figée, grandit avec la carte ;
    le titre part et revient lettre par lettre (Overlay.js), le centre du header s'efface */

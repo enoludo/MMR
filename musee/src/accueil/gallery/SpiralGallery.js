@@ -4,6 +4,7 @@ import { createPlaceholderTexture } from './placeholderTexture.js';
 import { buildCardTexture, CARD_TEXTURE_SIZE } from './cardTexture.js';
 import { extractMoodColor, extractAverageColor } from './cardColor.js';
 import { getPeriod, wrapHeight, helixPointAt, recycleFadeAt } from './spiralPath.js';
+import { dispositionGrille, progresCarte } from './Grille.js';
 
 const textureLoader = new THREE.TextureLoader();
 
@@ -61,6 +62,7 @@ const _dragPos = new THREE.Vector3();
 const _dragScale = new THREE.Vector3();
 const _dragPoint = new THREE.Vector3();
 const _normale = new THREE.Vector3();
+const _grille = new THREE.Vector3();
 const _lumiere = new THREE.Vector3();
 
 const BLUR_START = (CONFIG.blurStartDeg * Math.PI) / 180;
@@ -294,6 +296,14 @@ export class SpiralGallery {
     this.scene.add(this.group);
 
     this.slots = [];
+    /** Site React : carte cachée sous l'image d'une transition (Accueil.tsx), ou null */
+    this.carteCachee = null;
+    // Site React : vue Grille (Grille.js). `progres` va de 0 (spirale) à 1 (grille) ; `cartes` donne,
+    // pour chaque œuvre, la carte de la spirale qui va dans sa case (les autres s'effacent)
+    // `ordre` : rang de chaque carte dans la cascade du déroulé (null : l'ordre de la grille) ; au retour
+    // d'une salle, la carte de l'œuvre part la première (Accueil.tsx)
+    /** @type {{ progres: number, cartes: Map<any, number> | null, defilement: number, disposition: ReturnType<typeof dispositionGrille> | null, ordre: number[] | null }} */
+    this.grille = { progres: 0, cartes: null, defilement: 0, disposition: null, ordre: null };
     this.cardColors = new Map();
     this.cardEdgeColors = new Map();
     this.slotCount = getSlotCountForWidth(window.innerWidth);
@@ -312,6 +322,7 @@ export class SpiralGallery {
     }
     this.slots = [];
     this.slotCount = slotCount;
+    if (this.grille) this.grille.cartes = null;
     this.period = getPeriod(slotCount);
 
     if (!this.cardGeometry) {
@@ -397,6 +408,16 @@ export class SpiralGallery {
 
   /** Translate the whole coil vertically to reflect the current scroll value. */
   update(scrollY) {
+    const g = this.grille;
+    const enGrille = g.progres > 0;
+    if (enGrille && !g.cartes) this.choisirCartesGrille(scrollY);
+    if (enGrille) {
+      g.disposition = dispositionGrille(this.container.clientWidth, this.container.clientHeight, this.cardsData.length);
+      g.defilement = Math.min(g.defilement, g.disposition.defilementMax);
+    }
+    // Les copies d'une œuvre qui ne vont pas dans la grille s'effacent dans la première moitié du déroulé
+    const effacement = 1 - Math.min(1, g.progres * 2);
+
     for (const slot of this.slots) {
       const { point, fade, distance, scale } = computeSlotPlacement(slot.baseHeight, scrollY, this.period);
 
@@ -415,13 +436,83 @@ export class SpiralGallery {
 
       const depthOpacity =
         CONFIG.frontOpacity - (CONFIG.frontOpacity - CONFIG.backOpacity) * (distance / Math.PI);
-      const opacity = fade * depthOpacity;
+      let opacity = fade * depthOpacity;
+      let blur = blurAmountAt(distance);
+
+      // Site React : vue Grille, la carte glisse de la spirale vers sa case (ou s'efface)
+      if (enGrille) {
+        const i = g.cartes.get(slot);
+        if (i === undefined) {
+          opacity *= effacement;
+        } else {
+          const t = progresCarte(g.progres, g.ordre ? g.ordre[i] : i, this.cardsData.length);
+          const c = g.disposition.cases[i];
+          const echelle = this.versGrille(c, g.defilement, _grille);
+          slot.mesh.position.lerp(_grille, t);
+          slot.mesh.rotation.y = Math.atan2(Math.sin(point.angle), Math.cos(point.angle)) * (1 - t);
+          slot.mesh.rotation.z = CARD_TILT * (1 - t);
+          const s = scale + (echelle - scale) * t;
+          // Tranche presque effacée dans la grille : vue de face, sur les bords de l'écran elle se verrait
+          const epaisseur = s * (1 - 0.9 * t);
+          opacity += (1 - opacity) * t;
+          blur *= 1 - t;
+          slot.mesh.scale.set(s, s, epaisseur);
+        }
+      }
+      // Site React : la carte sous l'image d'une transition reste cachée (Accueil.tsx)
+      slot.mesh.visible = opacity > 0.002 && slot !== this.carteCachee;
       slot.faceMaterial.opacity = opacity;
       slot.edgeMaterial.opacity = opacity;
 
-      const blur = blurAmountAt(distance);
       if (slot.faceMaterial.userData.shader) slot.faceMaterial.userData.shader.uniforms.uBlur.value = blur;
     }
+  }
+
+  /**
+   * Site React : pour chaque œuvre, la carte qui ira dans sa case de la grille — celle de ses copies
+   * la plus proche de l'avant de la spirale (elle a le moins de chemin à faire)
+   */
+  choisirCartesGrille(scrollY) {
+    const cartes = new Map();
+    this.cardsData.forEach((card, i) => {
+      let meilleure = null;
+      let ecart = Infinity;
+      for (const slot of this.slots) {
+        if (slot.cardId !== card.id) continue;
+        const h = Math.abs(wrapHeight(slot.baseHeight - scrollY, this.period));
+        if (h < ecart) {
+          ecart = h;
+          meilleure = slot;
+        }
+      }
+      if (meilleure) cartes.set(meilleure, i);
+    });
+    this.grille.cartes = cartes;
+  }
+
+  /** Site React : la carte de la grille qui montre l'œuvre `cardId` */
+  carteGrille(cardId) {
+    if (!this.grille.cartes) return null;
+    for (const [slot, i] of this.grille.cartes) if (this.cardsData[i].id === cardId) return slot;
+    return null;
+  }
+
+  /**
+   * Site React : position (monde) d'une carte posée dans la case `c` de la grille (pixels), face à la
+   * caméra, à la profondeur de la carte du devant de la spirale ; renvoie son échelle. La caméra
+   * regarde droit devant elle (axe -z, voir resize) : un pixel y vaut partout la même longueur.
+   */
+  versGrille(c, defilement, out) {
+    const largeur = this.container.clientWidth;
+    const hauteur = this.container.clientHeight;
+    const distance = this.camera.position.z - CONFIG.radius;
+    const pixelsParUnite = hauteur / (2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2) * distance);
+    out.set(
+      this.camera.position.x + (c.x + c.l / 2 - largeur / 2) / pixelsParUnite,
+      this.camera.position.y - (c.y + c.h / 2 - defilement - hauteur / 2) / pixelsParUnite,
+      CONFIG.radius
+    );
+    return c.l / pixelsParUnite / CONFIG.cardWidth;
   }
 
   /**

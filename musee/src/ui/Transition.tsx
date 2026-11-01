@@ -92,8 +92,10 @@ export function Transition() {
     const vite = reduitMouvement() ? 0 : 1
     const a = anim.current
     const suite = (partiel: Partial<EtatTransition> | null) => {
+      // Même étape de la même transition (l'objet a pu changer entre-temps : retenue levée par la grille)
       const actuelle = store.get().transition
-      if (actuelle === t) store.set({ transition: partiel && { ...actuelle, ...partiel } })
+      if (actuelle && actuelle.sens === t.sens && actuelle.oeuvre === t.oeuvre && actuelle.phase === t.phase)
+        store.set({ transition: partiel && { ...actuelle, ...partiel } })
     }
 
     if (t.phase === 'preparation') {
@@ -112,9 +114,10 @@ export function Transition() {
         fait = true
         suite({ phase: 'zoom' })
       }
+      // Depuis la grille, le zoom attend en plus que la grille lève sa retenue (Accueil.tsx)
       const verifier = () => {
-        const { salle, sallePrete } = store.get()
-        if (salle && salle.cle === sallePrete) lancer()
+        const { salle, sallePrete, transition } = store.get()
+        if (salle && salle.cle === sallePrete && !transition?.retenue) lancer()
       }
       const desabonner = store.subscribe(verifier)
       const secours = setTimeout(lancer, PREPARATION_MAX)
@@ -127,6 +130,8 @@ export function Transition() {
     if (t.phase === 'zoom') {
       a.zoom = 0
       a.opacite = 1
+      // Lu par la page d'accueil avant la première image de ce zoom (Accueil.tsx, retour vers la grille)
+      carteVivante.zoom = 0
       if (t.sens === 'entree') {
         // L'avancée dans l'image part du début du zoom (sans mouvement : directement à la vue d'arrivée)
         entree.debut = vite ? temps() : null
@@ -219,8 +224,10 @@ export function Transition() {
       if (t.phase === 'retour' || t.phase === 'photo') return t0.effacer()
       const a = anim.current
       const plein = pleinEcran()
-      // Entrée : la carte cliquée, que la spirale recentre (carteVivante)
-      const carte = t.sens === 'entree' ? (carteVivante.cadre ?? t.carte) : t.carte
+      // La carte, si la page d'accueil la déplace (carteVivante) : à l'entrée, la carte cliquée que la
+      // spirale recentre ; au retour vers la grille, la carte qui part déjà vers sa case
+      carteVivante.zoom = a.zoom
+      const carte = carteVivante.cadre ?? t.carte
       const boite = !carte ? plein : t.sens === 'entree' ? entre(carte, plein, a.zoom) : entre(plein, carte, a.zoom)
 
       const r = reglagesCapture(o.vueEntree)

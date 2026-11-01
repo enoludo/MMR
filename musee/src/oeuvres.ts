@@ -198,6 +198,11 @@ export const cartesSpirale = [...oeuvres.slice(1), oeuvres[0]].map((o) => ({
   /** Image de la transition (ui/ToileTransition) */
   imageTransition: o.image,
   title: o.titre,
+  /** Vue Grille : étiquettes sous la vignette (mécène ou partenaire en rouge, maladie) */
+  etiquettes: [
+    ...(o.partenaire ? [{ texte: o.partenaire.nom, mecene: true }] : []),
+    ...(o.maladie ? [{ texte: o.maladie }] : []),
+  ],
   cta: 'Découvrir',
   link: lienOeuvre(o),
   /** Une capture de salle est montrée agrandie (×2 par défaut) dans sa carte (effet de masque des transitions) */

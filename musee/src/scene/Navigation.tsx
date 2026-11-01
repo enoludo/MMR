@@ -76,6 +76,56 @@ const TOUR_VERS_AXE = Math.PI / 3
 const APPROCHE = 6
 /** Passage, après le couloir : le regard vise ce point plus loin sur le trajet (m), amorti */
 const REGARD_DEVANT = 12
+/**
+ * Départ d'un passage (01/11, demande de Ludovic) : on se retourne d'abord sur place, de l'œuvre vers
+ * le fond du couloir, en tournant (en ligne droite, le point regardé passait près de la caméra, qui
+ * se retournait d'un coup, jusqu'à 360°/s), en un temps qui grandit avec l'angle (pointe à
+ * `rotationPassage`, touche M) ; on se met en marche quand la tête a fait cette part de la rotation.
+ */
+const DEPART_MARCHE = 0.6
+/** La marche est raccourcie du temps passé à se retourner avant de partir, jusqu'à cette part au plus */
+const MARCHE_MIN = 0.8
+/** Cap (vu du dessus) du point `p` depuis `o`, et sa distance horizontale */
+const cap = (o: THREE.Vector3, p: THREE.Vector3) => Math.atan2(p.x - o.x, p.z - o.z)
+const distanceSol = (o: THREE.Vector3, p: THREE.Vector3) => Math.hypot(p.x - o.x, p.z - o.z)
+/** Passage : temps de réponse du regard (s), qui suit sa cible sans dépasser `rotationPassage` */
+const REGARD_PASSAGE = 0.35
+/**
+ * Rapproche `actuel` de `cible` comme un ressort amorti (sans rebond), vitesse bornée à peu près à
+ * `vmax` (SmoothDamp, Game Programming Gems 4) ; `etat.v` garde la vitesse d'une image à l'autre.
+ */
+function suivre(actuel: number, cible: number, etat: { v: number }, temps: number, vmax: number, dt: number) {
+  if (dt <= 0) return actuel
+  const omega = 2 / temps
+  const x = omega * dt
+  const amorti = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x)
+  const ecart = borner(actuel - cible, -vmax * temps, vmax * temps)
+  const visee = actuel - ecart
+  const tmp = (etat.v + omega * ecart) * dt
+  etat.v = (etat.v - omega * tmp) * amorti
+  let sortie = visee + (ecart + tmp) * amorti
+  if (cible - actuel > 0 === sortie > cible) {
+    sortie = cible
+    etat.v = 0
+  }
+  return sortie
+}
+/**
+ * Point regardé entre `a` (k = 0) et `b` (k = 1) vus depuis `pos`, en tournant : cap dans le sens
+ * `sens` (celui du départ, gardé même si la caméra, en avançant, fait passer l'écart au-delà du
+ * demi-tour), inclinaison et distance en ligne droite.
+ */
+function regardEntre(pos: THREE.Vector3, a: THREE.Vector3, b: THREE.Vector3, k: number, sens: number, out: THREE.Vector3) {
+  const ca = cap(pos, a)
+  let ecart = enroule(cap(pos, b) - ca)
+  if (ecart * sens < -Math.PI / 2) ecart += 2 * Math.PI * sens
+  const da = Math.max(0.5, distanceSol(pos, a))
+  const db = Math.max(0.5, distanceSol(pos, b))
+  const inclinaison = lerp(Math.atan2(a.y - pos.y, da), Math.atan2(b.y - pos.y, db), k)
+  const c = ca + ecart * k
+  const d = lerp(da, db, k)
+  return out.set(pos.x + Math.sin(c) * d, pos.y + Math.tan(inclinaison) * d, pos.z + Math.cos(c) * d)
+}
 const reduitMouvement = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
 export function Navigation({
@@ -157,6 +207,16 @@ export function Navigation({
     dirPorte: new THREE.Vector3(),
     bout: new THREE.Vector3(),
     fin: new THREE.Vector3(),
+    /** Passage : part du trajet (0 → 1) où le regard tourne vers le fond du couloir, et dans quel sens */
+    /** Passage : temps écoulé depuis le début du retournement, sa durée et son sens (s) */
+    pivot: 0,
+    dureePivot: 0,
+    sensTour: 1,
+    /** Passage : cap et inclinaison du regard (radians), amortis et à vitesse bornée */
+    capLisse: 0,
+    inclLisse: 0,
+    vCap: { v: 0 },
+    vIncl: { v: 0 },
     // Image précédente
     cible: new THREE.Vector3(0, 4, 0),
     initialise: false,
@@ -391,6 +451,19 @@ export function Navigation({
     s.duree = reduitMouvement() ? 0 : g.dureePassage * borner(s.courbe.getLength() / 40, 0.7, 1)
     s.departCible.copy(s.cible)
     s.devant.copy(s.cible)
+    // Plus l'angle à parcourir pour regarder le fond du couloir est grand, plus on prend le temps
+    // (vitesse moyenne aux deux tiers de la pointe, avec `lisse`)
+    const ecart = enroule(cap(camera.position, s.bout) - cap(camera.position, s.cible))
+    s.sensTour = ecart < 0 ? -1 : 1
+    s.pivot = 0
+    s.dureePivot = s.duree > 0 ? Math.abs(ecart) / ((THREE.MathUtils.degToRad(g.rotationPassage) * 2) / 3) : 0
+    // Temps passé à tourner avant de partir (lisse(x) = DEPART_MARCHE pour x ≈ 0,57) : la marche est
+    // raccourcie d'autant, pour que le passage ne s'allonge pas trop
+    const attente = s.dureePivot * 0.5655
+    s.duree = Math.max(s.duree * MARCHE_MIN, s.duree - attente)
+    s.capLisse = cap(camera.position, s.cible)
+    s.inclLisse = Math.atan2(s.cible.y - camera.position.y, Math.max(0.5, distanceSol(camera.position, s.cible)))
+    s.vCap.v = s.vIncl.v = 0
     s.departFov = camera.fov
     s.elan = 0
     store.set({ etape: null, arrive: false })
@@ -612,7 +685,10 @@ export function Navigation({
         fov = lerp(champEntree(u, focale, camera.aspect, reglagesTransition(salle.current).champEnPlus), focale, k)
       }
     } else if (s.mode === 'passage' && s.courbe && configArrivee) {
-      s.t = s.duree > 0 ? Math.min(1, s.t + dt / s.duree) : 1
+      // On se retourne d'abord ; on se met en marche quand la tête a fait DEPART_MARCHE de la rotation
+      s.pivot += dt
+      const tour = s.dureePivot > 0 ? lisse(borner(s.pivot / s.dureePivot)) : 1
+      if (tour >= DEPART_MARCHE) s.t = s.duree > 0 ? Math.min(1, s.t + dt / s.duree) : 1
       const u = profilPassage(s.t)
       s.courbe.getPointAt(u, pos)
       // Regard : d'abord le fond du couloir, un point fixe (la tête tourne à peine pendant qu'on
@@ -628,9 +704,26 @@ export function Navigation({
       s.devant.x = amortir(s.devant.x, tmp.devant.x, 1.6, dt)
       s.devant.y = amortir(s.devant.y, tmp.devant.y, 1.6, dt)
       s.devant.z = amortir(s.devant.z, tmp.devant.z, 1.6, dt)
-      cible.lerpVectors(s.departCible, s.bout, lisseEntre(0, 0.2, s.t))
+      regardEntre(pos, s.departCible, s.bout, tour, s.sensTour, cible)
       cible.lerp(s.devant, lisseEntre(0.5, 1, avance / LONGUEUR_COULOIR))
-      cible.lerp(cibleArrivee(configArrivee, tmp.cibleCercle), Math.max(lisse(borner(sorti)), lisseEntre(0.9, 1, s.t)))
+      // Vers l'œuvre d'arrivée, en tournant aussi (en ligne droite, le regard pivotait d'un coup)
+      const versOeuvre = cibleArrivee(configArrivee, tmp.cibleCercle)
+      const sensArrivee = enroule(cap(pos, versOeuvre) - cap(pos, cible)) < 0 ? -1 : 1
+      regardEntre(pos, cible, versOeuvre, Math.max(lisse(borner(sorti)), lisseEntre(0.9, 1, s.t)), sensArrivee, cible)
+      // Le regard suit ce point sans tourner plus vite que `rotationPassage` (sortie du couloir dans
+      // une salle dont le chemin tourne fort, comme la rotonde) ; il le rejoint peu à peu, exactement à
+      // l'arrivée (la durée du passage ne change pas : 01/11, Ludovic trouvait trop longs les passages
+      // ralentis le temps que le regard rattrape son retard)
+      const vmax = THREE.MathUtils.degToRad(g.rotationPassage)
+      const capVise = s.capLisse + enroule(cap(pos, cible) - s.capLisse)
+      const dVise = Math.max(0.5, distanceSol(pos, cible))
+      const inclVise = Math.atan2(cible.y - pos.y, dVise)
+      s.capLisse = suivre(s.capLisse, capVise, s.vCap, REGARD_PASSAGE, vmax, dt)
+      s.inclLisse = suivre(s.inclLisse, inclVise, s.vIncl, REGARD_PASSAGE, vmax, dt)
+      const exact = lisseEntre(0.8, 1, s.t)
+      const c = lerp(s.capLisse, capVise, exact)
+      const incl = lerp(s.inclLisse, inclVise, exact)
+      cible.set(pos.x + Math.sin(c) * dVise, pos.y + Math.tan(incl) * dVise, pos.z + Math.cos(c) * dVise)
       fov = lerp(s.departFov, focale, lisseEntre(0, 0.3, s.t))
       if (s.t >= 1) arriver(pos, cible)
     } else if (s.mode === 'etape') {
@@ -794,6 +887,8 @@ export type ReglagesNavigation = {
   vitesseAuto: number
   duree: number
   dureePassage: number
+  /** Passage : vitesse de rotation du regard la plus grande (°/s) */
+  rotationPassage: number
 }
 
 const navigationParSalle = new Map<string, ReglagesNavigation>()
@@ -819,6 +914,7 @@ export function reglagesNavigation(config: SalleConfig): ReglagesNavigation {
       vitesseAuto: 0.15,
       duree: 2.8,
       dureePassage: 8,
+      rotationPassage: 90,
     }
     navigationParSalle.set(config.id, g)
   }
@@ -841,6 +937,7 @@ function ReglagesNavigationSalle({ config }: { config: SalleConfig }) {
     vitesseAuto: { value: g.vitesseAuto, min: 0, max: 1, step: 0.01, label: 'déplacement auto (m/s)' },
     duree: { value: g.duree, min: 0.5, max: 6, step: 0.1, label: 'durée des transitions (s)' },
     dureePassage: { value: g.dureePassage, min: 1, max: 15, step: 0.1, label: 'durée du passage par le couloir (s)' },
+    rotationPassage: { value: g.rotationPassage, min: 10, max: 120, step: 1, label: 'passage : rotation du regard au plus (°/s)' },
   })
   Object.assign(g, reglages)
   return null

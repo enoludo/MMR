@@ -5,6 +5,15 @@ import { SplitText } from 'gsap/SplitText';
 // Toujours passées en copie : GSAP complète les objets qu'on lui donne.
 const ENTREE_LETTRES = { yPercent: 110, opacity: 0 };
 const APPARITION_LETTRES = { yPercent: 0, opacity: 1, duration: 0.8, ease: 'power3.out', stagger: 0.022 };
+// Sortie : les lettres repartent par le haut à travers leur masque, une à une (changement de carte,
+// clic sur « Découvrir »)
+const SORTIE_LETTRES = { yPercent: -110, opacity: 0, duration: 0.45, ease: 'power2.inOut', stagger: 0.012 };
+
+/**
+ * Changement de carte : délai (s) entre le départ des lettres de l'ancien titre et la montée de celles
+ * du nouveau (0 = ensemble). Réglable touche M, « Titres de la spirale » (Accueil.tsx).
+ */
+export const reglagesTitres = { delaiEntree: 0.1 };
 
 gsap.registerPlugin(SplitText);
 
@@ -13,8 +22,10 @@ gsap.registerPlugin(SplitText);
  * (not text rendered in the 3D scene) so it stays sharp at any resolution
  * and remains accessible/selectable.
  *
- * Both fade out in place (pure alpha) on the way out, moving upward
- * slightly as they go (the CTA does, at least — see below). On the way
+ * Site React (01/11) : au changement de carte, les lettres de l'ancien titre
+ * partent vers le haut pendant que celles du nouveau montent (setCard,
+ * faireSortir) ; le CTA reste affiché. Au clic sur « Découvrir » (cacher),
+ * il s'efface en montant un peu. On the way
  * in, the CTA does the same slide in reverse (fromTo, not a plain `.to`,
  * so it always starts from the same below-rest position regardless of
  * where the exit tween left it — otherwise only the very first card
@@ -38,7 +49,9 @@ export class Overlay {
     this.split = null;
     // Site React : titre et CTA retenus hors de l'écran pendant les transitions vers les salles
     this.masque = false;
-    this.cartePrevue = null;
+    /** Calques des titres qui partent (faireSortir), dont le dernier, qui n'est pas encore effacé */
+    this.sorties = new Set();
+    this.sortieEnCours = null;
 
     gsap.set(this.ctaEl, { opacity: 0, y: 12 });
 
@@ -48,60 +61,97 @@ export class Overlay {
   dispose() {
     this.timeline?.kill();
     this.split?.revert();
+    for (const calque of this.sorties) this.retirer(calque);
   }
 
   setCard(card) {
     if (!card || card.id === this.currentCardId) return;
     this.currentCardId = card.id;
 
-    // A fast scroll can change the centered card again before the previous
-    // crossfade finishes; without killing it first, the two timelines race
-    // and the older one's `.call()` can overwrite the newer text last.
+    // Site React (01/11, demande de Ludovic) : les deux titres se croisent. Les lettres de l'ancien
+    // partent vers le haut sur un calque à part, figé à sa place, pendant que le nouveau titre est
+    // écrit dans le h2 et monte du bas, comme avant. Un scroll rapide fait repartir un titre en train
+    // d'entrer depuis là où en sont ses lettres (même éléments, mêmes tweens repris).
     this.timeline?.kill();
+    // Titre caché (grille, transition) : rien ne part ni n'entre. Sinon les lettres cachées sous leur
+    // masque partiraient vers le haut en le traversant (vu au retour dans la grille, quand la carte
+    // centrée change pendant que les vignettes se redéploient)
+    if (this.masque) {
+      if (this.split) gsap.killTweensOf(this.split.chars);
+      this.poser(card);
+      return;
+    }
+    const bas = this.ctaEl.getBoundingClientRect().top;
+    this.faireSortir();
+    this.poser(card);
 
-    this.cartePrevue = card;
-    this.timeline = gsap.timeline();
-    this.timeline
-      .to(this.titleEl, { opacity: 0, duration: 0.25, ease: 'power1.in' }, 0)
-      .to(this.ctaEl, { opacity: 0, y: -10, duration: 0.25, ease: 'power1.in' }, 0)
-      .call(() => {
-        this.poser(card);
-        if (this.masque) return;
-
-        // Appended now rather than built upfront, since `this.split.chars`
-        // doesn't exist until this callback actually runs.
-        this.timeline
-          .fromTo(
-            this.split.chars,
-            // .char-mask (style.css) pads its clip box beyond the
-            // character's own tight line-height so accents don't clip —
-            // measured on a real title, that's a 24px top / 14.4px bottom
-            // pad on a 76.8px-tall character (96px font, line-height
-            // 0.8), meaning full clearance needs yPercent ~118.75, not
-            // 100. 130 gives real headroom rather than a ~1px margin that
-            // rounding/antialiasing can eat — which is what still let the
-            // very top sliver of each letter show before the tween
-            // started. Site React (30/10, demande de Ludovic) : lettres plus douces,
-            // comme dans les salles (ui/apparition.ts) — elles se fondent en montant, donc
-            // encore transparentes en entrant dans leur masque : 110 suffit.
-            { ...ENTREE_LETTRES },
-            { ...APPARITION_LETTRES }
-          )
-          .fromTo(
-            this.ctaEl,
-            { opacity: 0, y: 12 },
-            { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out' },
-            '<'
-          );
-      });
+    // Le CTA (même libellé pour toutes les œuvres) reste affiché ; si le nouveau titre n'a pas le
+    // même nombre de lignes, le bloc se recentre et le CTA glisse vers sa nouvelle place
+    const ecart = bas - this.ctaEl.getBoundingClientRect().top;
+    this.timeline = gsap
+      .timeline()
+      .fromTo(this.split.chars, { ...ENTREE_LETTRES }, { ...APPARITION_LETTRES }, reglagesTitres.delaiEntree);
+    if (Math.abs(ecart) > 0.5) {
+      const y = gsap.getProperty(this.ctaEl, 'y');
+      this.timeline
+        .fromTo(this.ctaEl, { y: y + ecart }, { y: 0, duration: 0.6, ease: 'power3.inOut' }, 0)
+        .to(this.ctaEl, { opacity: 1, duration: 0.4, ease: 'power2.out' }, 0);
+    } else this.timeline.to(this.ctaEl, { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out' }, 0);
   }
 
-  /** Écrit le titre et le CTA de la carte, le titre découpé en lettres (cachées si masque). */
+  /**
+   * L'ancien titre quitte le h2 pour un calque posé exactement par-dessus (positionné dans
+   * .accueil__carte, qui ne bouge pas quand le bloc se recentre) ; ses lettres partent de là où elles
+   * en sont. Un calque plus ancien encore à l'écran (scroll rapide) s'efface vite : jamais plus de
+   * deux titres à la fois.
+   */
+  faireSortir() {
+    const split = this.split;
+    if (!split) return;
+    // Copie : revert() vide split.chars
+    const lettres = [...split.chars];
+    this.split = null;
+    gsap.killTweensOf(lettres);
+    if (!lettres.length) return split.revert();
+    const parent = this.titleEl.offsetParent ?? document.body;
+    const cadre = this.titleEl.getBoundingClientRect();
+    const origine = parent.getBoundingClientRect();
+    const calque = document.createElement('div');
+    calque.className = `${this.titleEl.className} accueil__titre--sortie`;
+    calque.setAttribute('aria-hidden', 'true');
+    // Un pixel de marge de chaque côté : les lignes se coupent comme dans le h2
+    Object.assign(calque.style, {
+      left: `${cadre.left - origine.left - 1}px`,
+      top: `${cadre.top - origine.top}px`,
+      width: `${cadre.width + 2}px`,
+    });
+    calque.append(...this.titleEl.childNodes);
+    parent.append(calque);
+    // Défait le découpage (le h2 reprend son texte) une fois les lettres emportées : sinon le
+    // prochain SplitText du h2 le défait lui-même et réécrit l'ancien titre
+    split.revert();
+
+    const ancien = this.sortieEnCours;
+    if (ancien) gsap.to(ancien, { opacity: 0, duration: 0.15, ease: 'power1.out', onComplete: () => this.retirer(ancien) });
+    this.sortieEnCours = calque;
+    this.sorties.add(calque);
+    gsap.to(lettres, { ...SORTIE_LETTRES, onComplete: () => this.retirer(calque) });
+  }
+
+  retirer(calque) {
+    gsap.killTweensOf(calque.querySelectorAll('.char'));
+    gsap.killTweensOf(calque);
+    calque.remove();
+    this.sorties.delete(calque);
+    if (this.sortieEnCours === calque) this.sortieEnCours = null;
+  }
+
+  /** Écrit le titre et le CTA de la carte, le titre découpé en lettres (cachées). */
   poser(card) {
-    this.cartePrevue = null;
     // Must run before textContent is overwritten below: revert()
     // restores the h2's plain-text DOM so SplitText isn't left
     // diffing against nodes that textContent already wiped out.
+    // (Déjà fait par faireSortir() au changement de carte.)
     this.split?.revert();
 
     this.titleEl.textContent = card.title;
@@ -121,11 +171,12 @@ export class Overlay {
       charsClass: 'char',
       wordsClass: 'word',
     });
-    gsap.set(this.titleEl, { opacity: 1 });
-    if (this.masque) {
-      gsap.set(this.split.chars, { ...ENTREE_LETTRES });
-      gsap.set(this.ctaEl, { opacity: 0, y: 12 });
-    }
+    // .char-mask (style.css) pads its clip box beyond the character's own
+    // tight line-height so accents don't clip. Les lettres se fondent en
+    // montant (30/10, comme dans les salles) : encore transparentes en
+    // entrant dans leur masque, 110 suffit.
+    gsap.set(this.split.chars, { ...ENTREE_LETTRES });
+    if (this.masque) gsap.set(this.ctaEl, { opacity: 0, y: 12 });
   }
 
   /**
@@ -137,12 +188,8 @@ export class Overlay {
     if (this.masque) return;
     this.masque = true;
     this.timeline?.kill();
-    // Changement de carte interrompu avant d'avoir écrit le titre : on l'écrit, caché
-    if (this.cartePrevue) return this.poser(this.cartePrevue);
     this.timeline = gsap.timeline();
-    if (this.split) {
-      this.timeline.to(this.split.chars, { yPercent: -110, opacity: 0, duration: 0.45, ease: 'power2.inOut', stagger: 0.012 }, 0);
-    }
+    if (this.split) this.timeline.to(this.split.chars, { ...SORTIE_LETTRES }, 0);
     this.timeline.to(this.ctaEl, { opacity: 0, y: -10, duration: 0.25, ease: 'power1.in' }, 0);
   }
 
@@ -151,11 +198,9 @@ export class Overlay {
     if (!this.masque) return;
     this.masque = false;
     this.timeline?.kill();
-    if (this.cartePrevue) this.poser(this.cartePrevue);
     if (!this.split) return;
     this.timeline = gsap
       .timeline()
-      .set(this.titleEl, { opacity: 1 })
       .fromTo(this.split.chars, { ...ENTREE_LETTRES }, { ...APPARITION_LETTRES })
       .fromTo(this.ctaEl, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out' }, '<');
   }
