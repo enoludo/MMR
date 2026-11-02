@@ -3,7 +3,7 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { Experience } from '../scene/Experience'
 import { InterfaceSalle } from '../ui/InterfaceSalle'
 import { VueLibre } from '../ui/VueLibre'
-import { lienOeuvre, oeuvres } from '../oeuvres'
+import { lienOeuvre, oeuvres, salleOuverte } from '../oeuvres'
 import { nouvelleCle, store, useEtat } from '../store'
 
 /**
@@ -14,7 +14,8 @@ import { nouvelleCle, store, useEtat } from '../store'
  */
 export function PageOeuvre({ id }: { id: string }) {
   const naviguer = useNavigate()
-  const oeuvre = oeuvres.find((o) => o.id === id)
+  // Salle fermée à la visite : comme une adresse inconnue, retour à l'accueil
+  const oeuvre = oeuvres.find((o) => o.id === id && salleOuverte(o.id))
   const salle = useEtat((e) => e.salle)
   // Entrée depuis la spirale : la salle se prépare, invisible, pendant le zoom de la carte ;
   // retour vers la spirale : elle reste montée, invisible, le temps de la réduction (main.tsx)

@@ -182,6 +182,14 @@ for (const o of oeuvres) {
 export const lienOeuvre = (o: Oeuvre) => `/oeuvre/${o.id}`
 
 /**
+ * Salles ouvertes à la visite (demande de Ludovic, 02/11). Les autres œuvres restent dans la
+ * collection (spirale, grille, flèches des salles), avec leurs boutons d'accès désactivés ; leur
+ * adresse ramène à l'accueil (main.tsx, PageOeuvre).
+ */
+const SALLES_OUVERTES = new Set(['le-seuil-des-proportions', 'la-maladie-de-huntington'])
+export const salleOuverte = (id: string) => SALLES_OUVERTES.has(id)
+
+/**
  * Musique de la spirale et des salles qui n'ont pas la leur : « Ambient Abstract (Extended) »,
  * Siarhei_Korbut (Pixabay, licence Pixabay : sans mention obligatoire)
  */
@@ -205,6 +213,8 @@ export const cartesSpirale = [...oeuvres.slice(1), oeuvres[0]].map((o) => ({
   ],
   cta: 'Découvrir',
   link: lienOeuvre(o),
+  /** Salle ouverte à la visite : sinon « Découvrir » et le clic dans la grille sont désactivés */
+  ouverte: salleOuverte(o.id),
   /** Une capture de salle est montrée agrandie (×2 par défaut) dans sa carte (effet de masque des transitions) */
   zoom: o.vueEntree ? reglagesTransition(o.salle).zoomCarte : 1,
 }))

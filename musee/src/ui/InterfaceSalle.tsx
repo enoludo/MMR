@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useProgress } from '@react-three/drei'
 import { nouvelleCle, store, useEtat, type Sens } from '../store'
-import { lienOeuvre, oeuvres, type Oeuvre, type Onglet } from '../oeuvres'
+import { lienOeuvre, oeuvres, salleOuverte, type Oeuvre, type Onglet } from '../oeuvres'
 import { EnTete } from './EnTete'
 import { IconeCroix, IconeFleche, IconePartage } from './icones'
 import { Popup, PopupChiffres, PopupEntete, PopupLien, PopupTexte } from './Popup'
@@ -164,8 +164,15 @@ export function InterfaceSalle({ oeuvre }: { oeuvre: Oeuvre }) {
  * Lance le passage par le couloir.
  */
 function Fleche({ oeuvre, sens, desactivee }: { oeuvre: Oeuvre; sens: Sens; desactivee: boolean }) {
+  // Salle fermée à la visite (oeuvres.ts) : la flèche reste, désactivée et estompée
+  const fermee = !salleOuverte(oeuvre.id)
   return (
-    <button type="button" className={`fleche fleche--${sens}`} disabled={desactivee} onClick={() => partirVers(oeuvre, sens)}>
+    <button
+      type="button"
+      className={`fleche fleche--${sens}${fermee ? ' fleche--fermee' : ''}`}
+      disabled={desactivee || fermee}
+      onClick={() => partirVers(oeuvre, sens)}
+    >
       <img className="fleche__image" src={oeuvre.vignetteVue ?? oeuvre.vignette ?? oeuvre.image} alt="" />
       <span className="fleche__libelle">
         <span className="fleche__texte">{sens === 'suivante' ? 'Œuvre suivante' : 'Œuvre précédente'}</span>

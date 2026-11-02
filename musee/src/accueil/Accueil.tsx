@@ -9,7 +9,7 @@ import { useControls } from 'leva'
 import { CaretDownIcon, MagnifyingGlassIcon } from '@phosphor-icons/react'
 import { BackgroundTint } from './gallery/BackgroundTint.js'
 import { getCenteredSlot } from './gallery/centeredSlot.js'
-import { cartesSpirale } from '../oeuvres'
+import { cartesSpirale, salleOuverte } from '../oeuvres'
 import { EnTete } from '../ui/EnTete'
 import { IconeFleche } from '../ui/icones'
 import { store, useEtat } from '../store'
@@ -156,7 +156,7 @@ export function Accueil() {
     /** Vers une salle depuis la grille : la grille se range en spirale (vue Grille gardée dans le store) */
     let allerSpirale = false
     const ouvrirDepuisGrille = (id: string) => {
-      if (!galerie.carteGrille(id) || galerie.grille.progres < 1 || store.get().transition) return
+      if (!galerie.carteGrille(id) || galerie.grille.progres < 1 || store.get().transition || !salleOuverte(id)) return
       cliquer()
       ouverteGrille = id
       grilleQuittee = { oeuvre: id, defilement }
@@ -234,7 +234,7 @@ export function Accueil() {
       const ancre = galerie.pickDragAnchor(e.clientX, e.clientY)
       const i = ancre && galerie.grille.cartes?.get(ancre.slot)
       const id = i !== undefined && i !== null ? cartesSpirale[i].id : null
-      toile.current!.style.cursor = id ? 'pointer' : ''
+      toile.current!.style.cursor = id && salleOuverte(id) ? 'pointer' : ''
       if (id !== (survol?.id ?? null)) survol = id ? { id, depuis: performance.now() } : null
     }
     const surClic = (e: MouseEvent) => {
@@ -379,7 +379,7 @@ export function Accueil() {
     }
     animer()
     decouvrir.current = () => {
-      if (!centre || centrage || store.get().transition) return
+      if (!centre || centrage || store.get().transition || !centre.carte.ouverte) return
       const cible = galerie.offsetForCard(centre.carte.id, y)
       const ecart = Math.abs(cible - y) / (CONFIG.pitch / CONFIG.slotsPerTurn)
       // Déjà centrée (à un pixel près) : on entre tout de suite

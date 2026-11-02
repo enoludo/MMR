@@ -145,6 +145,11 @@ button { font: inherit; color: inherit; }
   opacity: 0; /* affiché par Overlay.js, une fois son texte posé */
 }
 .accueil__cta:hover { background: #ececec; }
+/* Salle fermée à la visite (oeuvres.ts, 02/11) : « Découvrir » reste, désactivé (verre, texte estompé) */
+.accueil__cta--fermee, .accueil__cta--fermee:hover {
+  background: var(--verre); color: rgba(255, 255, 255, 0.5); cursor: default;
+  -webkit-backdrop-filter: var(--flou); backdrop-filter: var(--flou);
+}
 
 /* Vue Grille (gallery/Grille.js, maquette Figma 58:207) : les cartes 3D se rangent en grille, leurs
    titres et étiquettes (HTML) se posent dessous ; flèches et bouton « Découvrir » de la spirale retirés */
@@ -157,6 +162,7 @@ button { font: inherit; color: inherit; }
   position: absolute; left: 0; top: 0; display: flex; flex-direction: column; gap: 16px;
   color: #fff; text-decoration: none; pointer-events: auto; will-change: transform, opacity;
 }
+.grille__legende--fermee { cursor: default; }
 .grille__titre {
   margin: 0; font-family: var(--titre); font-weight: 400; font-size: 24px; line-height: 24px;
   text-transform: uppercase;
@@ -434,15 +440,17 @@ button { font: inherit; color: inherit; }
 .fleche--precedente .fleche__libelle { transform: translateX(calc(128px - var(--haut) / 2)); }
 
 @media (hover: hover) {
-  .fleche:is(:hover, :focus-visible) { width: 256px; height: 144px; }
-  .fleche:is(:hover, :focus-visible) .fleche__image { opacity: 1; transform: none; }
-  .fleche:is(:hover, :focus-visible)::after, .fleche:is(:hover, :focus-visible)::before { opacity: 1; }
-  .fleche:is(:hover, :focus-visible) .fleche__libelle { transform: none; }
-  .fleche:is(:hover, :focus-visible) .fleche__texte { max-width: 160px; opacity: 1; transition-delay: 0s, 0s, 0.12s; }
-  .fleche--suivante:is(:hover, :focus-visible) .fleche__texte { margin-right: 12px; }
-  .fleche--precedente:is(:hover, :focus-visible) .fleche__texte { margin-left: 12px; }
+  .fleche:not(.fleche--fermee):is(:hover, :focus-visible) { width: 256px; height: 144px; }
+  .fleche:not(.fleche--fermee):is(:hover, :focus-visible) .fleche__image { opacity: 1; transform: none; }
+  .fleche:not(.fleche--fermee):is(:hover, :focus-visible)::after, .fleche:not(.fleche--fermee):is(:hover, :focus-visible)::before { opacity: 1; }
+  .fleche:not(.fleche--fermee):is(:hover, :focus-visible) .fleche__libelle { transform: none; }
+  .fleche:not(.fleche--fermee):is(:hover, :focus-visible) .fleche__texte { max-width: 160px; opacity: 1; transition-delay: 0s, 0s, 0.12s; }
+  .fleche--suivante:not(.fleche--fermee):is(:hover, :focus-visible) .fleche__texte { margin-right: 12px; }
+  .fleche--precedente:not(.fleche--fermee):is(:hover, :focus-visible) .fleche__texte { margin-left: 12px; }
 }
 .fleche:disabled { cursor: default; }
+/* Salle fermée à la visite (oeuvres.ts, 02/11) : la flèche reste, estompée, et ne s'ouvre plus */
+.fleche--fermee { opacity: 0.35; }
 /* Pendant le passage par le couloir, le premier écran part élément par élément (useApparition,
    cascade) ; le panneau lui-même (fond sur mobile) s'efface ensuite */
 .salle-ui--passage .salle-accueil {

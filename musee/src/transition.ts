@@ -1,4 +1,4 @@
-import { oeuvres } from './oeuvres'
+import { oeuvres, salleOuverte } from './oeuvres'
 import { store, type Cadre } from './store'
 import { entree } from './entree'
 import { prechargerImages } from './ui/ToileTransition'
@@ -17,7 +17,7 @@ export const carteVivante: { cadre: Cadre | null; zoom: number } = { cadre: null
 
 /** Depuis la spirale : la carte `carte` (à l'écran) grandit jusqu'à remplir l'écran, puis la salle apparaît. */
 export function entrer(oeuvre: string, carte: Cadre, retenue = false) {
-  if (store.get().transition) return
+  if (store.get().transition || !salleOuverte(oeuvre)) return
   carteVivante.cadre = null
   prechargerOeuvre(oeuvre)
   store.set({ transition: { sens: 'entree', oeuvre, phase: 'preparation', carte, image: null, retenue } })
@@ -52,7 +52,7 @@ const prechargees = new Set<string>()
  */
 export function prechargerOeuvre(id: string) {
   const oeuvre = oeuvres.find((o) => o.id === id)
-  if (!oeuvre || prechargees.has(id)) return
+  if (!oeuvre || !salleOuverte(id) || prechargees.has(id)) return
   prechargees.add(id)
   prechargerImages(oeuvre.image, oeuvre.vueEntree)
   import('./pages/PageOeuvre')

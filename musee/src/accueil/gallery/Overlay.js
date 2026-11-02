@@ -157,6 +157,10 @@ export class Overlay {
     this.titleEl.textContent = card.title;
     this.ctaLabelEl.textContent = card.cta;
     this.ctaEl.href = card.link;
+    // Salle fermée à la visite (oeuvres.ts) : le bouton reste, désactivé
+    this.ctaEl.classList.toggle('accueil__cta--fermee', card.ouverte === false);
+    if (card.ouverte === false) this.ctaEl.setAttribute('aria-disabled', 'true');
+    else this.ctaEl.removeAttribute('aria-disabled');
 
     this.split = new SplitText(this.titleEl, {
       // 'words' too, not just 'chars': each character is its own

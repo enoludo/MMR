@@ -87,8 +87,9 @@ export class LegendesGrille {
     this.racine = racine;
     this.blocs = cartes.map((carte) => {
       const bloc = document.createElement('a');
-      bloc.className = 'grille__legende';
-      bloc.href = carte.link;
+      // Salle fermée à la visite (oeuvres.ts) : la légende reste, sans lien
+      bloc.className = `grille__legende${carte.ouverte === false ? ' grille__legende--fermee' : ''}`;
+      if (carte.ouverte !== false) bloc.href = carte.link;
       bloc.tabIndex = -1;
       bloc.addEventListener('click', (e) => {
         e.preventDefault();

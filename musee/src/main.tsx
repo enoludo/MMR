@@ -10,6 +10,7 @@ import { Transition } from './ui/Transition'
 import { Musique } from './ui/Musique'
 import { Intro } from './ui/Intro'
 import { prevoir } from './chargement'
+import { salleOuverte } from './oeuvres'
 import { store, useEtat } from './store'
 import './style.css'
 
@@ -20,6 +21,9 @@ const SORTIE_TEXTE_SALLE = 750
 /** Délai avant de démonter la salle quittée, une fois revenu sur la spirale (ms) */
 const DEMONTAGE_SALLE = 1500
 
+// Arrivée directe dans une salle fermée à la visite (oeuvres.ts) : on arrive sur l'accueil
+const salleDemandee = window.location.pathname.match(/^\/oeuvre\/([^/]+)/)?.[1]
+if (salleDemandee && !salleOuverte(decodeURIComponent(salleDemandee))) window.history.replaceState(null, '', '/')
 // Arrivée directe dans une salle : l'écran d'accueil attend aussi la salle (chargée à la demande)
 if (window.location.pathname.startsWith('/oeuvre/')) prevoir('salle', 6)
 

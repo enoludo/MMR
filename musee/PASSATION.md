@@ -7,7 +7,7 @@ titres de la spirale », toujours lisible dans l'historique Git.
 
 ---
 
-## 1. Prochaine tâche : la statue de « La maladie de Huntington »
+## 1. La statue de « La maladie de Huntington » (refonte abandonnée par Ludovic le 02/11, voir `JOURNAL.md`)
 
 **Demande de Ludovic (01/11) :** retravailler la statue pour être **plus fidèle à l'image de référence** :
 les **proportions du corps** et les **détails « plaques »**, travaillés plus finement.
@@ -52,8 +52,9 @@ dansée qui se défait, plaques anguleuses, éclats qui s'envolent du haut du co
 **Git :** tout est enregistré et envoyé sur GitHub (`enoludo/MMR`, branche
 `claude/spirale-interactive-gallery-b4mzwd`).
 
-**En ligne :** le labo `mmr-lab` (https://mmr-lab.labs.cubedesigners.com/) est toujours à la version du
-30/10 : **rien du 31/10 et du 01/11 n'est en ligne**.
+**En ligne :** le labo `mmr-lab` (https://mmr-lab.labs.cubedesigners.com/) est à jour depuis le 02/11
+(version du labo `29c0672`) : tout ce qui précède, plus les salles fermées à la visite (seuls le Seuil et
+Huntington s'ouvrent, `SALLES_OUVERTES` dans `oeuvres.ts`).
 
 **Fait le 01/11** (tout est « à voir » dans le journal, sauf ce qui a été abandonné) :
 1. **Titres de la spirale qui se croisent** au changement de carte.

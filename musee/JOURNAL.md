@@ -11,6 +11,21 @@ Une entrée par session, la plus récente en haut. Le détail technique est dans
 
 ---
 
+## 02/11/2026 — Claude Code (salles fermées à la visite)
+
+- **[à voir] Seules « Le seuil des proportions » et « La maladie de Huntington » se visitent** (demande de Ludovic). Les autres œuvres restent dans la spirale, la grille et les flèches, avec leurs boutons désactivés : « Découvrir » en verre, texte estompé ; légende de la grille sans lien ; flèche des salles estompée, qui ne s'ouvre plus au survol. Leur adresse (`/oeuvre/…`) ramène à l'accueil, et leurs salles ne sont plus préchargées. Liste dans `SALLES_OUVERTES` (`oeuvres.ts`). Vérifié dans le navigateur, compilation et construction OK.
+- Enregistré dans Git et envoyé sur GitHub ; **mis en ligne sur le labo `mmr-lab`** (version du labo `29c0672`), à la demande de Ludovic. Cette mise en ligne comprend aussi tout ce qui a été fait les 31/10 et 01/11 (rotonde, vue libre, effets d'image, vue Grille, titres de la spirale).
+
+
+## 02/11/2026 — Claude Code (refonte de la statue de Huntington, abandonnée)
+
+- **[abandonné]** **Statue de « La maladie de Huntington » plus fidèle à la vignette** (demande de Ludovic du 01/11). Abandonné par Ludovic (« on arrête le massacre ») ; la statue du 29/10 reste en place, `blender/huntington.py` et `sculpture-huntington/` remis tels quels, rien de changé dans le site. Essais successifs, tous refusés :
+  - corps reconstruit (volumes fondus, découpés en quadrilatères) et calé par superposition sur la vignette, en deux finitions (A : pavage de plaques ; B : bronze facetté et plaques éparses) : pose mal lue (le danseur est tourné vers la droite, jambe droite levée côté caméra, jambe gauche sur la pointe, paume droite vers le ciel, cou court) ;
+  - pose corrigée, corps fait de feuilles de papier qui se recouvrent, bras gauche qui s'envole en feuilles (suggestion de Ludovic) : buste démesuré, proportions pas humaines ;
+  - modèle généré par Spline à partir d'une image décrite (proportions humaines) : pas la bonne pose ;
+  - modèle généré par Spline à partir de la statue découpée sur la vignette : jambes ratées, forme molle (la vignette, ≈ 300 px, est trop petite et floue).
+  Les deux modèles Spline (≈ 460 000 et 500 000 triangles) restent dans le fichier Spline ouvert ce jour-là ; rien n'a été exporté. Planches de comparaison et page « Statue de Huntington, variantes » (artefact privé) gardées pour mémoire.
+
 ## 01/11/2026 — Claude Code (vue Grille de la page d'accueil)
 
 - **[à voir]** **Vue Grille** (demande de Ludovic, maquette Figma « Grille » 58:207) : au clic sur « Grille », la spirale se déroule. Pour chaque œuvre, sa carte la plus proche de l'avant quitte la spirale et glisse jusqu'à sa case, l'une après l'autre (elle se redresse, son flou disparaît) ; les copies en trop s'effacent. « Spirale » refait le mouvement à l'envers. 3 colonnes, 48 px entre les vignettes, marges de 72 px, première rangée à 96 px ; 2 colonnes sous 1024 px, 1 sous 640 px. Sous chaque vignette, le titre et des étiquettes (partenaire en rouge, maladie : il n'y a pas encore de « thème » dans les données). La grille défile à la molette ou au doigt. Un clic sur une vignette (ou son titre) ouvre la salle par la même transition que « Découvrir » ; au retour, on retrouve la grille, défilée jusqu'à l'œuvre quittée (vue gardée dans `store.vueAccueil`). Réglages touche M « Grille » : colonnes, écart, marges, haut, durée du déroulé, décalage entre les cartes. Code : `src/accueil/gallery/Grille.js` (cases, légendes), `SpiralGallery.js` (`update`, `choisirCartesGrille`, `versGrille`), `Accueil.tsx`. Vérifié en 1680 × 1050 : vignettes à 0,2 px près de leurs cases ; défilement en 1280 × 720 ; une colonne sur mobile ; parcours complet sans erreur. Fond noir en vue Grille (demande de Ludovic), en fondu de 1,2 s comme d'une carte à l'autre, déjà noir au retour d'une salle ; la teinte de la carte centrée revient avec la spirale. Pas encore faits : la barre de recherche et les filtres du bas de la maquette, un effet au survol des vignettes, le dégradé sombre du bas.
