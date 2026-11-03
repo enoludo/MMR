@@ -17,7 +17,7 @@ Une entrée par session, la plus récente en haut. Le détail technique est dans
 - **Lumière de la rotonde recalculée avec la nouvelle statue** (son ombre sur le socle et le sol ; `rotonde.py` lit `huntington-jeff.blend`), 2048 px, 18 min.
 - **À voir avec Ludovic :** de face, à contre-jour, la statue paraît presque noire (bronze sombre, un peu métallique, sans reflets d'environnement dans la salle) : régler sa matière avec lui.
 - **[vu] Captures refaites par Ludovic** (salle, cartouches, vignette), avec la nouvelle statue ; il a aussi rapproché la vue Manifeste (de 10,5 à 6,6 m) et réglé la profondeur de champ de la vue Maladie (`points-de-vue.json`).
-- Rien d'enregistré dans Git, rien mis en ligne.
+- Enregistré dans Git et envoyé sur GitHub (`a8fd61b`) ; **mis en ligne sur le labo `mmr-lab`** (version du labo `30d4808`), à la demande de Ludovic.
 
 
 ## 02/11/2026 — Claude Code (salles fermées à la visite)
