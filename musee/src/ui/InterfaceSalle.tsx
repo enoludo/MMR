@@ -214,7 +214,7 @@ function Soutien({ oeuvre }: { oeuvre: Oeuvre }) {
   )
 }
 
-/** Popup Maladie (maquette 471:511) */
+/** Popup Maladie (maquette 502:770) */
 function Maladie({ oeuvre }: { oeuvre: Oeuvre }) {
   const t = oeuvre.maladieTexte
   return (
@@ -222,7 +222,7 @@ function Maladie({ oeuvre }: { oeuvre: Oeuvre }) {
       <PopupEntete surtitre="La maladie" titre={t.titre} />
       <PopupTexte paragraphes={t.paragraphes} />
       {!!t.chiffres?.length && <PopupChiffres chiffres={t.chiffres} />}
-      {t.lien && <PopupLien href={t.lien}>En savoir plus</PopupLien>}
+      {t.lien !== undefined && <PopupLien href={t.lien ?? undefined}>En savoir plus</PopupLien>}
     </>
   )
 }

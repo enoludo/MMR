@@ -18,8 +18,11 @@ export interface TexteMaladie {
   paragraphes: string[]
   /** Chiffres clés (« Personnes concernées », « Gène en cause »…) */
   chiffres?: { libelle: string; valeur: string }[]
-  /** Lien du bouton « En savoir plus » (bouton masqué sans lien) */
-  lien?: string
+  /**
+   * Bouton « En savoir plus » : son lien, ou null pour un bouton sans lien (le site est une
+   * démo, demande de Ludovic du 03/11) ; pas de bouton si absent
+   */
+  lien?: string | null
 }
 
 /**
@@ -102,7 +105,7 @@ export const oeuvres: Oeuvre[] = [
         { libelle: "Mal diagnostiqué d'abord", valeur: '9/10' },
         { libelle: 'Traitement curatif', valeur: '0' },
       ],
-      lien: 'https://www.orpha.net/fr/disease/detail/963',
+      lien: null, // démo : bouton sans lien (fiche Orphanet de l'acromégalie : …/disease/detail/963)
     },
     manifesteTitre: 'Métamorphose', // maquettes Figma 477:973 et 477:2158
     // Maquette 477:2158 : le second paragraphe seulement, d'un seul tenant
@@ -123,7 +126,21 @@ export const oeuvres: Oeuvre[] = [
     musique: versionne('/assets/musiques/la-maladie-de-huntington.m4a'),
     vueEntree: '/assets/captures/la-maladie-de-huntington',
     cartouches: capturesCartouches('la-maladie-de-huntington'),
-    maladieTexte: maladieAVenir('Maladie de Huntington'),
+    // Proposé par Claude le 03/11, accepté par Ludovic avec un bouton sans lien (le site est une démo) ;
+    // prévalence et « 0 » traitement curatif à faire vérifier
+    maladieTexte: {
+      titre: 'Huntington', // sous « La maladie » ; « Maladie de Huntington » passait sur deux lignes
+      paragraphes: [
+        'La maladie de Huntington est une maladie neurologique héréditaire rare qui détruit peu à peu certains neurones du cerveau : mouvements involontaires, troubles cognitifs et psychiatriques apparaissent souvent entre 30 et 50 ans.',
+      ],
+      chiffres: [
+        { libelle: 'Personnes concernées', valeur: '1/10 000' },
+        { libelle: 'Gène en cause', valeur: 'HTT' },
+        { libelle: 'Risque de transmission', valeur: '1/2' },
+        { libelle: 'Traitement curatif', valeur: '0' },
+      ],
+      lien: null, // démo : bouton sans lien
+    },
     manifeste: A_VENIR,
     // Rotonde (31/10, essais) ; pour revenir à la salle carrée bleutée : salleProvisoireBleue (provisoire/config.ts)
     salle: salleRotonde,

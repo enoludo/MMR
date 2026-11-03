@@ -11,7 +11,10 @@ import { volLibre } from './VolLibre'
  * écran, sans fond, se pose sur la scène : l'œuvre reste centrée (maquette Figma).
  * On décale la fenêtre de projection (setViewOffset) : la caméra ne bouge pas,
  * la perspective reste la même, seul le cadrage glisse.
+ * À côté d'un popup, l'œuvre ne fait que `PART_DECALAGE` du chemin vers le milieu de
+ * l'espace libre : elle reste un peu plus près du centre de l'écran (demande de Ludovic du 03/11).
  */
+const PART_DECALAGE = 0.7
 export function Decentrage() {
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera
   const taille = useThree((s) => s.size)
@@ -30,7 +33,7 @@ export function Decentrage() {
       const lateral = r.width < window.innerWidth * 0.6
       if (!lateral) cible.current = { x: 0, y: Math.max(0, window.innerHeight - r.top) / 2 }
       else if (onglet === 'info') cible.current = { x: 0, y: 0 }
-      else cible.current = { x: -Math.max(0, window.innerWidth - r.left) / 2, y: 0 }
+      else cible.current = { x: (-Math.max(0, window.innerWidth - r.left) / 2) * PART_DECALAGE, y: 0 }
     }
     mesurer()
     // Le popup apparaît en 0,5 s : on remesure à la fin
@@ -46,10 +49,10 @@ export function Decentrage() {
     const a = actuel.current
     // Vue libre : décalée comme avec un popup ouvert sur ordinateur (bord et largeur de .popup, style.css), si demandé
     const vw = window.innerWidth / 100
-    const popup = Math.min(96, 5.714 * vw) + Math.min(653, Math.max(400, 38.87 * vw))
+    const popup = 96 + Math.min(576, Math.max(400, 34.286 * vw))
     // Captures (ui/VueLibre.tsx) : jamais décalées, quelle que soit la taille de la fenêtre
     const { libre, captures } = store.get()
-    const c = libre ? { x: volLibre.popup ? -popup / 2 : 0, y: 0 } : captures ? { x: 0, y: 0 } : cible.current
+    const c = libre ? { x: volLibre.popup ? (-popup / 2) * PART_DECALAGE : 0, y: 0 } : captures ? { x: 0, y: 0 } : cible.current
     const k = 1 - Math.exp(-4 * Math.min(delta, 0.1))
     a.x += (c.x - a.x) * k
     a.y += (c.y - a.y) * k

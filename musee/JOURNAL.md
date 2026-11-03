@@ -11,6 +11,19 @@ Une entrée par session, la plus récente en haut. Le détail technique est dans
 
 ---
 
+## 03/11/2026 — Claude Code (design des popups, première passe)
+
+- Comparaison avec la maquette Maladie `471:511` en 1680 × 1050 : cadre et mise en page identiques ; écarts : valeurs des chiffres (24 px sur la maquette, 36 sur le site) et cadrage de l'œuvre.
+- **[à voir] Chiffres en 24 px**, comme la maquette (accord de Ludovic).
+- **[à voir] Marges du popup** (demande de Ludovic) : marge intérieure toujours de 96 px (elle descendait jusqu'à 24 px sur les petits écrans), popup à 96 px au moins des bords de l'écran (y compris en haut et en bas) ; au-delà, le contenu défile à l'intérieur de la marge.
+- **[à voir] Barre de défilement du popup** (demande de Ludovic : discrète, élégante, efficace) : filet blanc à 15 % dans l'axe de la croix, de la marge du haut à celle du bas ; curseur de 2 px blanc à 70 %, à la taille de la part visible, qui s'élargit à 4 px au survol et se saisit à la souris (clic à côté : il y saute) ; n'apparaît que si le contenu défile ; fondu de 32 px du texte au bord qui cache encore du contenu (`Popup.tsx`, section « Popup » de `style.css`). Vérifié en 1440 × 900 (le popup Maladie y défile).
+- **[à voir] Œuvre décalée vers le centre** quand un popup est ouvert (demande de Ludovic : « légèrement ») : elle ne fait que 70 % du chemin vers le milieu de l'espace libre (`PART_DECALAGE`, `Decentrage.tsx`, repris dans la vue libre).
+- Compilation et construction vérifiées. Non enregistré dans Git, pas en ligne.
+- **[à voir] Deuxième passe d'après la nouvelle maquette Maladie `502:770`** (demande de Ludovic ; remplace `471:511`) : popup de 576 px (653 avant), marge intérieure de 72 px (remplace les 96 px de la première passe), texte sur 432 px ; croix à 12 px du coin ; 12 px entre le surtitre et le grand titre ; libellés des chiffres en blanc à 70 % ; chiffres juste sous le texte (24 px). Gardés : coins de 24 px (30 sur la maquette), popup à 96 px au moins des bords de l'écran, barre de défilement (déplacée dans l'axe de la nouvelle croix). Cotes relevées en 1680 × 1050 : à un pixel près de la maquette. Grand titre en 48 px en 1680 de large, plus petit en dessous (« Métamorphose » était coupé en 1440 × 900). Le Manifeste suit les mêmes styles (pas de nouvelle maquette Manifeste).
+- **[à voir] Maquette `502:770` mise à jour par Ludovic : chiffres resserrés** : 6 px entre libellé et valeur (12 avant), 12 px sous chaque valeur jusqu'à son filet et 12 px entre les deux lignes (24 au-dessus et au-dessous avant). Popup de 644 px de haut en 1680 × 1050 (643 sur la maquette).
+- **[à voir] Popup Maladie de « La maladie de Huntington »** : contenu proposé par Claude sur le modèle de l'acromégalie, accepté par Ludovic **sans lien** (« le projet n'est qu'une démo »). Titre « Huntington » sous « La maladie » ; texte de 4 lignes ; chiffres : personnes concernées 1/10 000, gène HTT, risque de transmission 1/2, traitement curatif 0 (prévalence et « 0 » à faire vérifier).
+- **[à voir] Bouton « En savoir plus » sans lien sur les deux œuvres** (demande de Ludovic) : il reste affiché mais ne mène nulle part (`lien: null` dans `oeuvres.ts`, `PopupLien` sans `href` = bouton) ; lien Orphanet du Seuil retiré (son adresse reste en commentaire).
+
 ## 03/11/2026 — Claude Code (réglages de la touche M par salle)
 
 - **[à voir] Réglages de lumière et d'effets propres à chaque salle** (demande de Ludovic) : dossiers « Salle », « Lumière sculpture », « Couleurs » (soleil, ambiances, lueur, matières), « Reflet au sol », « Faisceau », « Poussière », « Couloir », en plus de Sculpture, Lueur du socle, Navigation, Transitions et Effets, tous suffixés du titre de la salle (`src/reglages.ts`, `src/salles/couleurs.ts`). L'exposition et la lumière de la statue glissent d'une salle à l'autre pendant un passage.

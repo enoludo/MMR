@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, type PointerEvent as PointeurReact, type ReactNode } from 'react'
 import gsap from 'gsap'
 import { SplitText } from 'gsap/SplitText'
 import { IconeCroix } from './icones'
@@ -9,7 +9,7 @@ gsap.registerPlugin(SplitText)
 const BLOCS = '.popup__surtitre, .popup__texte p, .popup__chiffre, .popup__lien'
 
 /**
- * Popup d'une salle (maquettes Figma 471:511 « Maladie » et 477:2158 « Manifeste »),
+ * Popup d'une salle (maquette Figma 502:770 « Maladie » du 03/11, Manifeste 477:2158),
  * réutilisable dans toutes les salles. Il se compose avec les blocs ci-dessous :
  *
  *   <Popup ouvert={…} onFermer={…} etiquette="La maladie">
@@ -20,7 +20,7 @@ const BLOCS = '.popup__surtitre, .popup__texte p, .popup__chiffre, .popup__lien'
  *   </Popup>
  *
  * Mise en page (voir style.css, section Popup) : à droite, centré verticalement, texte sur
- * 461 px ; blocs espacés de 24 px.
+ * 432 px ; blocs espacés de 24 px.
  * Le popup garde le focus clavier pendant qu'il est ouvert et le rend en se fermant ;
  * la croix, un clic à côté (sur la scène) ou Échap le ferment.
  *
@@ -131,19 +131,93 @@ export function Popup({
     retour.current = null
   }, [ouvert])
 
+  // Défilement quand le contenu dépasse : barre fine (curseur à la taille de la part visible)
+  // et fondu du texte au bord qui cache encore du contenu (style.css, section Popup)
+  const defilement = useRef<HTMLDivElement>(null)
+  const barre = useRef<HTMLDivElement>(null)
+  const curseur = useRef<HTMLDivElement>(null)
+  const mesure = useRef({ piste: 0, hauteur: 0, course: 0 })
+  useLayoutEffect(() => {
+    const zone = defilement.current
+    const racine = cadre.current
+    if (!zone || !racine) return
+    if (ouvert) zone.scrollTop = 0 // chaque ouverture repart du haut
+    const contenu = zone.firstElementChild as HTMLElement
+    const suivre = () => {
+      // Hauteur du contenu sans les décalages de l'apparition (scrollHeight les compte)
+      const total = contenu.offsetHeight
+      const visible = zone.clientHeight
+      const course = Math.max(0, total - visible)
+      const deborde = course > 1
+      racine.classList.toggle('popup--defile', deborde)
+      zone.classList.toggle('popup__defilement--haut', deborde && zone.scrollTop > 1)
+      zone.classList.toggle('popup__defilement--bas', deborde && zone.scrollTop < course - 1)
+      const piste = barre.current?.clientHeight ?? 0
+      const hauteur = deborde ? Math.max(32, (piste * visible) / total) : 0
+      mesure.current = { piste, hauteur, course }
+      if (curseur.current) {
+        curseur.current.style.height = `${hauteur}px`
+        curseur.current.style.transform = `translateY(${deborde ? ((piste - hauteur) * Math.min(1, zone.scrollTop / course)) : 0}px)`
+      }
+    }
+    suivre()
+    const observateur = new ResizeObserver(suivre)
+    observateur.observe(zone)
+    observateur.observe(contenu)
+    zone.addEventListener('scroll', suivre, { passive: true })
+    return () => {
+      observateur.disconnect()
+      zone.removeEventListener('scroll', suivre)
+    }
+  }, [ouvert])
+
+  // Barre saisie à la souris ou au doigt : un clic à côté du curseur l'y amène, puis il suit
+  const saisir = (e: PointeurReact<HTMLDivElement>) => {
+    const zone = defilement.current
+    const piste = barre.current
+    const { hauteur, course } = mesure.current
+    if (!zone || !piste || course <= 0) return
+    e.preventDefault()
+    const libre = Math.max(1, mesure.current.piste - hauteur)
+    const haut = piste.getBoundingClientRect().top
+    const position = ((piste.clientHeight - hauteur) * zone.scrollTop) / course
+    const dans = e.clientY - haut - position
+    // Prise sur le curseur : il garde son décalage ; à côté : il se centre sous le pointeur
+    const prise = dans >= 0 && dans <= hauteur ? dans : hauteur / 2
+    const aller = (y: number) => {
+      zone.scrollTop = ((y - haut - prise) / libre) * course
+    }
+    aller(e.clientY)
+    piste.setPointerCapture(e.pointerId)
+    piste.classList.add('popup__barre--prise')
+    const bouger = (ev: PointerEvent) => aller(ev.clientY)
+    const lacher = () => {
+      piste.classList.remove('popup__barre--prise')
+      piste.removeEventListener('pointermove', bouger)
+      piste.removeEventListener('pointerup', lacher)
+      piste.removeEventListener('pointercancel', lacher)
+    }
+    piste.addEventListener('pointermove', bouger)
+    piste.addEventListener('pointerup', lacher)
+    piste.addEventListener('pointercancel', lacher)
+  }
+
   return (
     <aside ref={cadre} className={`popup ${ouvert ? 'popup--ouvert' : ''}`} inert={!ouvert} aria-label={etiquette}>
       <button type="button" ref={fermer} className="bouton-rond popup__fermer" aria-label="Fermer" onClick={onFermer}>
         <IconeCroix />
       </button>
-      <div className="popup__defilement">
+      <div ref={defilement} className="popup__defilement">
         <div className="popup__contenu">{children}</div>
+      </div>
+      <div ref={barre} className="popup__barre" aria-hidden onPointerDown={saisir}>
+        <div ref={curseur} className="popup__curseur" />
       </div>
     </aside>
   )
 }
 
-/** Surtitre (16 px) et, s'il y en a un, grand titre (Marquez 60 px), soulignés d'un filet. */
+/** Surtitre (16 px) et, s'il y en a un, grand titre (Marquez 48 px), soulignés d'un filet. */
 export function PopupEntete({ surtitre, titre }: { surtitre: string; titre?: string }) {
   return (
     <header className="popup__entete">
@@ -181,8 +255,15 @@ export function PopupChiffres({ chiffres }: { chiffres: { libelle: string; valeu
   )
 }
 
-/** Bouton lien (« En savoir plus »), ouvert dans un nouvel onglet. */
-export function PopupLien({ href, children }: { href: string; children: ReactNode }) {
+/** Bouton lien (« En savoir plus »), ouvert dans un nouvel onglet ; sans `href`, un bouton qui ne mène nulle part (démo). */
+export function PopupLien({ href, children }: { href?: string; children: ReactNode }) {
+  if (!href) {
+    return (
+      <button type="button" className="pilule popup__lien">
+        {children}
+      </button>
+    )
+  }
   return (
     <a className="pilule popup__lien" href={href} target="_blank" rel="noreferrer">
       {children}

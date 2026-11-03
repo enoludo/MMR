@@ -312,21 +312,22 @@ button { font: inherit; color: inherit; }
 .pilule--partage:hover { background: var(--verre); }
 
 /*
- * Popup (src/ui/Popup.tsx ; maquettes 471:511 « Maladie » et 477:2158 « Manifeste », dessinées
- * en 1680 × 1050) : 653 px de large à 96 px du bord droit, centré verticalement, coins de 24 px,
- * 96 px de marge intérieure : le texte tient sur 461 px.
- * La marge intérieure est la même sur les quatre côtés (demande de Ludovic du 30/10) : 96 px
- * quand l'écran le permet, jusqu'à 24 px sur les plus petits. Elle diminue avec la largeur (le
- * texte garde ses 461 px tant que possible) et avec la hauteur (le popup tient sans défiler) ;
- * au-delà, le contenu défile.
+ * Popup (src/ui/Popup.tsx ; maquette 502:770 « Maladie » du 03/11, dessinée en 1680 × 1050) :
+ * 576 px de large à 96 px du bord droit, centré verticalement, coins de 24 px (30 sur la
+ * maquette, réduits par Ludovic), 72 px de marge intérieure sur les quatre côtés : le texte
+ * tient sur 432 px.
+ * Le popup reste à 96 px au moins des bords de l'écran (demande de Ludovic du 03/11) ; si le
+ * contenu est plus haut, il défile dans la marge intérieure (barre fine dans la marge de droite,
+ * dans l'axe de la croix, et fondu du texte au bord qui cache encore du contenu).
  */
+@property --fondu-haut { syntax: '<length>'; inherits: false; initial-value: 0px; }
+@property --fondu-bas { syntax: '<length>'; inherits: false; initial-value: 0px; }
 .popup {
-  --bord: min(96px, 5.714vw);
-  --largeur: clamp(400px, 38.87vw, 653px);
-  /* Marge intérieure : 96 px en 1680 × 1050, 48 px en 900 de haut, 24 px au plus petit */
-  --marge-p: clamp(24px, min(calc((var(--largeur) - 461px) / 2), calc(32vh - 240px)), 96px);
+  --bord: 96px;
+  --largeur: clamp(400px, 34.286vw, 576px);
+  --marge-p: 72px;
   position: fixed; z-index: 10; top: 50%; right: var(--bord); width: var(--largeur);
-  max-height: calc(100% - 2 * (var(--marge) + var(--haut) + 12px)); /* entre le header et le pied */
+  max-height: calc(100% - 2 * var(--bord)); padding: var(--marge-p);
   display: flex; flex-direction: column; border-radius: var(--rayon); /* 30 px sur la maquette */
   background: var(--verre-sombre); -webkit-backdrop-filter: var(--flou); backdrop-filter: var(--flou);
   opacity: 0; visibility: hidden; transform: translate(24px, -50%);
@@ -338,45 +339,71 @@ button { font: inherit; color: inherit; }
   transition-duration: 0.45s, 0s, 0.6s; /* visible tout de suite : la croix peut prendre le focus */
   transition-delay: 0.2s, 0s, 0.2s; /* le premier écran commence à partir, le popup suit */
 }
-/* Croix : bouton rond de 48 px à 6 px du coin, transparent (noir sur la maquette ; demande de
-   Ludovic du 30/10) */
+/* Croix : bouton rond de 48 px à 12 px du coin, transparent (demande de Ludovic du 30/10) */
 .popup__fermer {
-  position: absolute; z-index: 1; top: 6px; right: 6px; background: transparent;
+  position: absolute; z-index: 1; top: 12px; right: 12px; background: transparent;
   -webkit-backdrop-filter: none; backdrop-filter: none;
 }
 .popup__fermer:hover { background: var(--verre-leger); }
 .popup__defilement {
-  overflow: hidden auto; overscroll-behavior: contain; padding: var(--marge-p);
-  scrollbar-width: none; /* la barre mangeait la marge de droite (le contenu défile toujours) */
+  flex: 1 1 auto; min-height: 0; overflow: hidden auto; overscroll-behavior: contain;
+  scrollbar-width: none; /* barre du navigateur remplacée par .popup__barre */
+  /* Fondu de 32 px au bord qui cache encore du contenu (classes posées par Popup.tsx) */
+  -webkit-mask-image: linear-gradient(transparent, #000 var(--fondu-haut), #000 calc(100% - var(--fondu-bas)), transparent);
+  mask-image: linear-gradient(transparent, #000 var(--fondu-haut), #000 calc(100% - var(--fondu-bas)), transparent);
+  transition: --fondu-haut 0.3s ease, --fondu-bas 0.3s ease;
 }
 .popup__defilement::-webkit-scrollbar { display: none; }
-/* Blocs espacés de 24 px (48 px avant les chiffres et le bouton) */
+.popup__defilement--haut { --fondu-haut: 32px; }
+.popup__defilement--bas { --fondu-bas: 32px; }
+/* Barre de défilement : un filet vertical dans l'axe de la croix, de la marge du haut à celle
+   du bas ; le curseur, un trait blanc de 2 px, s'élargit au survol et se saisit à la souris
+   (zone de prise de 24 px). Visible seulement quand le contenu défile. */
+.popup__barre {
+  position: absolute; top: var(--marge-p); bottom: var(--marge-p); right: 24px; width: 24px;
+  cursor: pointer; touch-action: none; opacity: 0; visibility: hidden;
+  transition: opacity 0.4s ease, visibility 0s 0.4s;
+}
+.popup--defile .popup__barre { opacity: 1; visibility: visible; transition: opacity 0.6s ease 0.8s, visibility 0s; }
+.popup__barre::before {
+  content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 1px; transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.15); transition: background-color 0.2s ease;
+}
+.popup__curseur {
+  position: absolute; top: 0; left: 50%; width: 2px; margin-left: -1px; border-radius: 2px;
+  background: rgba(255, 255, 255, 0.7);
+  transition: width 0.2s ease, margin-left 0.2s ease, background-color 0.2s ease;
+}
+.popup__barre:hover::before, .popup__barre--prise::before { background: rgba(255, 255, 255, 0.25); }
+.popup__barre:hover .popup__curseur, .popup__barre--prise .popup__curseur { width: 4px; margin-left: -2px; background: #fff; }
+/* Blocs espacés de 24 px (48 px avant le bouton) */
 .popup__contenu { display: flex; flex-direction: column; gap: 24px; }
 
 /* Surtitre et grand titre, soulignés d'un filet ; à l'écart de la croix quand la marge est petite */
 .popup__entete {
-  display: flex; flex-direction: column; gap: 24px; padding-bottom: 24px;
-  padding-right: max(0px, calc(62px - var(--marge-p)));
+  display: flex; flex-direction: column; gap: 12px; padding-bottom: 24px;
+  padding-right: max(0px, calc(68px - var(--marge-p)));
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 }
 .popup__surtitre { margin: 0; font-size: 16px; line-height: 25px; }
 .popup__titre {
   margin: 0; font-family: var(--titre); font-weight: 400; text-transform: uppercase;
-  font-size: 48px; line-height: 48px; /* 60 px sur la maquette, réduit à la demande de Ludovic */
+  /* 48 px en 1680 de large (maquette 502:770), moins en dessous : « Métamorphose » doit tenir sur la ligne */
+  font-size: clamp(32px, 2.857vw, 48px); line-height: 1;
 }
 /* Texte courant : 16 px Light (Maladie) ; 14 px (Manifeste, `petit`) */
 .popup__texte p { margin: 0 0 24px; font-weight: 300; font-size: 16px; line-height: 24px; white-space: pre-line; }
 .popup__texte--petit p { margin-bottom: 21px; font-weight: 400; font-size: 14px; line-height: 21px; }
 .popup__texte p:last-child { margin-bottom: 0; }
 
-/* Chiffres clés : deux par ligne, 48 px entre les colonnes, chacun souligné d'un filet */
-.popup__chiffres { margin: 24px 0 0; display: grid; grid-template-columns: 1fr 1fr; column-gap: 48px; }
+/* Chiffres clés : deux par ligne, 48 px entre les colonnes et 12 entre les lignes, chacun souligné d'un filet (maquette 502:770) */
+.popup__chiffres { margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 12px 48px; }
 .popup__chiffre {
-  display: flex; flex-direction: column; justify-content: center; gap: 12px; padding: 24px 0;
+  display: flex; flex-direction: column; justify-content: center; gap: 6px; padding: 0 0 12px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.2); line-height: 25px;
 }
-.popup__chiffre dt { font-weight: 300; font-size: 14px; }
-.popup__chiffre dd { margin: 0; font-size: 36px; text-transform: uppercase; }
+.popup__chiffre dt { font-weight: 300; font-size: 14px; color: rgba(255, 255, 255, 0.7); }
+.popup__chiffre dd { margin: 0; font-size: 24px; text-transform: uppercase; }
 /* Bouton rouge « En savoir plus » */
 .popup__lien { align-self: flex-start; margin-top: 24px; padding: 0 32px; background: #d93e34; }
 .popup__lien:hover { background: #c2352c; }
@@ -509,6 +536,7 @@ button { font: inherit; color: inherit; }
   }
   .salle-accueil--cache { transform: translateY(24px); }
   .popup { --marge-p: 24px; max-height: 60%; transform: translateY(24px); }
+  .popup__barre { right: 0; }
   .popup--ouvert { transform: none; }
   .salle-accueil__haut { gap: 16px; }
   .salle-accueil__titre { font-size: 28px; }
@@ -523,7 +551,7 @@ button { font: inherit; color: inherit; }
   .popup__titre { font-size: 32px; line-height: 32px; }
   .popup__texte p { font-size: 15px; line-height: 22px; }
   .popup__chiffres { column-gap: 24px; margin-top: 8px; }
-  .popup__chiffre { padding: 16px 0; gap: 4px; justify-content: flex-end; }
+  .popup__chiffre { gap: 4px; justify-content: flex-end; }
   .popup__chiffre dt { line-height: 18px; }
   .popup__chiffre dd { font-size: 24px; }
   .popup__lien { margin-top: 8px; }
@@ -576,7 +604,7 @@ html.vue-libre .salle-ui > :not(.salle-ui__vignette) { display: none; }
 .vue-libre__reglages output { text-align: right; font-variant-numeric: tabular-nums; }
 .vue-libre__message { color: #9fe0a8; }
 .vue-libre__popup {
-  position: fixed; z-index: 29; top: 15%; bottom: 15%; right: min(96px, 5.714vw); width: clamp(400px, 38.87vw, 653px);
+  position: fixed; z-index: 29; top: 15%; bottom: 15%; right: 96px; width: clamp(400px, 34.286vw, 576px);
   border-radius: 24px; border: 1px dashed rgba(255, 255, 255, .5); background: rgba(255, 255, 255, .06);
   display: grid; place-items: center; color: rgba(255, 255, 255, .6); pointer-events: none;
 }
