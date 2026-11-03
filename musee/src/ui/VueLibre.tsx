@@ -134,7 +134,8 @@ export function VueLibre({ oeuvre }: { oeuvre: Oeuvre }) {
     document.documentElement.classList.remove('vue-libre')
     scene.style.cssText = 'right:auto;bottom:auto;width:1280px;height:720px'
     try {
-      const canvas = scene.querySelector('canvas')!
+      // (le canvas visible : celui du moteur des salles, moteurSalles.ts)
+      const canvas = [...scene.querySelectorAll('canvas')].find((c) => c.style.display !== 'none')!
       for (let i = 0; i < 120 && Math.abs(canvas.width / canvas.height - 16 / 9) > 0.01; i++) {
         await new Promise(requestAnimationFrame)
       }

@@ -12,6 +12,7 @@ import { Intro } from './ui/Intro'
 import { prevoir } from './chargement'
 import { salleOuverte } from './oeuvres'
 import { store, useEtat } from './store'
+import { moteurSalles } from './scene/moteurSalles'
 import './style.css'
 
 // La salle 3D (React Three Fiber) n'est chargée qu'en entrant dans une œuvre
@@ -26,6 +27,9 @@ const salleDemandee = window.location.pathname.match(/^\/oeuvre\/([^/]+)/)?.[1]
 if (salleDemandee && !salleOuverte(decodeURIComponent(salleDemandee))) window.history.replaceState(null, '', '/')
 // Arrivée directe dans une salle : l'écran d'accueil attend aussi la salle (chargée à la demande)
 if (window.location.pathname.startsWith('/oeuvre/')) prevoir('salle', 6)
+// Le moteur de rendu des salles est créé pendant l'écran d'accueil, où son arrêt (≈ 0,13 s) ne se
+// voit pas, plutôt qu'à l'entrée dans la première salle (scene/moteurSalles.ts)
+setTimeout(moteurSalles, 300)
 
 function App() {
   const dev = useEtat((e) => e.dev)

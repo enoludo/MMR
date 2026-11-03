@@ -33,9 +33,14 @@ export type UniformsSculpture = {
  * - occlusion ambiante par sommet (attribut _occlusion, calculé avec le sol : voir
  *   blender/occlusion.mjs). Elle assombrit les creux et surtout le bas des pieds,
  *   qui reçoivent moins de lumière du ciel : la sculpture « pèse » sur le sol ;
- * - mode reflet : la couleur s'éteint avec la hauteur, l'alpha porte cette atténuation.
+ * - mode reflet : la couleur s'éteint avec la hauteur, l'alpha porte cette atténuation ;
+ * - image de couleur envoyée à la carte graphique telle quelle (linéaire) et convertie du sRGB
+ *   dans le shader : envoyée en sRGB, une image de 2048 px figeait la page ≈ 0,1 s à l'entrée
+ *   dans la salle (conversion lente de la carte graphique du Mac, mesurée le 04/11 : 50 à 160 ms
+ *   contre 6 à 11 en linéaire).
  */
 export function preparerSculpture(m: THREE.MeshStandardMaterial, u: UniformsSculpture) {
+  if (m.map?.colorSpace === THREE.SRGBColorSpace) m.map.colorSpace = THREE.NoColorSpace
   m.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, u)
     shader.vertexShader = shader.vertexShader
@@ -45,6 +50,12 @@ export function preparerSculpture(m: THREE.MeshStandardMaterial, u: UniformsScul
         '#include <project_vertex>\nvOcc = _occlusion;\nvHauteur = (modelMatrix * vec4(transformed, 1.0)).y;',
       )
     shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <map_fragment>',
+        `#ifdef USE_MAP
+          diffuseColor *= sRGBTransferEOTF( texture2D( map, vMapUv ) );
+        #endif`,
+      )
       .replace(
         '#include <common>',
         '#include <common>\nvarying float vOcc;\nvarying float vHauteur;\nuniform float uOcclusion;\nuniform float uOcclusionDirecte;\nuniform float uReflet;\nuniform float uLongueurReflet;',

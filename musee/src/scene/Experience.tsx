@@ -17,6 +17,7 @@ import type { Porte } from '../salles/types'
 import { oeuvres } from '../oeuvres'
 import { captureSalle } from '../transition'
 import { ResolutionAdaptative, qualite } from '../resolution'
+import { moteurLibre, moteurSalles, prendreMoteur } from './moteurSalles'
 
 const salleDe = (v: SalleVisitee) => (oeuvres.find((o) => o.id === v.oeuvre) ?? oeuvres[0]).salle
 /** Salle au bout d'un couloir : celle de l'œuvre suivante par la sortie, précédente par l'entrée (comme InterfaceSalle) ; aucune pour une impasse */
@@ -56,6 +57,10 @@ export function Experience() {
   // Le Canvas reçoit la résolution en cours : avec la résolution pleine, chaque rendu (début d'un
   // passage…) la remettait au maximum et réallouait tout le canvas (≈ 0,25 s figée)
   const resolution = useMemo(() => new ResolutionAdaptative(() => {}), [])
+  // Moteur de rendu gardé d'une salle à l'autre (moteurSalles.ts), sauf s'il sert déjà à une autre salle montée
+  const [moteur] = useState(() => (moteurLibre() ? moteurSalles() : null))
+  useEffect(() => (moteur ? prendreMoteur() : undefined), [moteur])
+  const toile = useRef<HTMLCanvasElement>(null)
   if (!visitee) return null
   const salle = salleDe(visitee)
   const arrivee = passage && { visite: passage, config: salleDe(passage) }
@@ -63,6 +68,7 @@ export function Experience() {
 
   return (
     <Canvas
+      ref={toile}
       // Ombres filtrées (PCF) : le flou (shadow.radius) y est pris en compte, contrairement aux
       // ombres « douces » par défaut, dont le bord crénelait l'épaule de l'œuvre
       shadows="percentage"
@@ -71,8 +77,14 @@ export function Experience() {
       dpr={resolution.ratio}
       camera={{ fov: rendu.focale, near: 0.05, far: 150, position: [0, 0, 0] }}
       // Anticrénelage dans les effets (SMAA, Effets.tsx) : celui du canvas, plus coûteux sur grand écran, ne servirait plus
-      gl={{ antialias: false, powerPreference: 'high-performance' }}
+      gl={moteur ?? { antialias: false, powerPreference: 'high-performance' }}
       onCreated={({ gl }) => {
+        // Moteur partagé : son canvas prend la place de celui du Canvas, gardé caché
+        const c = toile.current
+        if (moteur && c && c !== gl.domElement) {
+          c.style.display = 'none'
+          c.after(gl.domElement)
+        }
         gl.toneMapping = THREE.ACESFilmicToneMapping
         // Hors développement, pas de lecture des journaux de compilation : chacune attend la
         // carte graphique (≈ 0,3 s en tout au premier dessin d'une salle)
@@ -161,6 +173,25 @@ function Affichee({ cle }: { cle: number }) {
 
 const imageSuivante = () => new Promise((ok) => requestAnimationFrame(ok))
 
+const recopiees = new WeakSet<ImageBitmap>()
+/**
+ * Image d'une texture décodée par le navigateur (ImageBitmap : celles des modèles GLB, la sculpture)
+ * recopiée dans un canvas avant son envoi : elle part ainsi vers la carte graphique en dehors du fil
+ * principal, et l'envoi (initTexture) ne prend plus que quelques ms au lieu de 40 à 100 pour une
+ * image de 2048 px, qui figeaient la page à l'entrée dans la salle (mesuré le 04/11).
+ */
+function preparerImage(t: THREE.Texture) {
+  const image = t.image
+  if (typeof OffscreenCanvas === 'undefined' || !(image instanceof ImageBitmap) || recopiees.has(image)) return
+  const toile = new OffscreenCanvas(image.width, image.height)
+  toile.getContext('2d')?.drawImage(image, 0, 0)
+  const copie = toile.transferToImageBitmap()
+  recopiees.add(copie)
+  image.close()
+  t.image = copie
+  t.needsUpdate = true
+}
+
 /**
  * Entrée depuis la spirale, juste après le clic (le zoom de la carte attend) : la salle chargée
  * est préparée sans être montrée (le canvas ne tourne pas) : ses textures envoyées à la carte
@@ -187,6 +218,7 @@ function Preparation({ cle }: { cle: number }) {
       })
       for (const t of textures) {
         if (fini) return
+        preparerImage(t)
         gl.initTexture(t)
         await imageSuivante()
       }
@@ -234,6 +266,7 @@ function PreparationPassage({ cle, children }: { cle: number; children: ReactNod
       })
       for (const t of textures) {
         if (fini) return
+        preparerImage(t)
         gl.initTexture(t)
         await imageSuivante()
       }
