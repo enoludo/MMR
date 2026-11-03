@@ -17,6 +17,8 @@ Une entrée par session, la plus récente en haut. Le détail technique est dans
 - **[à voir] Boutons de copie** : « copier ce dossier » en tête de chaque dossier ; dossier « Transmettre » avec « Copier tous les réglages », « Coller des réglages » et, en local seulement, « Enregistrer les réglages de cette salle » (dans `src/salles/reglages.json`, repris au chargement et en ligne). Pour que le collègue de Ludovic envoie ses réglages depuis le labo.
 - Compilation et construction vérifiées ; pas encore essayé dans le navigateur (panneau du navigateur intégré masqué).
 - **[vu] Captures de Huntington refaites une nouvelle fois par Ludovic** (13 h 30), vue Manifeste retouchée de quelques millimètres (`points-de-vue.json`).
+- **Titres de la spirale :** le nouveau titre monte 0,25 s après le départ de l'ancien (0,1 s avant), valeur transmise par Ludovic (bouton de copie). En ligne sur le labo (`4bd4a37`) et dans Git.
+- **Vue Grille :** écart entre les vignettes 12 px (48 avant), marge à gauche et à droite 24 px (72 avant), réglages transmis par Ludovic. En ligne sur le labo (`4bd4a37`) et dans Git.
 - **Mis en ligne sur le labo `mmr-lab`** (version du labo `d38941c`) et enregistré dans Git, envoyé sur GitHub, à la demande de Ludovic.
 
 ## 03/11/2026 — Claude Code (statue de Huntington de Jeff)

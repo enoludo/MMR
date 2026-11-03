@@ -13,7 +13,7 @@ const SORTIE_LETTRES = { yPercent: -110, opacity: 0, duration: 0.45, ease: 'powe
  * Changement de carte : délai (s) entre le départ des lettres de l'ancien titre et la montée de celles
  * du nouveau (0 = ensemble). Réglable touche M, « Titres de la spirale » (Accueil.tsx).
  */
-export const reglagesTitres = { delaiEntree: 0.1 };
+export const reglagesTitres = { delaiEntree: 0.25 };
 
 gsap.registerPlugin(SplitText);
 

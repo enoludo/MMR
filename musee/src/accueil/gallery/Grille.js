@@ -10,9 +10,9 @@ import { CONFIG } from '../config.js';
  */
 export const reglagesGrille = {
   colonnes: 3,
-  ecart: 48,
-  /** Marge à gauche et à droite (maquette : 72 px en 1680) */
-  marge: 72,
+  ecart: 12,
+  /** Marge à gauche et à droite (24 px depuis le 03/11, réglage de Ludovic ; maquette : 72 px en 1680) */
+  marge: 24,
   /** Haut de la première rangée (sous le header) et marge sous la dernière */
   haut: 96,
   bas: 120,
