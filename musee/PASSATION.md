@@ -82,7 +82,7 @@ Pour regarder une animation au ralenti : `gsap.globalTimeline.timeScale(0.05)` (
 **Git :** tout est enregistré et envoyé sur GitHub (`enoludo/MMR`, branche
 `claude/spirale-interactive-gallery-b4mzwd`, dernier commit `80ed3fe`).
 
-**En ligne :** le labo `mmr-lab` (https://mmr-lab.labs.cubedesigners.com/) est à jour (version du labo
+**En ligne :** le labo `mmr-lab` (https://mmr-lab.labs.cubedesigners.com/) est à jour (version du labo `e0cd4b4`, popups d'après 502:770 ; avant :
 `4bd4a37`, 03/11).
 
 **Fait le 03/11** (tout est « à voir » dans le journal) :
