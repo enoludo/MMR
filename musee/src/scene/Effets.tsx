@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useControls } from 'leva'
 import * as THREE from 'three'
 import type { SalleConfig } from '../salles/types'
+import { boutonCopier, dossierSalle, valeursEnregistrees } from '../reglages'
 import { configActuelle, configArriveeLue, poidsArrivee } from './passage'
 import { FLOU_DEFAUT, flouDeLaVue, vueEnCours } from '../salles/pointsDeVue'
 import {
@@ -89,14 +90,16 @@ const parSalle = new Map<string, ReglagesEffets>()
 /** Les réglages d'effets d'une salle (un seul objet par salle : la touche M le modifie) */
 export function reglagesEffets(salle: SalleConfig): ReglagesEffets {
   let r = parSalle.get(salle.id)
-  if (!r) parSalle.set(salle.id, (r = { ...EFFETS_DEFAUT, ...salle.effets }))
+  // Valeurs de la config, puis celles enregistrées à la touche M (src/salles/reglages.json)
+  if (!r) parSalle.set(salle.id, (r = { ...EFFETS_DEFAUT, ...salle.effets, ...(valeursEnregistrees(salle, 'Effets') as Partial<ReglagesEffets>) }))
   return r
 }
 
 /** Réglages d'effets de la salle affichée (touche M, « Effets · <salle> ») */
 export function ReglagesEffetsSalle({ config }: { config: SalleConfig }) {
   const r = reglagesEffets(config)
-  const reglages = useControls(`Effets · ${config.titre}`, {
+  const reglages = useControls(dossierSalle('Effets', config), {
+    ...boutonCopier(dossierSalle('Effets', config)),
     courbe: { value: r.courbe, options: { 'AgX (photo)': 'agx', 'ACES (avant)': 'aces' }, label: 'courbe de couleurs' },
     halo: { value: r.halo, min: 0, max: 2, step: 0.01, label: 'halo des lumières' },
     seuilHalo: { value: r.seuilHalo, min: 0.2, max: 4, step: 0.05, label: 'seuil du halo' },
@@ -149,6 +152,7 @@ export function Effets() {
   const dpr = useThree((s) => s.viewport.dpr)
 
   const e = useControls('Effets (toutes les salles)', {
+    ...boutonCopier('Effets (toutes les salles)'),
     actifs: { value: true, label: 'effets actifs' },
     smaa: { value: true, label: 'anticrénelage SMAA' },
   })

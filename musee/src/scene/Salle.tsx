@@ -1,15 +1,35 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
-import { useControls } from 'leva'
 import * as THREE from 'three'
 import type { SalleConfig } from '../salles/types'
+import { AMBIANCE_CHAUDE, PARTIE_COULEURS, appliquerCouleurs, schemaCouleurs } from '../salles/couleurs'
+import { reglagesSalle, useReglagesSalle } from '../reglages'
 import { Faisceau, tableFaisceau } from './Faisceau'
 import { Poussiere } from './Poussiere'
 import { MAX_PORTES, appliquerPierre, creerUniformsSalle, reglerPierre } from './pierre'
 import { configActuelle, configArriveeLue, groupesSalles, poidsArrivee, salleActuelle, salleArrivee } from './passage'
 import { prechargerLightmaps, useLightmaps } from './lightmaps'
 import { CALQUE_REFLET, PasseReflet, creerUniformsReflet, preparerSculpture, type UniformsSculpture } from './Reflet'
+
+/**
+ * Touche M, « Salle · <salle> » : exposition de l'image (mélangée entre deux salles pendant un
+ * passage, voir Eclairage) et pierre. Texture de la pierre réduite de moitié le 31/10 (demande de
+ * Ludovic : 0,05 / 0,035 / 0,07 avant), comme dans les couloirs (Couloir.tsx).
+ */
+const REGLAGES_SALLE = {
+  exposition: { value: 3.4, min: 0.5, max: 15, step: 0.1 },
+  lumiere: { value: 1, min: 0.2, max: 3, step: 0.01, label: 'lumière' },
+  grain: { value: 0.025, min: 0, max: 0.3, step: 0.005, label: 'grain fin' },
+  voile: { value: 0.0175, min: 0, max: 0.3, step: 0.005, label: 'voile' },
+  nuances: { value: 0.035, min: 0, max: 0.4, step: 0.005, label: 'nuances' },
+}
+
+/** Touche M, « Lumière sculpture · <salle> » : soleil et ambiance de l'œuvre (Eclairage) */
+const LUMIERE_SCULPTURE = {
+  soleil: { value: 0.55, min: 0, max: 3, step: 0.01 },
+  ambiance: { value: 0.65, min: 0, max: 2, step: 0.01 },
+}
 
 /** Matières du sol : elles reçoivent le reflet de la sculpture */
 const SOLS = ['Sol', 'SolCentre']
@@ -35,14 +55,10 @@ export function Salle({ config }: { config: SalleConfig }) {
   const nomsLightmaps = Object.keys(config.lightmaps)
   const textures = useLightmaps(nomsLightmaps.map((n) => config.lightmaps[n].image))
 
-  // Texture de la pierre réduite de moitié le 31/10 (demande de Ludovic : 0,05 / 0,035 / 0,07 avant),
-  // comme dans les couloirs (Couloir.tsx)
-  const r = useControls('Salle', {
-    lumiere: { value: 1, min: 0.2, max: 3, step: 0.01, label: 'lumière' },
-    grain: { value: 0.025, min: 0, max: 0.3, step: 0.005, label: 'grain fin' },
-    voile: { value: 0.0175, min: 0, max: 0.3, step: 0.005, label: 'voile' },
-    nuances: { value: 0.035, min: 0, max: 0.4, step: 0.005, label: 'nuances' },
-  })
+  const r = useReglagesSalle(config, 'Salle', REGLAGES_SALLE)
+  // Couleurs de la salle (soleil, ambiance, lueur, matières), écrites dans sa config
+  const couleurs = useReglagesSalle(config, PARTIE_COULEURS, schemaCouleurs(config))
+  appliquerCouleurs(config, couleurs)
 
   // Repère de la salle et portes, communs à ses matières
   const uSalle = useMemo(creerUniformsSalle, [])
@@ -61,7 +77,7 @@ export function Salle({ config }: { config: SalleConfig }) {
 
   // Reflet de la sculpture au sol (uniforms partagés avec la passe de reflet)
   const uReflet = useMemo(creerUniformsReflet, [])
-  const reflet = useControls('Reflet au sol', {
+  const reflet = useReglagesSalle(config, 'Reflet au sol', {
     force: { value: 0.16, min: 0, max: 1, step: 0.01 },
     flou: { value: 10, min: 1, max: 30, step: 0.5, label: 'flou (px)' },
     longueur: { value: 1.4, min: 0.2, max: 6, step: 0.05, label: 'atténuation (m)' },
@@ -108,6 +124,13 @@ export function Salle({ config }: { config: SalleConfig }) {
       reglerPierre(m, r)
     }
   }, [materiaux, r])
+  useEffect(() => {
+    for (const [nom, m] of Object.entries(materiaux)) {
+      const { couleur, lumineuse } = config.matieres[nom]
+      m.color.set(couleur)
+      if (lumineuse !== undefined) m.color.multiplyScalar(lumineuse)
+    }
+  }, [materiaux, config, couleurs])
 
   useEffect(() => {
     scene.traverse((o) => {
@@ -136,11 +159,11 @@ export function Salle({ config }: { config: SalleConfig }) {
  * perd dans la tache du puits (et elle est écrêtée, voir lightmap.py) : ruban et halo la font lire.
  */
 function Lueur({ config, lueur }: { config: SalleConfig; lueur: { rayon: number; couleur: string } }) {
-  const l = useControls(`Lueur du socle · ${config.titre}`, {
+  const l = useReglagesSalle(config, 'Lueur du socle', {
     ruban: { value: 6, min: 0, max: 20, step: 0.1 },
     halo: { value: 0.3, min: 0, max: 3, step: 0.01 },
     etendue: { value: 0.1, min: 0.02, max: 1, step: 0.01, label: 'étendue du halo (m)' },
-  }, [config.id])
+  })
   const ruban = useMemo(() => new THREE.MeshBasicMaterial(), [])
   const halo = useMemo(
     () =>
@@ -233,14 +256,15 @@ function Sculpture({
     return copie
   }, [gltf.scene])
 
-  const s = useControls(`Sculpture · ${config.titre}`, {
+  const s = useReglagesSalle(config, 'Sculpture', {
     orientation: { value: config.sculpture.rotationY, min: -180, max: 180, step: 0.5, label: 'orientation (°)' },
     teinte: { value: '#ddd8d2' },
     rugosite: { value: 0.85, min: 0, max: 1, step: 0.01, label: 'rugosité' },
     relief: { value: 1, min: 0, max: 3, step: 0.05 },
     occlusion: { value: 0.9, min: 0, max: 1, step: 0.01, label: 'occlusion (creux, pieds)' },
     occlusionDirecte: { value: 0.35, min: 0, max: 1, step: 0.01, label: 'occlusion sur le soleil' },
-  }, [config.id]) // un dossier par salle
+  })
+  useReglagesSalle(config, 'Lumière sculpture', LUMIERE_SCULPTURE) // lue à chaque image par Eclairage
 
   const uSculpture = useMemo<UniformsSculpture>(
     () => ({
@@ -305,14 +329,11 @@ function Sculpture({
  * l'arrivée (et toutes les matières étaient recompilées).
  */
 export function Eclairage({ config }: { config: SalleConfig }) {
-  const l = useControls('Lumière sculpture', {
-    soleil: { value: 0.55, min: 0, max: 3, step: 0.01 },
-    ambiance: { value: 0.65, min: 0, max: 2, step: 0.01 },
-  })
   // Ambiance de l'œuvre : pendant un passage, elle glisse de celle de la salle quittée à celle de la
   // salle d'arrivée selon la distance de la caméra à chacune (sinon elle basculerait d'un coup)
   const hemi = useRef<THREE.HemisphereLight>(null)
   const camera = useThree((e) => e.camera)
+  const gl = useThree((e) => e.gl)
   const tmp = useMemo(() => ({ a: new THREE.Color(), b: new THREE.Color() }), [])
   // Les salles se lisent dans l'état à chaque image, pas dans les propriétés : à la fin d'un passage,
   // la salle d'arrivée devient la salle actuelle dans l'image même (Navigation.arriver), avant que
@@ -326,23 +347,28 @@ export function Eclairage({ config }: { config: SalleConfig }) {
     const amb = (c: SalleConfig | null | undefined) => c?.ambiance ?? AMBIANCE_CHAUDE
     h.color.copy(tmp.a.set(amb(ca).ciel)).lerp(tmp.b.set(amb(cb).ciel), w)
     h.groundColor.copy(tmp.a.set(amb(ca).sol)).lerp(tmp.b.set(amb(cb).sol), w)
+    // Force de l'ambiance et exposition de l'image : celles de chaque salle, mélangées de même
+    const lb = cb ? reglagesSalle(cb, 'Lumière sculpture', LUMIERE_SCULPTURE) : null
+    const la = reglagesSalle(ca, 'Lumière sculpture', LUMIERE_SCULPTURE)
+    h.intensity = melange(la.ambiance, lb?.ambiance ?? la.ambiance, w)
+    const ea = reglagesSalle(ca, 'Salle', REGLAGES_SALLE).exposition
+    gl.toneMappingExposure = melange(ea, cb ? reglagesSalle(cb, 'Salle', REGLAGES_SALLE).exposition : ea, w)
   })
   return (
     <>
-      <Soleil config={config} force={l.soleil} suivre={salleActuelle} lire={configActuelle} />
-      <Soleil config={config} force={l.soleil} suivre={salleArrivee} lire={configArriveeLue} />
+      <Soleil config={config} suivre={salleActuelle} lire={configActuelle} />
+      <Soleil config={config} suivre={salleArrivee} lire={configArriveeLue} />
       {/* Ambiance froide en haut, chaude en bas (ciel + rebonds sur la pierre), selon la salle où l'on est */}
       <hemisphereLight
         ref={hemi}
-        args={[AMBIANCE_CHAUDE.ciel, AMBIANCE_CHAUDE.sol, l.ambiance]}
+        args={[AMBIANCE_CHAUDE.ciel, AMBIANCE_CHAUDE.sol, LUMIERE_SCULPTURE.ambiance.value]}
         onUpdate={(h) => h.layers.enable(CALQUE_REFLET)}
       />
     </>
   )
 }
 
-/** Ambiance par défaut des salles : ciel froid en haut, rebonds chauds sur la pierre en bas */
-const AMBIANCE_CHAUDE = { ciel: '#a9bde0', sol: '#76675a', couloir: '#ffe1c2' }
+const melange = (a: number, b: number, w: number) => a + (b - a) * w
 
 
 /**
@@ -352,13 +378,11 @@ const AMBIANCE_CHAUDE = { ciel: '#a9bde0', sol: '#76675a', couloir: '#ffe1c2' }
  */
 function Soleil({
   config,
-  force,
   suivre,
   lire,
 }: {
   /** Salle par défaut, quand `lire` n'en donne pas */
   config: SalleConfig
-  force: number
   suivre: () => THREE.Group | undefined
   /**
    * Config de la salle suivie, lue à chaque image : géométrie (puits, direction, lames), force et
@@ -421,6 +445,7 @@ function Soleil({
     // Même éclairement que le soleil de Blender : I = E × d² ; éteint (et non retiré) sans salle
     const c = lire() ?? config
     placer(c.soleil)
+    const force = reglagesSalle(c, 'Lumière sculpture', LUMIERE_SCULPTURE).soleil // celle de la salle suivie
     spot.intensity = g ? c.soleil.force * distance * distance * force : 0
     spot.color.set(c.soleil.couleur)
   }, -1.8) // après le recalage de l'arrivée (navigation), avant la passe de reflet

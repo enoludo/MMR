@@ -6,6 +6,7 @@ import { Overlay, reglagesTitres } from './gallery/Overlay.js'
 import { LegendesGrille, dispositionGrille, rangsDepuis, reglagesGrille } from './gallery/Grille.js'
 import gsap from 'gsap'
 import { useControls } from 'leva'
+import { boutonCopier } from '../reglages'
 import { CaretDownIcon, MagnifyingGlassIcon } from '@phosphor-icons/react'
 import { BackgroundTint } from './gallery/BackgroundTint.js'
 import { getCenteredSlot } from './gallery/centeredSlot.js'
@@ -99,12 +100,14 @@ export function Accueil() {
   }, [vue])
   // Touche M : croisement des titres au changement de carte (Overlay.js)
   reglagesTitres.delaiEntree = useControls('Titres de la spirale', {
+    ...boutonCopier('Titres de la spirale'),
     delaiEntree: { value: reglagesTitres.delaiEntree, min: 0, max: 0.6, step: 0.01, label: 'entrée du titre suivant (s après le départ)' },
   }).delaiEntree
   // Touche M : la grille (gallery/Grille.js)
   Object.assign(
     reglagesGrille,
     useControls('Grille', {
+      ...boutonCopier('Grille'),
       colonnes: { value: reglagesGrille.colonnes, min: 1, max: 6, step: 1, label: 'colonnes' },
       ecart: { value: reglagesGrille.ecart, min: 0, max: 160, step: 1, label: 'écart entre les vignettes (px)' },
       marge: { value: reglagesGrille.marge, min: 0, max: 240, step: 1, label: 'marges gauche et droite (px)' },

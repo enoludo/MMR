@@ -1,6 +1,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { useControls } from 'leva'
+import { boutonCopier } from '../reglages'
 import { useLocation } from 'react-router-dom'
 import * as THREE from 'three'
 import { Eclairage, Salle, prechargerSalle } from './Salle'
@@ -43,8 +44,9 @@ export function Experience() {
   )
   // Retour vers la spirale : la salle quittée attend, cachée, d'être démontée (main.tsx)
   const quittee = !useLocation().pathname.startsWith('/oeuvre/')
+  // L'exposition est réglée par salle (« Salle · <salle> », appliquée par Eclairage)
   const rendu = useControls('Rendu', {
-    exposition: { value: 3.4, min: 0.5, max: 15, step: 0.1 },
+    ...boutonCopier('Rendu'),
     focale: { value: 55, min: 30, max: 90, step: 1, label: 'champ de vision (°)' },
     plancher: { value: qualite.plancher, min: 1, max: 2, step: 0.25, label: 'résolution minimale' },
     passage: { value: qualite.passage, min: 0.4, max: 1, step: 0.05, label: 'résolution pendant les passages (×)' },
@@ -77,7 +79,6 @@ export function Experience() {
         gl.debug.checkShaderErrors = import.meta.env.DEV
       }}
     >
-      <ReglagesRendu exposition={rendu.exposition} />
       <Capture />
       <color attach="background" args={['#0d0b0a']} />
       <Resolution resolution={resolution} />
@@ -345,11 +346,3 @@ function Capture() {
   return null
 }
 
-/** Exposition réglable en direct (le champ de vision est géré par la navigation). */
-function ReglagesRendu({ exposition }: { exposition: number }) {
-  const gl = useThree((s) => s.gl)
-  useEffect(() => {
-    gl.toneMappingExposure = exposition
-  }, [gl, exposition])
-  return null
-}

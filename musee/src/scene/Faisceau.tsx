@@ -1,9 +1,9 @@
 import { useMemo } from 'react'
-import { useControls } from 'leva'
 import * as THREE from 'three'
 import type { SalleConfig } from '../salles/types'
 import { GLSL_TABLE_LAMES, tableLames } from './lames'
 import { GLSL_SORTIE, uSortie } from './Effets'
+import { useReglagesSalle } from '../reglages'
 
 /**
  * Faisceau de soleil visible dans l'air (lumière volumétrique simplifiée).
@@ -22,7 +22,7 @@ export const tableFaisceau = (soleil: SalleConfig['soleil']) =>
   tableLames(soleil, (soleil.ouverture[0] / 2) * 1.25, soleil.puits[1])
 
 export function Faisceau({ config }: { config: SalleConfig }) {
-  const f = useControls('Faisceau', {
+  const f = useReglagesSalle(config, 'Faisceau', {
     intensite: { value: 0.009, min: 0, max: 0.06, step: 0.001, label: 'intensité' },
   })
 
@@ -138,6 +138,7 @@ export function Faisceau({ config }: { config: SalleConfig }) {
     [uniforms],
   )
   uniforms.uIntensite.value = f.intensite
+  uniforms.uCouleur.value.set(config.soleil.couleur) // réglable à la touche M (« Couleurs »)
 
   return <mesh geometry={geometrie} material={materiau} renderOrder={5} frustumCulled={false} userData={{ traversable: true }} />
 }

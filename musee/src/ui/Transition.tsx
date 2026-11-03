@@ -7,6 +7,7 @@ import { store, useEtat, type Cadre, type Transition as EtatTransition } from '.
 import { captureSalle, carteVivante } from '../transition'
 import { avancee, champEntree, entree, partVisible, reglagesTransition, temps } from '../entree'
 import type { SalleConfig } from '../salles/types'
+import { boutonCopier, dossierSalle } from '../reglages'
 import { obtenirToile, prechargerImages, reglagesCapture } from './ToileTransition'
 
 /** Au-delà, on montre la salle même si elle n'a pas signalé être prête (ms) */
@@ -297,7 +298,8 @@ export function Transition() {
  */
 export function ReglagesTransitionSalle({ config }: { config: SalleConfig }) {
   const rt = reglagesTransition(config)
-  const reglages = useControls(`Transitions · ${config.titre}`, {
+  const reglages = useControls(dossierSalle('Transitions', config), {
+    ...boutonCopier(dossierSalle('Transitions', config)),
     zoomEntree: { value: rt.zoomEntree, min: 0.3, max: 4, step: 0.05, label: 'entrée : zoom de la carte (s)' },
     fonduEntree: { value: rt.fonduEntree, min: 0.2, max: 3, step: 0.05, label: 'entrée : fondu sur la salle (s)' },
     monteeImage: { value: rt.monteeImage, min: 0.5, max: 4, step: 0.05, label: 'entrée : avancée dans l’image (s)' },

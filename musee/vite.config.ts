@@ -42,6 +42,26 @@ function enregistrementCaptures(): Plugin {
         await writeFile(path.join(dossier, nom), Buffer.concat(morceaux))
         res.end('ok')
       })
+      // Réglages de la touche M propres à une salle (src/reglages.ts, ui/CopieReglages.tsx) : src/salles/reglages.json
+      serveur.middlewares.use('/__reglages', async (req, res) => {
+        const morceaux: Buffer[] = []
+        for await (const m of req) morceaux.push(m as Buffer)
+        try {
+          const { salle, reglages } = JSON.parse(Buffer.concat(morceaux).toString())
+          const valide = (v: unknown) => (typeof v === 'number' && Number.isFinite(v)) || typeof v === 'string' || typeof v === 'boolean'
+          if (req.method !== 'POST' || !/^[a-z0-9-]+$/.test(salle) || typeof reglages !== 'object' ||
+            !Object.values(reglages).every((p) => typeof p === 'object' && p && Object.values(p).every(valide)))
+            throw new Error('réglages refusés')
+          const fichier = path.resolve(__dirname, 'src/salles/reglages.json')
+          const tous = JSON.parse(await readFile(fichier, 'utf8'))
+          tous[salle] = { ...tous[salle], ...reglages }
+          await writeFile(fichier, JSON.stringify(tous, null, 2) + '\n')
+          res.end('ok')
+        } catch (e) {
+          res.statusCode = 400
+          res.end(String(e))
+        }
+      })
       // Points de vue réglés en vue libre (src/ui/VueLibre.tsx) : src/salles/points-de-vue.json
       serveur.middlewares.use('/__points-de-vue', async (req, res) => {
         const morceaux: Buffer[] = []

@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import type { SalleConfig } from './salles/types'
+import { valeursEnregistrees } from './reglages'
 
 /**
  * Entrée dans une salle depuis la spirale : un seul mouvement de caméra, en ligne droite,
@@ -61,7 +62,8 @@ const parSalle = new Map<string, ReglagesTransition>()
 /** Les réglages de transition d'une salle (un seul objet par salle : la touche M le modifie) */
 export function reglagesTransition(salle: SalleConfig): ReglagesTransition {
   let r = parSalle.get(salle.id)
-  if (!r) parSalle.set(salle.id, (r = { ...TRANSITION_DEFAUT, ...salle.transition }))
+  // Valeurs de la config, puis celles enregistrées à la touche M (src/salles/reglages.json)
+  if (!r) parSalle.set(salle.id, (r = { ...TRANSITION_DEFAUT, ...salle.transition, ...(valeursEnregistrees(salle, 'Transitions') as Partial<ReglagesTransition>) }))
   return r
 }
 const PART_IMAGE = 0.6

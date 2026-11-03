@@ -1,13 +1,14 @@
 import { useEffect, useMemo } from 'react'
 import { useGLTF } from '@react-three/drei'
 import { useLightmap } from './lightmaps'
-import { useControls } from 'leva'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import type { Porte, SalleConfig } from '../salles/types'
 import { GLSL_PIERRE, textureBruit } from './pierre'
 import { LONGUEUR_COULOIR, matricePlacement, placementCouloir } from './passage'
 import { GLSL_SORTIE, uSortie } from './Effets'
+import { useReglagesSalle } from '../reglages'
+import { AMBIANCE_CHAUDE, PARTIE_COULEURS, schemaCouleurs } from '../salles/couleurs'
 
 /**
  * Couloir entre deux salles, derrière la porte (références : references/couloir).
@@ -52,7 +53,7 @@ export function Couloir({
    */
   voisine?: SalleConfig
 }) {
-  const c = useControls('Couloir', {
+  const c = useReglagesSalle(config, 'Couloir', {
     soleil: { value: 1.2, min: 0, max: 4, step: 0.01 },
     hauteurSoleil: { value: 32, min: 5, max: 75, step: 1, label: 'hauteur du soleil (°)' },
     // D'où vient le soleil, depuis le nord dans le sens horaire (90 = est). Une paroi épaisse ne
@@ -77,6 +78,8 @@ export function Couloir({
     finAmbiance: { value: 12, min: 0, max: 14, step: 0.1, label: 'ambiance de la salle voisine : fin (m)' },
   })
   const autre = voisine ?? config
+  // Couleurs de la salle (touche M, « Couleurs », appliquées à sa config par Salle) : le couloir les suit
+  const couleurs = useReglagesSalle(config, PARTIE_COULEURS, schemaCouleurs(config))
 
   const L = LONGUEUR_COULOIR
   const W = porte.largeur
@@ -176,6 +179,14 @@ export function Couloir({
       .set(-Math.sin(a) * Math.cos(h), -Math.sin(h), Math.cos(a) * Math.cos(h))
       .applyMatrix3(versCouloir)
       .normalize()
+    uniforms.uCouleurSol.value.set(config.matieres.Sol?.couleur ?? '#a29b95')
+    uniforms.uCouleurMur.value.set(config.matieres.Mur?.couleur ?? '#c4bcb1')
+    uniforms.uCouleurPlafond.value.set(config.matieres.Plafond?.couleur ?? '#bcb6af')
+    uniforms.uTeinteDiffus.value.set(config.ambiance?.couloir ?? AMBIANCE_CHAUDE.couloir)
+    uniforms.uCouleurSol2.value.set(autre.matieres.Sol?.couleur ?? '#a29b95')
+    uniforms.uCouleurMur2.value.set(autre.matieres.Mur?.couleur ?? '#c4bcb1')
+    uniforms.uCouleurPlafond2.value.set(autre.matieres.Plafond?.couleur ?? '#bcb6af')
+    uniforms.uTeinteDiffus2.value.set(autre.ambiance?.couloir ?? AMBIANCE_CHAUDE.couloir)
     uniforms.uSoleil.value.set(config.soleil.couleur).multiplyScalar(c.soleil)
     uniforms.uZenithSoleil.value.set(config.soleil.couleur).multiplyScalar(c.zenithal)
     uniforms.uSoleil2.value.set(autre.soleil.couleur).multiplyScalar(c.soleil)
@@ -194,7 +205,7 @@ export function Couloir({
     uniforms.uFente.value = c.fente
     uniforms.uPremiere.value = fentes.premiere
     uniforms.uNombre.value = fentes.nombre
-  }, [uniforms, c, fentes, H, versCouloir, config.soleil.couleur, autre.soleil.couleur, azimut])
+  }, [uniforms, c, fentes, H, versCouloir, config, autre, couleurs, azimut])
 
   // Parois, sol et plafond : des pavés fusionnés en une seule géométrie
   const geometrie = useMemo(() => {

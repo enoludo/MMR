@@ -2,6 +2,7 @@ import type { SalleConfig } from './salles/types'
 import { salleProvisoire } from './salles/provisoire/config'
 import { salleRotonde } from './salles/rotonde/config'
 import { avecPointsDeVue } from './salles/pointsDeVue'
+import { avecCouleurs } from './salles/couleurs'
 import { reglagesTransition } from './entree'
 import { existe, versionLegere, versionne } from './version'
 
@@ -172,6 +173,8 @@ export const oeuvres: Oeuvre[] = [
 
 // Points de vue réglés en vue libre (touche V, salles/pointsDeVue.ts) : ils remplacent ceux des configs
 for (const o of oeuvres) o.salle = avecPointsDeVue(o.salle, o.vues)
+// Couleurs réglées à la touche M et enregistrées (src/salles/reglages.json) ; propres à chaque salle
+for (const o of oeuvres) o.salle = avecCouleurs(o.salle)
 
 // Flèches précédente / suivante : la vue initiale de la salle quand elle a été capturée (outils/capture.ts)
 for (const o of oeuvres) {

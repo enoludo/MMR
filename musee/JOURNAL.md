@@ -11,6 +11,14 @@ Une entrée par session, la plus récente en haut. Le détail technique est dans
 
 ---
 
+## 03/11/2026 — Claude Code (réglages de la touche M par salle)
+
+- **[à voir] Réglages de lumière et d'effets propres à chaque salle** (demande de Ludovic) : dossiers « Salle », « Lumière sculpture », « Couleurs » (soleil, ambiances, lueur, matières), « Reflet au sol », « Faisceau », « Poussière », « Couloir », en plus de Sculpture, Lueur du socle, Navigation, Transitions et Effets, tous suffixés du titre de la salle (`src/reglages.ts`, `src/salles/couleurs.ts`). L'exposition et la lumière de la statue glissent d'une salle à l'autre pendant un passage.
+- **[à voir] Boutons de copie** : « copier ce dossier » en tête de chaque dossier ; dossier « Transmettre » avec « Copier tous les réglages », « Coller des réglages » et, en local seulement, « Enregistrer les réglages de cette salle » (dans `src/salles/reglages.json`, repris au chargement et en ligne). Pour que le collègue de Ludovic envoie ses réglages depuis le labo.
+- Compilation et construction vérifiées ; pas encore essayé dans le navigateur (panneau du navigateur intégré masqué).
+- **[vu] Captures de Huntington refaites une nouvelle fois par Ludovic** (13 h 30), vue Manifeste retouchée de quelques millimètres (`points-de-vue.json`).
+- **Mis en ligne sur le labo `mmr-lab`** (version du labo `d38941c`) et enregistré dans Git, envoyé sur GitHub, à la demande de Ludovic.
+
 ## 03/11/2026 — Claude Code (statue de Huntington de Jeff)
 
 - **[à voir] La statue de « La maladie de Huntington » est celle de Jeff** (`huntington-export-jeff.glb`, 3ds Max), à la place de celle du 29/10. Source rangée dans `blender/sculpture-huntington/huntington-jeff.glb`. **Même taille que l'ancienne** : silhouette de 2,70 m des pieds au haut de la tête (éclats compris : 2,71 m), pieds centrés sur le socle, même orientation (bras tendu à l'ouest, éclats à l'est). Préparée par `blender/huntington-jeff.py`, compressée (13,8 Mo → 1,4 Mo, textures WebP 2048), occlusion recalculée. Vue dans le navigateur.

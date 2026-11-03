@@ -1,10 +1,10 @@
 import { useEffect, useMemo } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { useControls } from 'leva'
 import * as THREE from 'three'
 import type { SalleConfig } from '../salles/types'
 import { GLSL_LAMES, uniformsLames } from './lames'
 import { GLSL_SORTIE, uSortie } from './Effets'
+import { useReglagesSalle } from '../reglages'
 
 const MAX = 16000 // grains réservés (8000 avant le 29/10) ; le réglage « densité » n’en affiche qu’une partie
 
@@ -18,7 +18,7 @@ const MAX = 16000 // grains réservés (8000 avant le 29/10) ; le réglage « de
  * Les grains proches de la caméra sont plus gros et plus diffus (flou de profondeur).
  */
 export function Poussiere({ config }: { config: SalleConfig }) {
-  const p = useControls('Poussière', {
+  const p = useReglagesSalle(config, 'Poussière', {
     densite: { value: 1, min: 0, max: 1, step: 0.01, label: 'densité' },
     taille: { value: 3.35, min: 0.3, max: 16, step: 0.05 },
     vitesse: { value: 1.05, min: 0, max: 12, step: 0.05 },
@@ -128,6 +128,8 @@ export function Poussiere({ config }: { config: SalleConfig }) {
       }),
     [uniforms],
   )
+
+  uniforms.uCouleur.value.set(config.soleil.couleur) // réglable à la touche M (« Couleurs »)
 
   // Moins de grains sur les petits écrans (téléphones)
   const facteurEcran = size.width < 768 ? 0.5 : 1

@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useControls } from 'leva'
 import * as THREE from 'three'
 import type { Porte, SalleConfig, Vec3 } from '../salles/types'
+import { boutonCopier, dossierSalle, valeursEnregistrees } from '../reglages'
 import { vueEnCours } from '../salles/pointsDeVue'
 import { store, useEtat, type Sens } from '../store'
 import { CALQUE_REFLET } from './Reflet'
@@ -915,6 +916,7 @@ export function reglagesNavigation(config: SalleConfig): ReglagesNavigation {
       duree: 2.8,
       dureePassage: 8,
       rotationPassage: 90,
+      ...(valeursEnregistrees(config, 'Navigation') as Partial<ReglagesNavigation>), // touche M, src/salles/reglages.json
     }
     navigationParSalle.set(config.id, g)
   }
@@ -924,7 +926,8 @@ export function reglagesNavigation(config: SalleConfig): ReglagesNavigation {
 /** Touche M : un dossier par salle (chaque salle a son parcours : une œuvre de 3 m n'est pas vue comme une œuvre de 10 m) */
 function ReglagesNavigationSalle({ config }: { config: SalleConfig }) {
   const g = reglagesNavigation(config)
-  const reglages = useControls(`Navigation · ${config.titre}`, {
+  const reglages = useControls(dossierSalle('Navigation', config), {
+    ...boutonCopier(dossierSalle('Navigation', config)),
     rayon: { value: g.rayon, min: 3, max: 14, step: 0.1, label: 'rayon du cercle (m)' },
     rayonLointain: { value: g.rayonLointain, min: 3, max: 14, step: 0.1, label: 'rayon de la vue d’arrivée (m)' },
     rayonProche: { value: g.rayonProche, min: 2, max: 9, step: 0.1, label: 'rayon du cercle réduit (m)' },
