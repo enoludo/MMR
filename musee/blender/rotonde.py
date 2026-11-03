@@ -286,8 +286,9 @@ mobilier = finir("Mobilier", groupes["Mobilier"], MATS)
 fentes = finir("Fentes", groupes["Fentes"], [FENTE_MAT], uv=False)
 print("FACES", len(room.data.polygons), len(mobilier.data.polygons), len(fentes.data.polygons))
 
-# Sculpture : porte son ombre dans le précalcul (elle-même est éclairée en temps réel)
-with bpy.data.libraries.load(os.path.join(HERE, "sculpture-huntington", "huntington.blend")) as (src, dst):
+# Sculpture : porte son ombre dans le précalcul (elle-même est éclairée en temps réel). Depuis le 03/11,
+# la statue de Jeff (huntington-jeff.py) ; avant : huntington.blend (huntington.py)
+with bpy.data.libraries.load(os.path.join(HERE, "sculpture-huntington", "huntington-jeff.blend")) as (src, dst):
     dst.objects = ["Sculpture"]
 sc = dst.objects[0]; scn.collection.objects.link(sc)
 sc.location.z = SOCLE_H - ENFONCE

@@ -26,14 +26,14 @@
     },
     "manifeste": {
       "position": [
-        10.5,
+        6.591,
         1.7,
-        3.799
+        2.374
       ],
       "cible": [
-        0.009,
-        1.723,
-        -0.026
+        0.019,
+        1.754,
+        -0.053
       ]
     },
     "flou": {
@@ -46,8 +46,8 @@
       "maladie": {
         "actif": true,
         "flou": 4.6,
-        "nettete": 4,
-        "miseAuPoint": 2.8
+        "nettete": 2.8,
+        "miseAuPoint": 2.2
       },
       "manifeste": {
         "actif": false,

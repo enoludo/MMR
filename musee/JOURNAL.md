@@ -11,6 +11,15 @@ Une entrée par session, la plus récente en haut. Le détail technique est dans
 
 ---
 
+## 03/11/2026 — Claude Code (statue de Huntington de Jeff)
+
+- **[à voir] La statue de « La maladie de Huntington » est celle de Jeff** (`huntington-export-jeff.glb`, 3ds Max), à la place de celle du 29/10. Source rangée dans `blender/sculpture-huntington/huntington-jeff.glb`. **Même taille que l'ancienne** : silhouette de 2,70 m des pieds au haut de la tête (éclats compris : 2,71 m), pieds centrés sur le socle, même orientation (bras tendu à l'ouest, éclats à l'est). Préparée par `blender/huntington-jeff.py`, compressée (13,8 Mo → 1,4 Mo, textures WebP 2048), occlusion recalculée. Vue dans le navigateur.
+- **Lumière de la rotonde recalculée avec la nouvelle statue** (son ombre sur le socle et le sol ; `rotonde.py` lit `huntington-jeff.blend`), 2048 px, 18 min.
+- **À voir avec Ludovic :** de face, à contre-jour, la statue paraît presque noire (bronze sombre, un peu métallique, sans reflets d'environnement dans la salle) : régler sa matière avec lui.
+- **[vu] Captures refaites par Ludovic** (salle, cartouches, vignette), avec la nouvelle statue ; il a aussi rapproché la vue Manifeste (de 10,5 à 6,6 m) et réglé la profondeur de champ de la vue Maladie (`points-de-vue.json`).
+- Rien d'enregistré dans Git, rien mis en ligne.
+
+
 ## 02/11/2026 — Claude Code (salles fermées à la visite)
 
 - **[à voir] Seules « Le seuil des proportions » et « La maladie de Huntington » se visitent** (demande de Ludovic). Les autres œuvres restent dans la spirale, la grille et les flèches, avec leurs boutons désactivés : « Découvrir » en verre, texte estompé ; légende de la grille sans lien ; flèche des salles estompée, qui ne s'ouvre plus au survol. Leur adresse (`/oeuvre/…`) ramène à l'accueil, et leurs salles ne sont plus préchargées. Liste dans `SALLES_OUVERTES` (`oeuvres.ts`). Vérifié dans le navigateur, compilation et construction OK.

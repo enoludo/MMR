@@ -156,7 +156,8 @@ export const salleProvisoire: SalleConfig = {
  * Salle de « La maladie de Huntington » : la même architecture, dans une ambiance bleutée, celle
  * de sa vignette (gris bleus, lumière blanche froide) : pierre plus bleue, qui refroidit la
  * lumière chaude du précalcul ; soleil de l'œuvre, faisceau et poussière plus froids ; ambiance
- * de l'œuvre et des couloirs. L'œuvre (blender/huntington.py) fait 2,20 m, sur un socle rond de
+ * de l'œuvre et des couloirs. L'œuvre (modèle de Jeff, préparé par blender/huntington-jeff.py, depuis
+ * le 03/11 ; avant : blender/huntington.py) fait 2,70 m, sur un socle rond de
  * 80 cm : son propre précalcul (`salle.py … huntington`, ombre de l'œuvre et du socle), un
  * parcours resserré et ses propres points de vue.
  */
