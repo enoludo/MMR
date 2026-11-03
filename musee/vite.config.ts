@@ -32,7 +32,7 @@ function enregistrementCaptures(): Plugin {
     configureServer(serveur) {
       serveur.middlewares.use('/__capture', async (req, res) => {
         const nom = new URL(req.url ?? '', 'http://x').searchParams.get('fichier') ?? ''
-        if (req.method !== 'POST' || !/^[a-z0-9-]+(\.webp|\.png|\.json)$/.test(nom)) {
+        if (req.method !== 'POST' || !/^[a-z0-9-]+(\.webp|\.png|\.json|\.mp4)$/.test(nom)) {
           res.statusCode = 400
           return res.end('fichier refusé')
         }

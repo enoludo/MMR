@@ -161,6 +161,7 @@ export function Accueil() {
     const ouvrirDepuisGrille = (id: string) => {
       if (!galerie.carteGrille(id) || galerie.grille.progres < 1 || store.get().transition || !salleOuverte(id)) return
       cliquer()
+      const carteCliquee = galerie.carteGrille(id)
       ouverteGrille = id
       grilleQuittee = { oeuvre: id, defilement }
       // La spirale tournée pour que l'œuvre soit au centre ; les cartes de la grille choisies de
@@ -168,6 +169,9 @@ export function Accueil() {
       y = galerie.offsetForCard(id, y)
       scroll.virtualOffset = y
       galerie.choisirCartesGrille(y)
+      // La vidéo du survol revient à l'image de la carte pendant le rangement (demande de Ludovic, 03/11) ;
+      // le zoom l'attend (plus bas, `departAller`)
+      galerie.revenirEnSpirale(carteCliquee, galerie.carteGrille(id), reduitMouvement() ? 0 : reglagesGrille.departAller * reglagesGrille.duree)
       const d = dispositionGrille(toile.current!.clientWidth, toile.current!.clientHeight, cartesSpirale.length)
       galerie.grille.ordre = rangsDepuis(d, cartesSpirale.findIndex((c) => c.id === id))
       deroule?.kill()
@@ -189,12 +193,15 @@ export function Accueil() {
     }
     // Arrivée sur l'accueil en vue Grille (hors retour d'une salle) : la grille est déjà en place
     if (vueGrille) {
+      galerie.prechargerSurvols()
       galerie.grille.progres = 1
       galerie.choisirCartesGrille(y)
       defilement = galerie.grille.defilement = defilementDeRetour()
       overlay.cacher()
     }
     const changerVue = (grille: boolean) => {
+      galerie.finSurvol(true)
+      if (grille) galerie.prechargerSurvols()
       vueGrille = grille
       ouverteGrille = null
       allerSpirale = false
@@ -239,7 +246,11 @@ export function Accueil() {
       const id = i !== undefined && i !== null ? cartesSpirale[i].id : null
       toile.current!.style.cursor = id && salleOuverte(id) ? 'pointer' : ''
       if (id !== (survol?.id ?? null)) survol = id ? { id, depuis: performance.now() } : null
+      // Vidéo de la vignette survolée à la souris (essai du 03/11 : seule « Le seuil » en a une)
+      const video = vueGrille && e.pointerType === 'mouse' && !e.buttons && !store.get().transition && id && salleOuverte(id)
+      galerie.survoler(video ? ancre!.slot : null, video ? cartesSpirale[i as number] : null)
     }
+    const surSortie = () => galerie.finSurvol()
     const surClic = (e: MouseEvent) => {
       const bouge = appui?.bouge
       appui = null
@@ -250,6 +261,7 @@ export function Accueil() {
     }
     toile.current!.addEventListener('pointerdown', surAppui)
     toile.current!.addEventListener('pointermove', surDeplacement)
+    toile.current!.addEventListener('pointerleave', surSortie)
     toile.current!.addEventListener('click', surClic)
 
     let raf = 0
@@ -297,7 +309,9 @@ export function Accueil() {
         const duree = reduitMouvement() ? 0 : reglagesGrille.duree
         g.progres = duree ? Math.max(0, g.progres - Math.min(maintenant - avant, PAS_MAX) / 1000 / duree) : 0
         // Le zoom peut partir (Transition.tsx attend en plus que la salle soit prête)
-        if (transition?.retenue && 1 - g.progres >= reglagesGrille.departAller) store.set({ transition: { ...transition, retenue: false } })
+        // (et que la vidéo du survol soit revenue à l'image de la carte)
+        if (transition?.retenue && 1 - g.progres >= reglagesGrille.departAller && !galerie.videoSurCarte(galerie.carteGrille(transition.oeuvre)))
+          store.set({ transition: { ...transition, retenue: false } })
         // Transition abandonnée (retour arrière) : la grille revient (changerVue)
         if (!transition && g.progres === 0) allerSpirale = false
       }
@@ -333,8 +347,11 @@ export function Accueil() {
       if (versSalle || versGrille) carteVivante.cadre = galerie.cardScreenFrame(slot)
       // Sous l'image de la transition, la carte 3D est cachée : elle grandirait avec la spirale sans
       // avoir tout à fait la forme de l'image, et ses bords dépasseraient. On la revoit au fondu du retour.
+      // Tant que la vidéo du survol y revient à sa première image, c'est elle qu'on voit : la carte reste
+      // visible et l'image de la transition attend (Transition.tsx, carteVivante.video)
+      carteVivante.video = transition?.sens === 'entree' && galerie.videoSurCarte(slot)
       const aCacher =
-        transition && !(transition.sens === 'sortie' && transition.phase === 'fondu') && imagePrete(carte.imageTransition)
+        transition && !(transition.sens === 'sortie' && transition.phase === 'fondu') && imagePrete(carte.imageTransition) && !carteVivante.video
           ? slot
           : null
       // (galerie.update la garde cachée aux images suivantes ; cette image-ci est déjà placée)

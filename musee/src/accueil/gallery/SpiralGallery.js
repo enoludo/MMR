@@ -47,6 +47,53 @@ function preparerCarte(card) {
   }
   return preparations.get(cle);
 }
+// Site React : vidéos du survol des vignettes de la grille, à l'endroit et à l'envers (une paire par
+// œuvre, gardée d'un montage à l'autre)
+/**
+ * Texture d'une vidéo du survol : une image arrivée n'est envoyée à la carte graphique que par
+ * `appliquer` (SpiralGallery.suivreSurvol), et pas tant qu'elle est `gelee`
+ */
+class TextureSurvol extends THREE.VideoTexture {
+  set needsUpdate(oui) {
+    if (oui) this.nouvelle = true;
+  }
+
+  appliquer() {
+    if (!this.nouvelle || this.gelee) return;
+    this.nouvelle = false;
+    this.version++;
+    this.source.needsUpdate = true;
+  }
+}
+function lecteur(adresse) {
+  const video = document.createElement('video');
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = 'auto';
+  video.src = adresse;
+  // Couleurs sRGB décodées dans le shader des cartes
+  const texture = new TextureSurvol(video);
+  video.addEventListener('seeked', () => {
+    texture.gelee = false;
+    texture.needsUpdate = true;
+  });
+  return { video, texture };
+}
+const videosSurvol = new Map();
+function videoSurvol(card) {
+  if (!videosSurvol.has(card.id)) videosSurvol.set(card.id, { aller: lecteur(card.survol.aller), retour: lecteur(card.survol.retour) });
+  return videosSurvol.get(card.id);
+}
+/** Le retour à la première image (souris hors de la vignette) va deux fois plus vite que l'aller (demande de Ludovic, 03/11) */
+const VITESSE_RETOUR = 2;
+/**
+ * Horloge bornée (s par image), comme le rangement de la grille (PAS_MAX, Accueil.tsx). Quand la page
+ * se fige (salle qui se prépare au clic : jusqu'à 0,2 s), la vidéo, elle, continue : après coup, on la
+ * ramène où elle en serait si elle avait attendu, et la carte garde son image en attendant. Une pause,
+ * pas un saut (03/11, sauts vus par Ludovic).
+ */
+const PAS_SURVOL = 0.034;
+
 const CARD_DEPTH = 0.04;
 const EDGE_COLOR = 0xffffff;
 
@@ -217,6 +264,13 @@ const BLUR_MAP_FRAGMENT = `
   sampledDiffuseColor += texture2D( map, vMapUv + texel * vec2( 3.0, -3.0) ) * 0.015;
   sampledDiffuseColor += texture2D( map, vMapUv + texel * vec2(-3.0,  3.0) ) * 0.015;
   sampledDiffuseColor += texture2D( map, vMapUv + texel * vec2(-3.0, -3.0) ) * 0.015;
+  // Site React : vidéo du survol d'une vignette de la grille, fondue sur l'image (survoler)
+  // (la vidéo n'est pas décodée en sRGB par la carte graphique comme l'image : on le fait ici)
+  if ( uMelange > 0.0 ) {
+    vec4 video = texture2D( uVideo, vMapUv );
+    video.rgb = mix( video.rgb / 12.92, pow( ( video.rgb + 0.055 ) / 1.055, vec3( 2.4 ) ), step( 0.04045, video.rgb ) );
+    sampledDiffuseColor = mix( sampledDiffuseColor, video, uMelange );
+  }
   diffuseColor *= sampledDiffuseColor;
 #endif
 `;
@@ -231,11 +285,13 @@ function createCardFaceMaterial() {
   });
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uBlur = { value: 0 };
+    shader.uniforms.uVideo = { value: null };
+    shader.uniforms.uMelange = { value: 0 };
     shader.uniforms.uTexel = {
       value: new THREE.Vector2(1 / CARD_TEXTURE_SIZE.width, 1 / CARD_TEXTURE_SIZE.height),
     };
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <map_pars_fragment>', '#include <map_pars_fragment>\nuniform float uBlur;\nuniform vec2 uTexel;')
+      .replace('#include <map_pars_fragment>', '#include <map_pars_fragment>\nuniform float uBlur;\nuniform vec2 uTexel;\nuniform sampler2D uVideo;\nuniform float uMelange;')
       .replace('#include <map_fragment>', BLUR_MAP_FRAGMENT);
     material.userData.shader = shader;
   };
@@ -298,6 +354,9 @@ export class SpiralGallery {
     this.slots = [];
     /** Site React : carte cachée sous l'image d'une transition (Accueil.tsx), ou null */
     this.carteCachee = null;
+    /** Site React : vignettes de la grille dont la vidéo du survol est sur la carte, et celle sous la souris (survoler) */
+    this.survols = [];
+    this.survol = null;
     // Site React : vue Grille (Grille.js). `progres` va de 0 (spirale) à 1 (grille) ; `cartes` donne,
     // pour chaque œuvre, la carte de la spirale qui va dans sa case (les autres s'effacent)
     // `ordre` : rang de chaque carte dans la cascade du déroulé (null : l'ordre de la grille) ; au retour
@@ -466,6 +525,7 @@ export class SpiralGallery {
 
       if (slot.faceMaterial.userData.shader) slot.faceMaterial.userData.shader.uniforms.uBlur.value = blur;
     }
+    this.suivreSurvol();
   }
 
   /**
@@ -637,6 +697,152 @@ export class SpiralGallery {
     this.renderer.setSize(width, height);
   }
 
+  /**
+   * Site React : vidéo au survol d'une vignette de la grille (Accueil.tsx ; demande de Ludovic, 03/11).
+   * Sa première image est celle de la carte (outils/capture.ts, capturerSurvol) : elle remplace l'image
+   * dès qu'elle est prête, sans fondu, et reste sur sa dernière image (la vue Maladie) tant que la souris
+   * est là. Quand la souris s'en va, elle revient à l'envers jusqu'à sa première image, deux fois plus
+   * vite, et la carte retrouve son image ; si la souris revient entre-temps, elle repart à l'endroit
+   * d'où elle en est. `slot` nul, ou une œuvre sans vidéo : fin du survol.
+   */
+  survoler(slot, card) {
+    const s = this.survol;
+    if (s && s.slot === slot) {
+      if (s.sens === 'retour') this.lire(s, 'aller');
+      return;
+    }
+    // La vignette quittée revient à sa première image, à l'envers
+    this.finSurvol();
+    if (!slot || !card?.survol) return;
+    // Une vignette encore en train de revenir repart à l'endroit d'où elle en est
+    let survol = this.survols.find((x) => x.slot === slot);
+    if (!survol) {
+      survol = { slot, ...videoSurvol(card), sens: null, montree: null, demande: 0, vitesse: VITESSE_RETOUR, dernier: null };
+      this.survols.push(survol);
+    }
+    this.survol = survol;
+    this.lire(survol, 'aller');
+  }
+
+  /** Site React : la souris quitte la vignette, la vidéo revient à l'envers ; `instant` : les images reviennent tout de suite (changement de vue) */
+  finSurvol(instant = false) {
+    const s = this.survol;
+    this.survol = null;
+    if (instant) {
+      for (const x of this.survols) this.couperSurvol(x);
+      this.survols = [];
+    } else if (s && !s.montree) this.retirerSurvol(s);
+    else if (s) this.lire(s, 'retour');
+  }
+
+  /**
+   * Site React : clic sur une vignette dont la vidéo joue (demande de Ludovic, 03/11). Elle revient à sa
+   * première image, à l'envers, pendant que la grille se range en spirale (le zoom vers la salle attend
+   * la fin, Accueil.tsx) : au moins deux fois plus vite que l'aller, et plus vite s'il le faut pour avoir
+   * fini en `dureeMax` s. La carte de l'œuvre a pu changer (choisirCartesGrille) : la vidéo y passe.
+   */
+  revenirEnSpirale(ancienne, nouvelle, dureeMax) {
+    const s = this.survols.find((x) => x.slot === ancienne);
+    for (const x of this.survols) if (x !== s) this.couperSurvol(x);
+    this.survols = s ? [s] : [];
+    this.survol = null;
+    if (!s) return;
+    if (!s.montree) {
+      this.retirerSurvol(s);
+      return;
+    }
+    if (nouvelle && nouvelle !== ancienne) {
+      const shader = ancienne.faceMaterial.userData.shader;
+      if (shader) shader.uniforms.uMelange.value = 0;
+      s.slot = nouvelle;
+    }
+    // Où l'on en est, en temps de l'aller : c'est ce qu'il reste à parcourir à l'envers
+    const v = s[s.montree].video;
+    const reste = s.montree === 'aller' ? v.currentTime : v.duration - v.currentTime;
+    s.vitesse = Math.max(VITESSE_RETOUR, reste / Math.max(0.1, dureeMax));
+    s.retour.video.playbackRate = s.vitesse;
+    this.lire(s, 'retour');
+  }
+
+  /** Site React : la vidéo du survol est encore sur cette carte */
+  videoSurCarte(slot) {
+    return !!slot && this.survols.some((x) => x.slot === slot && x.montree);
+  }
+
+  /**
+   * Lit la vidéo `sens` (aller ou retour) à partir de l'image où l'on en est ; celle qu'on quitte
+   * s'arrête et reste sur la carte jusqu'à ce que l'autre ait cette image
+   */
+  lire(s, sens) {
+    if (s.sens === sens) return;
+    const actuelle = s.montree && s[s.montree];
+    // Même image dans l'autre sens : l'instant t à l'endroit est (durée − t) à l'envers
+    const depuis = actuelle ? Math.max(0, actuelle.video.duration - actuelle.video.currentTime) : 0;
+    actuelle?.video.pause();
+    const { video } = s[sens];
+    s.sens = sens;
+    s.dernier = null;
+    const demande = ++s.demande;
+    video.playbackRate = sens === 'retour' ? s.vitesse : 1;
+    video.currentTime = depuis;
+    video.play().catch(() => {});
+    const montrer = () =>
+      requestAnimationFrame(() => {
+        if (this.survols.includes(s) && s.demande === demande) s.montree = sens;
+      });
+    if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(montrer);
+    else video.addEventListener('playing', montrer, { once: true });
+  }
+
+  /** Site React : vidéos des vignettes chargées d'avance (vue Grille affichée) */
+  prechargerSurvols() {
+    for (const card of this.cardsData) if (card.survol) videoSurvol(card);
+  }
+
+  retirerSurvol(s) {
+    this.couperSurvol(s);
+    this.survols = this.survols.filter((x) => x !== s);
+  }
+
+  couperSurvol(s) {
+    s.aller.video.pause();
+    s.retour.video.pause();
+    s.vitesse = VITESSE_RETOUR;
+    const shader = s.slot.faceMaterial.userData.shader;
+    if (shader) shader.uniforms.uMelange.value = 0;
+  }
+
+  /**
+   * Vidéos du survol sur les cartes, à chaque image (update) : rattrapage des gels de la page
+   * (PAS_SURVOL), envoi de l'image arrivée ; au bout du retour, l'image de la carte revient
+   */
+  suivreSurvol() {
+    const maintenant = performance.now();
+    const ecoule = (maintenant - (this.avantSurvol ?? maintenant)) / 1000;
+    this.avantSurvol = maintenant;
+    for (const s of this.survols) {
+      const m = s.montree && s.sens === s.montree ? s[s.montree] : null;
+      if (m && !m.video.paused && !m.video.seeking) {
+        // La page s'est figée : la vidéo a continué sans nous ; elle revient où elle en serait
+        if (ecoule > 1.5 * PAS_SURVOL && s.dernier !== null) {
+          m.texture.gelee = true;
+          m.video.currentTime = Math.min(m.video.duration, s.dernier + PAS_SURVOL * m.video.playbackRate);
+        } else s.dernier = m.video.currentTime;
+      }
+      s.aller.texture.appliquer();
+      s.retour.texture.appliquer();
+      if (s.montree === 'retour' && s.sens === 'retour' && s.retour.video.ended) {
+        this.retirerSurvol(s);
+        continue;
+      }
+      const shader = s.slot.faceMaterial.userData.shader;
+      if (shader) {
+        shader.uniforms.uVideo.value = s.montree ? s[s.montree].texture : null;
+        shader.uniforms.uMelange.value = s.montree ? 1 : 0;
+      }
+    }
+  }
+
   render() {
     this.renderer.render(this.scene, this.camera);
   }
@@ -652,6 +858,7 @@ export class SpiralGallery {
 
   /** Libère tout (ajouté pour le site React : la spirale est démontée quand on entre dans une salle). */
   dispose() {
+    this.finSurvol(true);
     for (const slot of this.slots) {
       slot.texture?.dispose();
       slot.faceMaterial.dispose();

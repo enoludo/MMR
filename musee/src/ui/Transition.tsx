@@ -223,6 +223,8 @@ export function Transition() {
       const o = oeuvres.find((x) => x.id === t?.oeuvre)
       if (!t || !o) return
       if (t.phase === 'retour' || t.phase === 'photo') return t0.effacer()
+      // Depuis la grille : la vidéo du survol revient encore à l'image de la carte, qu'on voit dans la spirale
+      if (t.sens === 'entree' && t.phase === 'preparation' && carteVivante.video) return t0.effacer()
       const a = anim.current
       const plein = pleinEcran()
       // La carte, si la page d'accueil la déplace (carteVivante) : à l'entrée, la carte cliquée que la

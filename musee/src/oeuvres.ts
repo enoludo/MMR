@@ -47,6 +47,12 @@ export interface Oeuvre {
    * (-profondeur.png) et les réglages (.json) donnent la parallaxe de la transition depuis la spirale
    */
   vueEntree?: string
+  /**
+   * Vidéos du survol de la vignette dans la grille : de l'image de la carte à la vue Maladie, et la
+   * même à l'envers (`__visite.capturerSurvol(id)` ou bouton de la vue libre, outils/capture.ts ;
+   * voir videosSurvol)
+   */
+  survol?: { aller: string; retour: string }
   /** Photos des cartouches Maladie et Manifeste du premier écran (à défaut, l'image de la carte) */
   cartouches?: Partial<Record<'maladie' | 'manifeste', string>>
   mecene?: { nom: string; lien?: string }
@@ -64,6 +70,12 @@ export interface Oeuvre {
 }
 
 const A_VENIR = ['Texte à venir.']
+
+/** Vidéos du survol de la vignette (outils/capture.ts, capturerSurvol) */
+const videosSurvol = (id: string): Oeuvre['survol'] => ({
+  aller: versionne(`/assets/captures/${id}-survol.mp4`),
+  retour: versionne(`/assets/captures/${id}-survol-retour.mp4`),
+})
 const maladieAVenir = (titre: string): TexteMaladie => ({ titre, paragraphes: A_VENIR })
 
 /**
@@ -90,6 +102,7 @@ export const oeuvres: Oeuvre[] = [
     musique: versionne('/assets/musiques/le-seuil-des-proportions.m4a'),
     vueEntree: '/assets/captures/le-seuil-des-proportions',
     cartouches: capturesCartouches('le-seuil-des-proportions'),
+    survol: videosSurvol('le-seuil-des-proportions'),
     mecene: { nom: 'Fondation Delorme-Vasseur' },
     partenaire: { nom: 'Recordati', logo: versionne('/assets/logos/recordati.svg') },
     // Textes et chiffres de la maquette Figma (chiffres et lien à faire valider)
@@ -126,6 +139,7 @@ export const oeuvres: Oeuvre[] = [
     musique: versionne('/assets/musiques/la-maladie-de-huntington.m4a'),
     vueEntree: '/assets/captures/la-maladie-de-huntington',
     cartouches: capturesCartouches('la-maladie-de-huntington'),
+    survol: videosSurvol('la-maladie-de-huntington'),
     // Proposé par Claude le 03/11, accepté par Ludovic avec un bouton sans lien (le site est une démo) ;
     // prévalence et « 0 » traitement curatif à faire vérifier
     maladieTexte: {
@@ -235,6 +249,8 @@ export const cartesSpirale = [...oeuvres.slice(1), oeuvres[0]].map((o) => ({
   link: lienOeuvre(o),
   /** Salle ouverte à la visite : sinon « Découvrir » et le clic dans la grille sont désactivés */
   ouverte: salleOuverte(o.id),
+  /** Vue Grille : vidéo au survol de la vignette */
+  survol: o.survol,
   /** Une capture de salle est montrée agrandie (×2 par défaut) dans sa carte (effet de masque des transitions) */
   zoom: o.vueEntree ? reglagesTransition(o.salle).zoomCarte : 1,
 }))

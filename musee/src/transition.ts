@@ -12,8 +12,12 @@ import { prechargerImages } from './ui/ToileTransition'
 /** Photographie de la salle à l'écran, posée par la scène 3D tant qu'elle est montée (Experience) */
 export const captureSalle: { courante: (() => HTMLCanvasElement | null) | null } = { courante: null }
 
-/** Entrée : cadre de la carte cliquée à l'écran, mis à jour par la spirale qui la recentre (Accueil) */
-export const carteVivante: { cadre: Cadre | null; zoom: number } = { cadre: null, zoom: 0 }
+/**
+ * Entrée : cadre de la carte cliquée à l'écran, mis à jour par la spirale qui la recentre (Accueil) ;
+ * `video` : la vidéo du survol de la grille y revient encore à sa première image (l'image de la
+ * transition attend, ui/Transition.tsx)
+ */
+export const carteVivante: { cadre: Cadre | null; zoom: number; video: boolean } = { cadre: null, zoom: 0, video: false }
 
 /** Depuis la spirale : la carte `carte` (à l'écran) grandit jusqu'à remplir l'écran, puis la salle apparaît. */
 export function entrer(oeuvre: string, carte: Cadre, retenue = false) {

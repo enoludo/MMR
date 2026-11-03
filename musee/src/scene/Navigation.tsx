@@ -184,6 +184,8 @@ export function Navigation({
     elan: 0,
     /** Pas de déplacement automatique (photos des cartouches : la vue exacte du popup, outils/capture.ts) */
     immobile: false,
+    /** Caméra posée de l'extérieur, image par image (vidéo du survol de la grille, outils/capture.ts) */
+    pose: null as { position: THREE.Vector3; quaternion: THREE.Quaternion; fov: number } | null,
     /**
      * Entrée depuis la spirale (voir entree.ts) : la caméra avance en ligne droite jusqu'à la
      * vue d'arrivée, au rythme de l'image de la carte, qui s'efface par-dessus
@@ -626,6 +628,13 @@ export function Navigation({
     const s = n.current
     // Vue libre (touche V) : la caméra est à scene/VolLibre.tsx ; en revenant, on repart d'où l'on était
     if (store.get().libre) return void (s.initialise = false)
+    if (s.pose) {
+      camera.position.copy(s.pose.position)
+      camera.quaternion.copy(s.pose.quaternion)
+      camera.fov = s.pose.fov
+      camera.updateProjectionMatrix()
+      return
+    }
     const g = r.current
     const dt = Math.min(delta, 0.1)
     const instant = !s.initialise
@@ -815,6 +824,17 @@ export function Navigation({
         if (!oeuvre) throw new Error(`œuvre inconnue : ${nom}`)
         const m = await import('../outils/capture')
         return m.capturerCartouches({ gl, scene, camera, etat: n.current, etapes: salle.current.etapes, vues: oeuvre.vues, aller: allerEtape, retour: revenirAuCercle, nom })
+      },
+      /** Vidéo du survol de la vignette dans la grille : de la carte à la vue Maladie (voir outils/capture.ts) */
+      capturerSurvol: async (nom: string) => {
+        const { oeuvres } = await import('../oeuvres')
+        const oeuvre = oeuvres.find((o) => o.id === nom)
+        if (!oeuvre) throw new Error(`œuvre inconnue : ${nom}`)
+        const m = await import('../outils/capture')
+        return m.capturerSurvol({
+          gl, scene, camera, etat: n.current, etapes: salle.current.etapes, vues: oeuvre.vues,
+          aller: allerEtape, retour: revenirAuCercle, nom, transition: reglagesTransition(salle.current),
+        })
       },
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

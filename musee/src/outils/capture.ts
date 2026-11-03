@@ -287,3 +287,165 @@ export async function capturerCartouches({
   retour()
   return fichiers
 }
+
+/** Vidéo du survol des vignettes de la grille : taille, cadence, débit (la durée est celle du trajet de la visite) */
+const SURVOL = { largeur: 1280, hauteur: 720, images: 30, debit: 5_000_000 }
+
+/** Pose de caméra imposée à la navigation, image par image (Navigation.tsx, `pose`) */
+type Pose = { position: THREE.Vector3; quaternion: THREE.Quaternion; fov: number }
+const lirePose = (camera: THREE.PerspectiveCamera): Pose => ({
+  position: camera.position.clone(),
+  quaternion: camera.quaternion.clone(),
+  fov: camera.fov,
+})
+const lisseCubique = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2)
+
+/**
+ * Vidéo du survol d'une vignette de la grille (essai du 03/11, demande de Ludovic) : la caméra part
+ * de l'image de la carte et va au point de vue du popup Maladie. Première image = la carte : la vue
+ * d'entrée, avec le champ réduit de l'agrandissement de la carte (`zoomCarte` : agrandir le centre
+ * d'une image revient à resserrer le champ depuis le même point) ; puis une courbe qui part dans
+ * l'axe du mouvement d'entrée (par la vue initiale) et rejoint la vue Maladie, champ et regard
+ * glissant en même temps. Durée : celle du trajet de la visite de la vue initiale à la vue Maladie
+ * (demande de Ludovic du 03/11). Dessinée image par image (fluide quelle que soit la machine), encodée
+ * en MP4 (H.264) par le navigateur (WebCodecs, mp4-muxer), à l'endroit et à l'envers (le retour à la
+ * première image quand la souris quitte la vignette ou au clic : les navigateurs ne lisent pas une
+ * vidéo à l'envers).
+ *
+ * Dans la salle, navigateur en 1280 × 720 : `await __visite.capturerSurvol('le-seuil-des-proportions')`,
+ * ou bouton « Vidéo du survol » de la vue libre (touche V). Fichiers : public/assets/captures/<nom>-survol.mp4
+ * et <nom>-survol-retour.mp4.
+ */
+export async function capturerSurvol({
+  gl,
+  scene,
+  camera,
+  etat,
+  etapes,
+  vues,
+  aller,
+  retour,
+  nom,
+  transition,
+}: {
+  gl: THREE.WebGLRenderer
+  scene: THREE.Scene
+  camera: THREE.PerspectiveCamera
+  /** État de la navigation (Navigation.tsx) */
+  etat: { mode: string; immobile: boolean; enEntree: boolean; duree: number; pose: Pose | null }
+  etapes: { id: string }[]
+  vues: Partial<Record<string, string | null>>
+  aller: (i: number) => void
+  retour: () => void
+  nom: string
+  transition: ReglagesTransition
+}) {
+  const { width, height } = gl.domElement
+  if (Math.abs(width / height - FORMAT_CAPTURE) > 0.01) throw new Error(`le canvas doit être en 16:9 (${width} × ${height})`)
+  const i = etapes.findIndex((e) => e.id === vues.maladie)
+  if (i < 0) throw new Error('pas de point de vue pour maladie')
+  const { Muxer, ArrayBufferTarget } = await import('mp4-muxer')
+  const config: VideoEncoderConfig = {
+    codec: 'avc1.640028',
+    width: SURVOL.largeur,
+    height: SURVOL.hauteur,
+    bitrate: SURVOL.debit,
+    framerate: SURVOL.images,
+    avc: { format: 'avc' },
+  }
+  if (!(await VideoEncoder.isConfigSupported(config)).supported) throw new Error('encodage H.264 non disponible dans ce navigateur')
+
+  // Les trois poses : vue d'entrée (la carte), vue initiale (au bout du mouvement d'entrée), vue Maladie
+  etat.enEntree = true
+  entree.fige = 0
+  await images(4)
+  const depart = lirePose(camera)
+  depart.fov = (2 * Math.atan(Math.tan((depart.fov * Math.PI) / 360) / transition.zoomCarte) * 180) / Math.PI
+  entree.fige = 1
+  await images(4)
+  const initiale = lirePose(camera)
+  entree.fige = null
+  etat.enEntree = false
+  etat.immobile = true
+  try {
+    aller(i)
+    // Durée du trajet de la visite vers la vue Maladie (Navigation.tsx, demarrerTransition)
+    const duree = etat.duree > 0 ? etat.duree : 2
+    while (etat.mode !== 'etape') await images(1)
+    await images(30)
+    const maladie = lirePose(camera)
+
+    /** Un fichier MP4 : `ajouter` une image après l'autre, puis `finir` */
+    const encodage = () => {
+      const cible = new ArrayBufferTarget()
+      const muxer = new Muxer({ target: cible, video: { codec: 'avc', width: SURVOL.largeur, height: SURVOL.hauteur }, fastStart: 'in-memory' })
+      let erreur: unknown = null
+      const encodeur = new VideoEncoder({ output: (morceau, meta) => muxer.addVideoChunk(morceau, meta), error: (e) => (erreur = e) })
+      encodeur.configure(config)
+      let k = 0
+      return {
+        ajouter(source: CanvasImageSource) {
+          const trame = new VideoFrame(source, { timestamp: Math.round((k * 1e6) / SURVOL.images), duration: Math.round(1e6 / SURVOL.images) })
+          encodeur.encode(trame, { keyFrame: k % SURVOL.images === 0 })
+          trame.close()
+          k++
+          if (erreur) throw erreur
+        },
+        async finir() {
+          await encodeur.flush()
+          encodeur.close()
+          muxer.finalize()
+          return new Blob([cible.buffer], { type: 'video/mp4' })
+        },
+      }
+    }
+    const aLEndroit = encodage()
+    /** Chaque image gardée (WebP), pour la vidéo à l'envers */
+    const gardees: Blob[] = []
+    const image = document.createElement('canvas')
+    image.width = SURVOL.largeur
+    image.height = SURVOL.hauteur
+    const ctx = image.getContext('2d')!
+    ctx.imageSmoothingQuality = 'high'
+
+    const pose: Pose = { position: new THREE.Vector3(), quaternion: new THREE.Quaternion(), fov: depart.fov }
+    etat.pose = pose
+    const ratio = gl.getPixelRatio()
+    const n = Math.max(2, Math.round(duree * SURVOL.images))
+    for (let k = 0; k < n; k++) {
+      const t = lisseCubique(k / (n - 1))
+      // Courbe de Bézier (départ, vue initiale, vue Maladie), regard et champ glissant ensemble
+      pose.position
+        .copy(depart.position)
+        .multiplyScalar((1 - t) ** 2)
+        .addScaledVector(initiale.position, 2 * (1 - t) * t)
+        .addScaledVector(maladie.position, t * t)
+      pose.quaternion.slerpQuaternions(depart.quaternion, maladie.quaternion, t)
+      pose.fov = depart.fov + (maladie.fov - depart.fov) * t
+      // Le temps que la navigation pose la caméra et que le reflet suive
+      await images(2)
+      if (gl.getPixelRatio() !== resolutionMax()) gl.setPixelRatio(resolutionMax())
+      dessiner(gl, scene, camera)
+      ctx.drawImage(gl.domElement, 0, 0, image.width, image.height)
+      aLEndroit.ajouter(image)
+      gardees.push(await enBlob(image, 'image/webp', 0.95))
+    }
+    gl.setPixelRatio(ratio)
+    rendu.redimensionner?.()
+    const aLEnvers = encodage()
+    for (let k = n - 1; k >= 0; k--) {
+      const bitmap = await createImageBitmap(gardees[k])
+      aLEnvers.ajouter(bitmap)
+      bitmap.close()
+    }
+    const video = await aLEndroit.finir()
+    const videoRetour = await aLEnvers.finir()
+    await envoyer(`${nom}-survol.mp4`, video)
+    await envoyer(`${nom}-survol-retour.mp4`, videoRetour)
+    return { fichiers: [`${nom}-survol.mp4`, `${nom}-survol-retour.mp4`], duree, images: n, octets: video.size + videoRetour.size }
+  } finally {
+    etat.pose = null
+    etat.immobile = false
+    retour()
+  }
+}

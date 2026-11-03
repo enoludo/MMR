@@ -106,6 +106,16 @@ export function VueLibre({ oeuvre }: { oeuvre: Oeuvre }) {
       },
     )
 
+  /** Vidéo du survol de la vignette dans la grille (de la carte à la vue Maladie, outils/capture.ts) */
+  const capturerSurvol = () =>
+    enCapture(
+      'Vidéo en cours… (une demi-minute, ne touchez à rien)',
+      'Vidéo faite. Elle passera au survol de la vignette dans la grille, au rechargement.',
+      async (visite) => {
+        await visite.capturerSurvol(oeuvre.id)
+      },
+    )
+
   /**
    * Les captures demandent un canvas en 16:9 et la visite sur son anneau : la scène passe le temps
    * des captures à 1280 × 720 (2560 × 1440 sur un écran Retina, comme le mode d'emploi de
@@ -240,6 +250,15 @@ export function VueLibre({ oeuvre }: { oeuvre: Oeuvre }) {
         </span>
         <button type="button" className="vue-libre__principal" onClick={capturer} disabled={enCours}>
           Faire les captures
+        </button>
+      </div>
+      <div className="vue-libre__ligne">
+        <span>
+          Vidéo du survol
+          <small>vignette de la grille : de la carte à la vue Maladie</small>
+        </span>
+        <button type="button" onClick={capturerSurvol} disabled={enCours}>
+          Vidéo du survol
         </button>
       </div>
       <p className="vue-libre__note">
