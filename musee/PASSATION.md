@@ -1,112 +1,132 @@
-# Passation — avant de retravailler la statue de « La maladie de Huntington »
+# Passation — avant de reprendre le design des popups
 
-Rédigée le 01/11/2026 par Claude Code, à la fin de la session « vue Grille de la page d'accueil ». À lire
-après `CLAUDE.md` (contexte, décisions de Ludovic, architecture détaillée) et le haut de `JOURNAL.md`
-(détail de chaque changement, avec son statut). Remplace la passation « avant de reprendre l'animation des
-titres de la spirale », toujours lisible dans l'historique Git.
+Rédigée le 03/11/2026 par Claude Code, à la fin de la session « statue de Jeff et réglages par salle ». À
+lire après `CLAUDE.md` (contexte, décisions de Ludovic, architecture détaillée) et le haut de `JOURNAL.md`
+(détail de chaque changement, avec son statut). Remplace la passation « avant de retravailler la statue de
+Huntington », toujours lisible dans l'historique Git.
 
 ---
 
-## 1. La statue de « La maladie de Huntington » (refonte abandonnée par Ludovic le 02/11, voir `JOURNAL.md`)
+## 1. La suite : le design des popups Maladie et Manifeste
 
-**Demande de Ludovic (01/11) :** retravailler la statue pour être **plus fidèle à l'image de référence** :
-les **proportions du corps** et les **détails « plaques »**, travaillés plus finement.
+**Demande de Ludovic (03/11) :** reprendre le design des popups, dont il n'est **pas encore satisfait**. Il
+n'a pas encore dit ce qui ne va pas : **commencer par le lui demander** (ce qui le gêne, s'il a une nouvelle
+maquette Figma ou des références), puis lui montrer des captures à chaque étape, en 1680 × 1050.
 
-**Image de référence :** `public/assets/images/la-maladie-de-huntington.webp` (l'ancien visuel de l'œuvre,
-aujourd'hui la vignette des flèches précédente / suivante). La regarder en grand avant tout : silhouette
-dansée qui se défait, plaques anguleuses, éclats qui s'envolent du haut du corps.
+**Maquettes actuelles :** Figma `BV6AsWeLSbWpCA7AarJGdr`, Maladie `471:511`, Manifeste `477:2158` (depuis le
+30/10). Avant : `447:602` et `448:911`, puis une première intégration refaite parce qu'il n'en était pas
+content (voir `JOURNAL.md`, entrées du 27/10 et du 30/10). S'il fournit une nouvelle maquette, relever ses
+cotes en 1680 × 1050 (l'écran de la maquette).
 
-**La statue aujourd'hui :** `blender/huntington.py` (modélisée par Claude le 29/10, d'après cette vignette).
-- Squelette posé à la main (dictionnaire `J` : bassin, buste, tête, bras, jambes en mètres, Z en haut,
-  l'œuvre regarde vers -Y), os `OS` avec un rayon au début et à la fin.
-- Chaque membre est un volume anguleux (enveloppe convexe de points tirés au hasard, `random.seed(7)`),
-  couvert de plaques un peu décollées (jointures sombres), éclats autour du haut du corps.
-- Une seule matière, couleurs par sommet : `BRONZE`, `OR` (plaques), `JOINT`.
-- Silhouette de **2,70 m** (décision de Ludovic, 29/10), sur un **socle rond de 80 cm** (1,2 m de rayon) à
-  gorge lumineuse : le socle est dans la salle (`rotonde.py` / `salle.py`), pas dans `huntington.py`.
-- Lancer : `/Applications/Blender.app/Contents/MacOS/Blender -b --python-use-system-env -P blender/huntington.py -- aperçu.png`
-  (l'aperçu PNG permet de comparer à la référence sans passer par le site).
+### Ce que sont les popups aujourd'hui
 
-**Pistes pour être plus fidèle :**
-- Comparer côte à côte l'aperçu et la référence, à la même focale et sous le même angle (vue d'arrivée
-  cadrée comme la vignette, 6,3 m dans l'ancienne salle) ; corriger d'abord les proportions (longueur des
-  membres, largeur des épaules et du bassin, taille de la tête, cambrure), puis la pose.
-- Plaques plus fines : plus nombreuses et plus petites, découpées en facettes plutôt qu'en volumes
-  convexes, jointures plus régulières, épaisseur visible sur les bords ; garder un nombre de triangles
-  raisonnable pour le site (le GLB fait aujourd'hui 95 Ko).
-- Montrer des aperçus à Ludovic à chaque étape (face, trois-quarts, profil) avant de lancer le reste de la
-  chaîne, qui est long.
+**Composant unique, réutilisable dans toutes les salles :** `src/ui/Popup.tsx`. Toujours passer par lui.
+- `Popup` (cadre, croix, défilement, focus clavier, fermeture par la croix, Échap ou un clic à côté),
+  composé de blocs : `PopupEntete` (surtitre + grand titre), `PopupTexte` (paragraphes, `petit` pour le
+  Manifeste), `PopupChiffres` (deux colonnes), `PopupLien` (bouton rouge « En savoir plus »).
+- Utilisé dans `src/ui/InterfaceSalle.tsx` (`Maladie`, `Manifeste`, vers la fin du fichier). Les textes
+  viennent de `src/oeuvres.ts` (`maladieTexte` : titre, paragraphes, chiffres, lien ; `manifesteTitre`,
+  `manifeste`).
 
-**Après la modélisation (tout cela dépend de la forme de la statue) :**
-1. Compression vers le site : `gltf-transform optimize … --compress meshopt --simplify false`, puis
-   `occlusion.mjs … 0.005` → `public/models/huntington.glb` (détail : `blender/README.md`, étape 1 bis).
-2. **Lumière de la rotonde à recalculer** (l'ombre et l'occlusion de la statue sont dans ses lightmaps) :
-   `rotonde.py 2048 768 256` puis `blender/chaine.sh 2048 rotonde` (≈ 40 min ; lancer en arrière-plan).
-3. **Captures à refaire**, salle ouverte, avec la vue libre (touche V, bouton « Faire les captures ») :
-   image de la transition depuis la spirale et la grille, vignette des flèches, photos des cartouches
-   Maladie et Manifeste.
-4. Revoir les points de vue Maladie et Manifeste si la pose change (touche V).
+**Mise en page** (`src/style.css`, section « Popup », commentaires détaillés) :
+
+| Élément | Valeur actuelle |
+|---|---|
+| Cadre | 653 px de large (`clamp(400px, 38.87vw, 653px)`), à 96 px du bord droit, centré en hauteur, entre le header et le pied |
+| Fond | `--verre-sombre` (noir à 20 %), flou 15 px, coins 24 px (30 sur la maquette, réduit par Ludovic) |
+| Marge intérieure | la même sur les quatre côtés (demande de Ludovic) : 96 px en 1680 × 1050, 48 px en 1440 × 900, jusqu'à 24 px ; au-delà le contenu défile, barre masquée |
+| Croix | bouton rond de 48 px à 6 px du coin, transparent, voile léger au survol (demande de Ludovic) |
+| En-tête | surtitre 16 px, grand titre Marquez 48 px (60 sur la maquette, réduit par Ludovic), filet dessous |
+| Texte | Maladie 16 px Light, interligne 24 ; Manifeste 14 px, interligne 21 |
+| Chiffres | deux colonnes, 48 px d'écart, valeur 36 px en capitales, filet sous chacun |
+| Bouton | pilule rouge `#d93e34` (`#c2352c` au survol) |
+| Mobile (< 761 px) | en bas, au-dessus des flèches, 60 % de la hauteur au plus, tailles réduites (section mobile de `style.css`) |
+| Écrans peu hauts | section `@media (max-height: 800px)` |
+
+**Animations** (dans `Popup.tsx`, réglées dans l'esprit du premier écran) :
+- Ouverture : le premier écran part en cascade, le cadre arrive 0,2 s après (glisse de 24 px, 0,6 s, CSS),
+  puis le surtitre, le **grand titre lettre par lettre** (SplitText, masque par lettre), et chaque
+  paragraphe, chiffre et bouton l'un après l'autre (0,1 s d'écart), la croix en fondu.
+- Fermeture : tout repart par le haut dans le même ordre, puis le cadre s'efface (0,35 s après).
+- Le titre reste découpé tant que le popup est ouvert (sinon accents et espacement sautaient) ; les
+  masques de lettres laissent de la place aux accents (`.char-mask`, en haut de `style.css`).
+- Son de clic à l'ouverture (`cliquer()`, `musique.ts`), rien à la fermeture.
+
+**Lien avec la 3D :**
+- À l'ouverture, la caméra va au point de vue du popup (Maladie : la grosse main ; Manifeste : le
+  visage), réglés dans la vue libre (touche V, `src/salles/points-de-vue.json`). Popup ouvert, rotation
+  automatique lente et scroll qui tourne autour de l'œuvre (`Navigation.tsx`, `tourEtape`).
+- **L'image se décale** pour que l'œuvre reste au milieu de l'espace libre à gauche du popup :
+  `src/scene/Decentrage.tsx`. Il mesure `.popup--ouvert` à l'écran, mais **la vue libre et les captures
+  recopient en dur le bord et la largeur du popup** (`Math.min(96, 5.714 * vw) + …`). **Si la largeur ou la
+  position du popup change, changer aussi cette ligne**, puis revoir les points de vue Maladie et Manifeste
+  (touche V, case « Cadrer comme avec un popup ouvert »).
+- Les photos des cartouches (premier écran) sont les vues des popups, sans le décalage : elles ne
+  changent pas avec le design du popup, seulement avec les points de vue.
+
+**Points connus, à reprendre avec le design :**
+- Chiffres du popup Maladie du Seuil repris du Figma (1/2M, ACVR1, 9/10, 0) : **à faire valider** (« 1/2M » et
+  « ACVR1 » ne correspondent pas à l'acromégalie ; ACVR1 est le gène de la FOP). Lien Orphanet à confirmer.
+- Huntington et les autres œuvres n'ont qu'un texte d'attente (`maladieAVenir` : titre et paragraphe « à
+  venir », ni chiffres ni lien) : le popup doit rester beau sans eux.
+- Mobile : le popup Maladie défile ; pas de maquette mobile.
+- Police de la maquette (Geist Light) remplacée par Google Sans Flex Light.
+
+**Pour vérifier :** salle ouverte (`/oeuvre/le-seuil-des-proportions` et `/oeuvre/la-maladie-de-huntington`),
+clic sur une cartouche ; contrôler en 1680 × 1050 (cotes de la maquette), 1440 × 900, 1280 × 720 et mobile.
+Le navigateur intégré doit être **visible** (masqué, il fige les animations et la salle ne se charge pas).
+Pour regarder une animation au ralenti : `gsap.globalTimeline.timeScale(0.05)` (voir `CLAUDE.md`).
 
 ## 2. Où en est-on
 
 **Git :** tout est enregistré et envoyé sur GitHub (`enoludo/MMR`, branche
-`claude/spirale-interactive-gallery-b4mzwd`).
+`claude/spirale-interactive-gallery-b4mzwd`, dernier commit `80ed3fe`).
 
-**En ligne :** le labo `mmr-lab` (https://mmr-lab.labs.cubedesigners.com/) est à jour depuis le 02/11
-(version du labo `29c0672`) : tout ce qui précède, plus les salles fermées à la visite (seuls le Seuil et
-Huntington s'ouvrent, `SALLES_OUVERTES` dans `oeuvres.ts`).
+**En ligne :** le labo `mmr-lab` (https://mmr-lab.labs.cubedesigners.com/) est à jour (version du labo
+`4bd4a37`, 03/11).
 
-**Fait le 01/11** (tout est « à voir » dans le journal, sauf ce qui a été abandonné) :
-1. **Titres de la spirale qui se croisent** au changement de carte.
-2. **Vue Grille** de la page d'accueil : la spirale se déroule en grille (`gallery/Grille.js`), fond noir,
-   légendes sous les vignettes, défilement.
-3. **Grille → salle :** la grille se range en spirale (la vignette cliquée en dernier, au centre), le zoom
-   part à 69 % du rangement. **Salle → grille :** retour de la spirale, puis la spirale se range en grille
-   avant la fin de la réduction (75 %), la vignette de l'œuvre la première. La grille revient défilée comme
-   on l'a quittée. Les essais de pile au centre et de retour en courbe ont été abandonnés.
-4. **Préchargement au survol** d'une vignette (0,2 s) : plus de saccade au clic.
-5. **Barre de recherche** en bas de la vue Grille (maquette « SearchBar » 58:455) : **affichée seulement**,
-   la saisie et les menus Tags / Mécènes ne filtrent pas encore.
-6. **Flèches de la spirale et champs de la recherche qui se chassent** au changement de vue (effet des
-   titres).
-7. Corrections : dédoublement de l'image pendant le zoom vers une salle (carte 3D réaffichée sous l'image),
-   lettres des titres qui traversaient leur masque quand le titre était caché.
+**Fait le 03/11** (tout est « à voir » dans le journal) :
+1. **Statue de Huntington de Jeff** à la place de l'ancienne, même taille (2,70 m) ; lumière de la rotonde
+   recalculée ; captures refaites par Ludovic. Elle paraît très sombre de face (bronze métallique) : à
+   régler avec lui.
+2. **Réglages de la touche M propres à chaque salle** : lumières, couleurs, effets de la salle et de la
+   statue (`src/reglages.ts`, `src/salles/couleurs.ts`), un bouton « copier ce dossier » par dossier, et
+   le dossier « Transmettre » (copier tout, coller, enregistrer en local dans `src/salles/reglages.json`).
+   Pour que le collègue de Ludovic envoie ses réglages depuis le labo : Ludovic colle le texte copié dans
+   la conversation, il faut alors reprendre les valeurs (dossier d'une salle : `reglages.json` sous l'id de
+   la salle ; dossier commun, comme « Grille » ou « Titres de la spirale » : valeur par défaut dans le code).
+   **Pas encore essayé dans le navigateur** (il était masqué) : à vérifier au début de la session.
+3. Réglages transmis par Ludovic : titres de la spirale (délai 0,25 s), grille (écart 12 px, marges 24 px).
 
 ## 3. Où trouver quoi
 
 | Sujet | Fichiers |
 |---|---|
-| Statue de Huntington | `blender/huntington.py`, `blender/sculpture-huntington/`, `public/models/huntington.glb`, `src/salles/rotonde/config.ts` (`sculpture`) |
-| Rotonde (lumière précalculée) | `blender/rotonde.py`, `blender/chaine.sh`, `blender/salle-rotonde/`, `public/models/rotonde-*` |
-| Vue Grille | `src/accueil/gallery/Grille.js` (réglages, cases, légendes, `rangsDepuis`), `src/accueil/gallery/SpiralGallery.js` (`grille`, `versGrille`, `carteCachee`), `src/accueil/Accueil.tsx` (`changerVue`, `ouvrirDepuisGrille`, `allerSpirale`, `retourGrille`) |
-| Transitions spirale ou grille ↔ salle | `src/transition.ts` (`entrer`, `carteVivante`), `src/ui/Transition.tsx`, `src/ui/ToileTransition.ts` |
-| Recherche, flèches qui se chassent | `src/accueil/Accueil.tsx` (`.recherche`, `.masque`, `SORTIE_PILULES`), `src/style.css` |
-| Captures | `src/outils/capture.ts`, `src/ui/VueLibre.tsx` |
+| Popups | `src/ui/Popup.tsx`, `src/style.css` (section « Popup », mobile, écrans peu hauts), `src/ui/InterfaceSalle.tsx` (`Maladie`, `Manifeste`, cartouches) |
+| Textes des popups | `src/oeuvres.ts` (`maladieTexte`, `manifesteTitre`, `manifeste`) |
+| Cadrage de l'œuvre à côté du popup | `src/scene/Decentrage.tsx`, `src/salles/points-de-vue.json`, `src/ui/VueLibre.tsx` |
+| Animations des textes | `src/ui/apparition.ts` (premier écran), `Popup.tsx` (popups) |
+| Réglages par salle | `src/reglages.ts`, `src/salles/couleurs.ts`, `src/salles/reglages.json`, `src/ui/CopieReglages.tsx`, `vite.config.ts` (`/__reglages`) |
 
 ## 4. Points ouverts (détail dans `CLAUDE.md`)
 
-- **À montrer à Ludovic :** toute la vue Grille et ses transitions, les réglages de départ (touche M
-  « Grille » : « vers une salle : départ du zoom », « retour : départ de la grille »).
-- **Recherche et filtres** à relier à la grille (et l'étiquette « thème », absente des données).
-- Une image d'environ 0,1 s reste au premier dessin d'une salle (matières du reflet, des ombres et des
-  effets compilées à ce moment-là), pendant le rangement de la grille.
-- Rotonde : bruit de la lumière sur les colonnes, approche de la porte d'entrée, lumière de l'œuvre.
-- Mobile, chiffres du popup Maladie, bundle de 1,3 Mo : inchangés.
+- Essayer les réglages par salle dans le navigateur (dossiers, copie, collage, enregistrement, passage
+  d'une salle à l'autre).
+- Matière de la statue de Jeff, trop sombre de face.
+- À montrer à Ludovic : vue Grille et ses transitions ; recherche et filtres à relier à la grille.
+- Rotonde : bruit de la lumière sur les colonnes, approche de la porte d'entrée.
+- Mobile (avec une maquette), bundle de 1,3 Mo.
 - Ménage : `~/MMR/_to_delete/`, `musee/_a_supprimer/`, les zips et « Claude outputs » à la racine de `MMR`.
 
 ## 5. Rappels pratiques
 
-- **Serveur de développement :** `npm run dev` (http://localhost:5173).
+- **Serveur de développement :** `npm run dev` (http://localhost:5173) ; depuis Claude Code, `preview_start`
+  avec le nom `dev`.
 - **Vérifier avant d'annoncer :** `npx tsc --noEmit`, `npm run build`, un coup d'œil dans le navigateur.
-  Mesurer les performances sur la version compilée (`npm run build` puis `npx vite preview`), onglet du
-  navigateur intégré **au premier plan** (un onglet en arrière-plan ralentit tout).
-- **Navigateur intégré :** masqué, il fige les animations. `gsap.globalTimeline.timeScale(0.05)` ralentit
-  les transitions, mais pas le rangement de la grille (horloge propre). Leva se pilote depuis la console
-  avec `levaStore` (importé depuis l'adresse de `leva.js` relevée dans `performance.getEntriesByType('resource')`).
-- **Blender :** scripts lancés avec le Blender de l'application (commande dans `CLAUDE.md`) ; les calculs
-  longs en arrière-plan.
+- **CSS :** toujours `-webkit-backdrop-filter` **avant** `backdrop-filter` (sinon le flou disparaît en ligne
+  dans Chrome).
 - **Mettre en ligne sur le labo :** `npm run build`, copier `dist/` sans `.htaccess` ni les lightmaps WebP,
   ajouter une copie de `index.html` dans `oeuvre/<id>/` pour chaque œuvre et dans `a-propos/`, zipper, puis
-  `lab_upload_zip` (labo `mmr-lab`, `clean: true`).
+  `lab_upload_zip` (labo `mmr-lab`, `clean: true`, envoi du zip par `curl` sur l'adresse renvoyée).
 - **Ludovic :** répondre en français, court ; montrer des captures ; ne marquer « validé » que sur son
   accord explicite ; enregistrer dans Git ou mettre en ligne seulement à sa demande.

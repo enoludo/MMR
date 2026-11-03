@@ -1,7 +1,7 @@
 # CLAUDE.md — Musée des Maladies Rares (MMR), site 3D
 
 Contexte de travail pour Claude Code. À lire en entier au début de chaque session.
-Dernière mise à jour : 03/11/2026 (statue de Huntington remplacée par le modèle de Jeff ; vue Grille et ses transitions : `PASSATION.md`).
+Dernière mise à jour : 03/11/2026 (statue de Huntington de Jeff, réglages de la touche M par salle ; suite, le design des popups : `PASSATION.md`).
 
 ## Interlocuteur et façon de travailler
 
