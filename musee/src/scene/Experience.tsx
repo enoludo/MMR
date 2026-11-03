@@ -173,6 +173,20 @@ function Affichee({ cle }: { cle: number }) {
 
 const imageSuivante = () => new Promise((ok) => requestAnimationFrame(ok))
 
+/**
+ * Compile les matières sans bloquer, telles que la salle les dessinera : dans l'image intermédiaire
+ * des effets d'image s'ils sont actifs (Effets.tsx : autre variante des programmes, en linéaire et
+ * sans tonemapping), sinon à l'écran. Compilées pour l'écran alors que la salle dessine dans les
+ * effets, elles l'étaient de nouveau au premier dessin, d'un bloc (≈ 0,25 s figées, mesuré le 04/11).
+ */
+function compilerCommeAuRendu(gl: THREE.WebGLRenderer, objet: THREE.Object3D, camera: THREE.Camera, scene?: THREE.Scene) {
+  const avant = gl.getRenderTarget()
+  gl.setRenderTarget(renduEffets.cible ?? null)
+  const fait = gl.compileAsync(objet, camera, scene)
+  gl.setRenderTarget(avant)
+  return fait
+}
+
 const recopiees = new WeakSet<ImageBitmap>()
 /**
  * Image d'une texture décodée par le navigateur (ImageBitmap : celles des modèles GLB, la sculpture)
@@ -222,7 +236,7 @@ function Preparation({ cle }: { cle: number }) {
         gl.initTexture(t)
         await imageSuivante()
       }
-      if (!fini) await gl.compileAsync(scene, camera)
+      if (!fini) await compilerCommeAuRendu(gl, scene, camera)
       for (let i = 0; i < 2 && !fini; i++) {
         advance(performance.now())
         await imageSuivante()
@@ -271,7 +285,7 @@ function PreparationPassage({ cle, children }: { cle: number; children: ReactNod
         await imageSuivante()
       }
       // Matières de la salle cachée, avec les lumières de toute la scène
-      if (!fini) await gl.compileAsync(g, camera, scene)
+      if (!fini) await compilerCommeAuRendu(gl, g, camera, scene)
       // Premier dessin de chaque objet, réduit à un pixel, un par image : le pilote graphique y
       // prépare ses états de dessin (et ses textures), ≈ 0,2 à 0,4 s d'un coup sinon, à l'apparition
       const objets: THREE.Object3D[] = []

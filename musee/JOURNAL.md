@@ -11,6 +11,20 @@ Une entrée par session, la plus récente en haut. Le détail technique est dans
 
 ---
 
+## 04/11/2026 — Claude Code (arrêts à l'entrée dans une salle)
+
+- Branche Git `moteur-salle-unique` (l'état d'avant est sous l'étiquette `avant-moteur-unique`, `1afa89f`, envoyé sur GitHub) : on peut y revenir d'une commande.
+- **Mesures sur le site construit** (1680 × 1050, survol du Seuil puis clic dans la grille, 3 essais) : les arrêts ne venaient pas de la vidéo mais de la salle qui se prépare pendant le rangement : création du contexte WebGL (≈ 0,13 s, ≈ 0,24 s avec ses extensions), envoi des images de la sculpture (2048 px : 40 à 100 ms chacune), compilation des matières pour une autre variante que celle dessinée (≈ 0,25 s).
+- **[à voir] Corrections :**
+  - **moteur de rendu des salles gardé** d'une salle à l'autre (`scene/moteurSalles.ts`, comme la spirale) et créé pendant l'écran d'accueil (`main.tsx`), toutes ses extensions activées à la création ; le Canvas de React Three Fiber garde son canvas, caché, et dessine dans celui du moteur ; deux salles montées en même temps : la seconde a son propre moteur, comme avant ;
+  - **images des modèles recopiées dans un canvas avant leur envoi** (`preparerImage`, `Experience.tsx`) : elles passent sur la carte graphique hors du fil principal (envoi : 0,1 à 0,2 ms au lieu de 60 à 100) ;
+  - **matières compilées pour l'image intermédiaire des effets d'image** (`compilerCommeAuRendu`, `Experience.tsx`, `rendu.cible` d'Effets.tsx) : elles l'étaient pour l'écran, et recompilées d'un bloc au premier dessin ;
+  - **image de couleur de la sculpture envoyée en linéaire**, convertie du sRGB dans son shader (`preparerSculpture`, `Reflet.tsx`) : l'envoi en sRGB est lent sur Mac (50 à 160 ms contre 6 à 11).
+- **Résultat** (mêmes 3 essais) : arrêts au total 0,41 à 0,59 s → 0 à 0,05 s ; images de plus de 50 ms : 6 à 7 → 1 à 3 ; pire image 140 à 176 ms → 89 à 110 ms.
+- Vérifié : entrée par la grille et par la spirale (« Découvrir »), popup, retour vers la spirale et nouvelle entrée (même moteur), passage d'une salle à l'autre, salle montée pendant qu'une autre l'est encore (moteur à part), couleur de la sculpture inchangée ; aucune erreur. Non vu : mobile, Safari.
+- **Point à surveiller** : deux fois, après des manipulations de la spirale à la molette, le titre affiché (Huntington) et l'œuvre visée par « Découvrir » (L'entre-deux, fermée) ne concordaient pas, et le clic ne faisait rien ; non reproduit avec un défilement régulier, ni sur la version d'avant (2 essais) ; le code de la spirale n'a pas changé dans ce chantier.
+- Non fusionné dans la branche principale, pas en ligne.
+
 ## 03/11/2026 — Claude Code (vidéo au survol des vignettes de la grille, essai)
 
 - **[à voir] Vidéo au survol de la vignette « Le seuil des proportions » dans la grille** (demande de Ludovic, essai) : au survol, la carte joue une vidéo de 3,2 s qui part de son image et va jusqu'à la vue Maladie, et reste sur sa dernière image tant que la souris est là ; à la sortie, elle s'efface en 0,35 s ; au clic, l'image revient tout de suite et la transition vers la salle part comme avant. La vidéo est fondue dans la matière de la carte (même lumière, mêmes coins arrondis ; couleurs décodées dans le shader) : `SpiralGallery.survoler`, `finSurvol`, `prechargerSurvols` ; branchée dans `Accueil.tsx` (souris seulement, salles ouvertes) ; champ `survol` de l'œuvre (`oeuvres.ts`).
