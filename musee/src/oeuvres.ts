@@ -230,10 +230,11 @@ export const salleOuverte = (id: string) => SALLES_OUVERTES.has(id)
 export const musiqueSpirale = versionne('/assets/musiques/spirale.m4a')
 
 /**
- * Cartes de la spirale d'accueil (format attendu par src/accueil/gallery).
- * Même ordre que l'ancien cards.json de la galerie, pour garder la même composition.
+ * Cartes de la spirale d'accueil (format attendu par src/accueil/gallery), dans l'ordre des
+ * œuvres : « Le seuil des proportions », « La maladie de Huntington », puis les autres (demande
+ * de Ludovic du 04/11 ; c'est aussi l'ordre des cases de la grille et des flèches des salles).
  */
-export const cartesSpirale = [...oeuvres.slice(1), oeuvres[0]].map((o) => ({
+export const cartesSpirale = oeuvres.map((o) => ({
   id: o.id,
   // Carte de 960 × 540 px : la version légère de la capture suffit (décodage trois fois plus court)
   image: versionLegere(o.image),

@@ -24,6 +24,7 @@ Une entrée par session, la plus récente en haut. Le détail technique est dans
 - Vérifié : entrée par la grille et par la spirale (« Découvrir »), popup, retour vers la spirale et nouvelle entrée (même moteur), passage d'une salle à l'autre, salle montée pendant qu'une autre l'est encore (moteur à part), couleur de la sculpture inchangée ; aucune erreur. Non vu : mobile, Safari.
 - **Point à surveiller** : deux fois, après des manipulations de la spirale à la molette, le titre affiché (Huntington) et l'œuvre visée par « Découvrir » (L'entre-deux, fermée) ne concordaient pas, et le clic ne faisait rien ; non reproduit avec un défilement régulier, ni sur la version d'avant (2 essais) ; le code de la spirale n'a pas changé dans ce chantier.
 - Non fusionné dans la branche principale, pas en ligne.
+- **[à voir] Ordre des œuvres dans la spirale et la grille** (demande de Ludovic) : « Le seuil des proportions », « La maladie de Huntington », puis les autres, l'ordre de `oeuvres` (`cartesSpirale`, `oeuvres.ts` ; avant, le Seuil était dernier, comme l'ancienne galerie). C'est aussi l'ordre des flèches des salles (inchangé). La spirale tourne seule tant qu'on n'y touche pas, y compris derrière l'écran d'accueil : l'œuvre centrée à l'arrivée dépend de ce temps (essai de la centrer sur le Seuil au départ retiré, sans effet visible). Vérifié dans la grille (ordre, vidéo du Seuil à sa nouvelle place).
 
 ## 03/11/2026 — Claude Code (vidéo au survol des vignettes de la grille, essai)
 
