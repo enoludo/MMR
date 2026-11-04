@@ -109,7 +109,8 @@ export function Accueil() {
     useControls('Grille', {
       ...boutonCopier('Grille'),
       colonnes: { value: reglagesGrille.colonnes, min: 1, max: 6, step: 1, label: 'colonnes' },
-      ecart: { value: reglagesGrille.ecart, min: 0, max: 160, step: 1, label: 'écart entre les vignettes (px)' },
+      ecart: { value: reglagesGrille.ecart, min: 0, max: 160, step: 1, label: 'écart entre les colonnes (px)' },
+      ecartLignes: { value: reglagesGrille.ecartLignes, min: 0, max: 160, step: 1, label: 'écart entre les rangées (px)' },
       marge: { value: reglagesGrille.marge, min: 0, max: 240, step: 1, label: 'marges gauche et droite (px)' },
       haut: { value: reglagesGrille.haut, min: 48, max: 320, step: 1, label: 'haut de la grille (px)' },
       duree: { value: reglagesGrille.duree, min: 0.3, max: 5, step: 0.05, label: 'durée du déroulé (s)' },

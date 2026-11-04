@@ -158,22 +158,26 @@ button { font: inherit; color: inherit; }
 .grille { position: fixed; inset: 0; z-index: 10; pointer-events: none; overflow: hidden; visibility: hidden; }
 .grille--active { visibility: visible; }
 .accueil--transition .grille { opacity: 0; transition: opacity 0.3s ease; }
+/* Sous chaque vignette (maquette « Grille » 477:1404, 04/11) : titre et étiquettes centrés, à 24 px des
+   bords de la vignette, 6 px entre eux */
 .grille__legende {
-  position: absolute; left: 0; top: 0; display: flex; flex-direction: column; gap: 16px;
+  position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 0 24px; text-align: center;
   color: #fff; text-decoration: none; pointer-events: auto; will-change: transform, opacity;
 }
 .grille__legende--fermee { cursor: default; }
 .grille__titre {
-  margin: 0; font-family: var(--titre); font-weight: 400; font-size: 24px; line-height: 24px;
-  text-transform: uppercase;
+  margin: 0; font-family: var(--titre); font-weight: 400; font-size: 24px; line-height: 26px;
+  letter-spacing: 0.05em; text-transform: uppercase;
 }
-.grille__etiquettes { display: flex; flex-wrap: wrap; gap: 4px; }
+.grille__etiquettes { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
 .grille__etiquette {
-  display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 12px;
-  background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.6);
-  font-size: 10px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase;
+  display: inline-flex; align-items: center; height: 24px; padding: 0 12px; border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1); color: #fff;
+  font-size: 10px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase;
 }
-.grille__etiquette--mecene { background: rgba(217, 62, 52, 0.15); color: #e0645b; }
+/* Mécène ou partenaire : même fond, texte rouge */
+.grille__etiquette--mecene { color: #ff5c5c; }
 /* Recherche et filtres de la vue Grille (« SearchBar » 58:455) : en bas, centrés, à 24 px du bord ;
    champ de 339 px, filtres à leur largeur, 12 px entre eux */
 .recherche {

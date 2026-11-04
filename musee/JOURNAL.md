@@ -26,6 +26,10 @@ Une entrée par session, la plus récente en haut. Le détail technique est dans
 - Non fusionné dans la branche principale, pas en ligne.
 - **[à voir] Ordre des œuvres dans la spirale et la grille** (demande de Ludovic) : « Le seuil des proportions », « La maladie de Huntington », puis les autres, l'ordre de `oeuvres` (`cartesSpirale`, `oeuvres.ts` ; avant, le Seuil était dernier, comme l'ancienne galerie). C'est aussi l'ordre des flèches des salles (inchangé). La spirale tourne seule tant qu'on n'y touche pas, y compris derrière l'écran d'accueil : l'œuvre centrée à l'arrivée dépend de ce temps (essai de la centrer sur le Seuil au départ retiré, sans effet visible). Vérifié dans la grille (ordre, vidéo du Seuil à sa nouvelle place).
 
+## 04/11/2026 — Claude Code (grille d'après la maquette 477:1404)
+
+- **[à voir] Vue Grille reprise d'après la maquette « Grille » 477:1404** (demande de Ludovic) : titre et étiquettes centrés sous la vignette, à 24 px de ses bords, 6 px entre eux ; titre espacé (0,05 em), interligne 26 px ; étiquettes en blanc (60 % avant), 12 px de marge intérieure, lettres espacées (0,1 em) ; mécène ou partenaire : même fond clair, texte rouge `#ff5c5c` (fond rougeâtre avant) ; 48 px entre les rangées (`ecartLignes`, nouveau réglage de la touche M « Grille »), 12 px entre les colonnes inchangés (`Grille.js`, section grille de `style.css`). Gardé : vignettes en 16:9 (la maquette les dessine en 512 × 297 ; ce sont les cartes 3D de la spirale, dont dépendent captures et transitions). Vérifié en 1680 × 1050 (cotes, aller-retour vers le Seuil).
+
 ## 04/11/2026 — Claude Code (raccord de la transition vers le Seuil)
 
 - **Ludovic a déplacé la position initiale du Seuil** (12,83 → 14,21 m de l'œuvre, regard un peu plus haut) **et refait ses captures** (transition, cartouches, vignette, vidéos du survol).

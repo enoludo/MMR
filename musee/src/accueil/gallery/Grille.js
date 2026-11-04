@@ -10,7 +10,9 @@ import { CONFIG } from '../config.js';
  */
 export const reglagesGrille = {
   colonnes: 3,
+  /** Écart entre deux colonnes, et entre deux rangées (sous la légende ; maquette « Grille » 477:1404, 04/11) */
   ecart: 12,
+  ecartLignes: 48,
   /** Marge à gauche et à droite (24 px depuis le 03/11, réglage de Ludovic ; maquette : 72 px en 1680) */
   marge: 24,
   /** Haut de la première rangée (sous le header) et marge sous la dernière */
@@ -34,8 +36,8 @@ export const reglagesGrille = {
   departRetour: 0.75,
 };
 
-/** Sous la vignette : 16 px, le titre (24), 16 px, les étiquettes (24) */
-const LEGENDE = 80;
+/** Sous la vignette (maquette 477:1404) : 16 px, le titre (26), 6 px, les étiquettes (24) */
+const LEGENDE = 72;
 const FORMAT = CONFIG.cardHeight / CONFIG.cardWidth;
 
 /** Cases de la grille (pixels, en haut à gauche, sans le défilement) et hauteur de tout le contenu */
@@ -45,7 +47,7 @@ export function dispositionGrille(largeur, hauteur, n) {
   const marge = largeur < 640 ? 24 : r.marge;
   const l = (largeur - 2 * marge - (colonnes - 1) * r.ecart) / colonnes;
   const h = l * FORMAT;
-  const pas = h + LEGENDE + r.ecart;
+  const pas = h + LEGENDE + r.ecartLignes;
   const cases = [];
   for (let i = 0; i < n; i += 1) {
     const c = i % colonnes;
@@ -53,7 +55,7 @@ export function dispositionGrille(largeur, hauteur, n) {
     cases.push({ x: marge + c * (l + r.ecart), y: r.haut + rangee * pas, l, h });
   }
   const rangees = Math.ceil(n / colonnes);
-  const total = r.haut + rangees * pas - r.ecart + r.bas;
+  const total = r.haut + rangees * pas - r.ecartLignes + r.bas;
   return { cases, total, defilementMax: Math.max(0, total - hauteur) };
 }
 
