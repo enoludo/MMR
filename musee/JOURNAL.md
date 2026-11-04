@@ -11,6 +11,14 @@ Une entrée par session, la plus récente en haut. Le détail technique est dans
 
 ---
 
+## 04/11/2026 — Claude Code (petits arrêts au clic dans la grille)
+
+- **[à voir] Petits arrêts pendant le rangement de la grille en spirale (vus par Ludovic), réduits.** Mesuré sur le site construit (1680 × 1050, survol du Seuil puis clic) : il restait une tâche de ≈ 146 ms au montage de la salle (le canvas du moteur passait de 300 × 150 px à la taille de l'écran) et trois compilations de ≈ 0,1 s au premier dessin (ombre de la sculpture, faces retournées du reflet, anticrénelage SMAA des effets d'image : variantes que la préparation ne compilait pas).
+  - moteur des salles créé directement à la taille de la fenêtre, en résolution pleine (`moteurSalles.ts`), et la salle reprend cette résolution (`Experience.tsx`) ;
+  - préparation : matières des ombres (`compilerOmbres`), faces retournées du reflet (`PasseReflet`, `Reflet.tsx`) et matières du SMAA (`rendu.compiler`, `Effets.tsx`) compilées en parallèle, sans bloquer ; puis premier dessin de chaque objet étalé sur plusieurs images, 6 ms au plus par image (`premiersDessins`), à l'entrée comme pour la salle d'arrivée d'un passage.
+- **Résultat** (3 essais) : pire image avant le zoom 119 à 149 ms → 50 à 61 ms ; tâches longues : 146 + 107 à 131 ms → une seule de 61 ms sur trois essais. Le serveur de dev (localhost:5173) reste plus lent que le site en ligne.
+- Vérifié : entrée par la grille, passage vers Huntington, aucune erreur. Non vu : mobile, Safari. Toujours sur la branche `moteur-salle-unique`, pas en ligne.
+
 ## 04/11/2026 — Claude Code (arrêts à l'entrée dans une salle)
 
 - Branche Git `moteur-salle-unique` (l'état d'avant est sous l'étiquette `avant-moteur-unique`, `1afa89f`, envoyé sur GitHub) : on peut y revenir d'une commande.

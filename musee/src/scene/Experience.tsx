@@ -16,7 +16,7 @@ import { store, useEtat, type SalleVisitee } from '../store'
 import type { Porte } from '../salles/types'
 import { oeuvres } from '../oeuvres'
 import { captureSalle } from '../transition'
-import { ResolutionAdaptative, qualite } from '../resolution'
+import { ResolutionAdaptative, qualite, resolutionMax } from '../resolution'
 import { moteurLibre, moteurSalles, prendreMoteur } from './moteurSalles'
 
 const salleDe = (v: SalleVisitee) => (oeuvres.find((o) => o.id === v.oeuvre) ?? oeuvres[0]).salle
@@ -56,10 +56,15 @@ export function Experience() {
   qualite.passage = rendu.passage
   // Le Canvas reçoit la résolution en cours : avec la résolution pleine, chaque rendu (début d'un
   // passage…) la remettait au maximum et réallouait tout le canvas (≈ 0,25 s figée)
-  const resolution = useMemo(() => new ResolutionAdaptative(() => {}), [])
   // Moteur de rendu gardé d'une salle à l'autre (moteurSalles.ts), sauf s'il sert déjà à une autre salle montée
   const [moteur] = useState(() => (moteurLibre() ? moteurSalles() : null))
   useEffect(() => (moteur ? prendreMoteur() : undefined), [moteur])
+  // Avec le moteur gardé, on repart de sa résolution : son canvas garde sa taille (la changer fige la page)
+  const resolution = useMemo(() => {
+    const r = new ResolutionAdaptative(() => {})
+    if (moteur) r.ratio = Math.min(resolutionMax(), Math.max(qualite.plancher, moteur.getPixelRatio()))
+    return r
+  }, [moteur])
   const toile = useRef<HTMLCanvasElement>(null)
   if (!visitee) return null
   const salle = salleDe(visitee)
@@ -187,6 +192,49 @@ function compilerCommeAuRendu(gl: THREE.WebGLRenderer, objet: THREE.Object3D, ca
   return fait
 }
 
+/** Face dessinée dans les ombres selon celle de la matière (three, WebGLShadowMap, ombres PCF) */
+const FACE_OMBRE = { [THREE.FrontSide]: THREE.BackSide, [THREE.BackSide]: THREE.FrontSide, [THREE.DoubleSide]: THREE.DoubleSide }
+
+/**
+ * Compile sans bloquer la variante d'ombre de chaque objet qui projette une ombre (sous `racine`) :
+ * three dessine les ombres avec une matière de profondeur à lui, qu'il compilait au premier calcul
+ * des ombres, d'un bloc (≈ 0,1 s figées pendant le rangement de la grille, mesuré le 04/11). Une
+ * matière de profondeur aux mêmes réglages donne le même programme, que three réutilise ensuite.
+ */
+function compilerOmbres(gl: THREE.WebGLRenderer, racine: THREE.Object3D, camera: THREE.Camera, scene: THREE.Scene) {
+  const temp = new THREE.Scene()
+  const vues = new Set<string>()
+  const matieres: THREE.Material[] = []
+  racine.traverse((o) => {
+    const mesh = o as THREE.Mesh
+    if (!mesh.isMesh || !mesh.castShadow) return
+    for (const m of (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) as THREE.MeshStandardMaterial[]) {
+      const face = m.shadowSide ?? FACE_OMBRE[m.side]
+      // Le programme dépend aussi des données de la géométrie (attributs) et du type d'objet
+      const attributs = Object.keys(mesh.geometry.attributes).sort().join(',')
+      const cle = `${!!m.map}|${!!m.alphaMap}|${m.alphaTest}|${face}|${attributs}|${(mesh as THREE.InstancedMesh).isInstancedMesh ?? false}`
+      if (vues.has(cle)) continue
+      vues.add(cle)
+      const ombre = new THREE.MeshDepthMaterial({ map: m.map, alphaMap: m.alphaMap, alphaTest: m.alphaTest, side: face })
+      matieres.push(ombre)
+      temp.add((mesh as THREE.InstancedMesh).isInstancedMesh ? new THREE.InstancedMesh(mesh.geometry, ombre, 1) : new THREE.Mesh(mesh.geometry, ombre))
+    }
+  })
+  if (!matieres.length) return Promise.resolve()
+  // Dessinées dans une image (la carte d'ombre), avec les lumières de la scène
+  const cible = new THREE.WebGLRenderTarget(1, 1)
+  const avant = gl.getRenderTarget()
+  gl.setRenderTarget(cible)
+  const fait = gl.compileAsync(temp, camera, scene)
+  gl.setRenderTarget(avant)
+  // Libérées bien après le premier calcul des ombres, qui aura repris leurs programmes
+  setTimeout(() => {
+    matieres.forEach((m) => m.dispose())
+    cible.dispose()
+  }, 10000)
+  return fait.catch(() => {})
+}
+
 const recopiees = new WeakSet<ImageBitmap>()
 /**
  * Image d'une texture décodée par le navigateur (ImageBitmap : celles des modèles GLB, la sculpture)
@@ -204,6 +252,67 @@ function preparerImage(t: THREE.Texture) {
   image.close()
   t.image = copie
   t.needsUpdate = true
+}
+
+/** Temps donné par image aux premiers dessins des objets (ms) */
+const BUDGET_PREMIERS_DESSINS = 6
+
+/**
+ * Premier dessin de chaque objet, réduit à un pixel, quelques-uns par image (au plus
+ * BUDGET_PREMIERS_DESSINS ms) : le pilote graphique y prépare ses états de dessin (et ses textures),
+ * d'un coup sinon au premier dessin de la salle (≈ 0,1 à 0,4 s figées). Dessinés dans le tampon des
+ * effets d'image s'ils sont actifs (les matières y sont compilées pour lui) ; les autres objets de
+ * la scène sont cachés le temps de chaque dessin ; `groupe` (salle cachée) est montré le temps du dessin.
+ * Renvoie faux si `fini()` a interrompu.
+ */
+async function premiersDessins(
+  gl: THREE.WebGLRenderer,
+  scene: THREE.Scene,
+  camera: THREE.Camera,
+  objets: THREE.Object3D[],
+  fini: () => boolean,
+  groupe?: THREE.Object3D,
+) {
+  const autres: THREE.Object3D[] = []
+  let debut = performance.now()
+  for (const o of objets) {
+    if (performance.now() - debut > BUDGET_PREMIERS_DESSINS) {
+      await imageSuivante()
+      debut = performance.now()
+    }
+    if (fini()) return false
+    scene.traverse((x) => {
+      if (((x as THREE.Mesh).isMesh || (x as THREE.Points).isPoints) && x.visible && x !== o && !objets.includes(x)) autres.push(x)
+    })
+    autres.forEach((x) => (x.visible = false))
+    objets.forEach((x) => (x.userData.visiblePreparation = x.visible))
+    objets.forEach((x) => (x.visible = x === o && x.userData.visiblePreparation))
+    if (groupe) groupe.visible = true
+    const ombres = gl.shadowMap.autoUpdate
+    gl.shadowMap.autoUpdate = false
+    const avant = gl.getRenderTarget()
+    if (renduEffets.cible) gl.setRenderTarget(renduEffets.cible)
+    gl.setScissorTest(true)
+    gl.setScissor(0, 0, 1, 1)
+    gl.render(scene, camera)
+    gl.setScissorTest(false)
+    gl.setRenderTarget(avant)
+    gl.shadowMap.autoUpdate = ombres
+    if (groupe) groupe.visible = false
+    objets.forEach((x) => (x.visible = x.userData.visiblePreparation))
+    autres.forEach((x) => (x.visible = true))
+    autres.length = 0
+  }
+  return true
+}
+
+/** Les objets dessinables (maillages, points) sous `racine` */
+function objetsDe(racine: THREE.Object3D) {
+  const objets: THREE.Object3D[] = []
+  racine.traverse((o) => {
+    if ((o as THREE.Mesh).isMesh || (o as THREE.Points).isPoints) objets.push(o)
+  })
+  return objets
 }
 
 /**
@@ -236,7 +345,10 @@ function Preparation({ cle }: { cle: number }) {
         gl.initTexture(t)
         await imageSuivante()
       }
-      if (!fini) await compilerCommeAuRendu(gl, scene, camera)
+      if (!fini) await Promise.all([compilerCommeAuRendu(gl, scene, camera), compilerOmbres(gl, scene, camera, scene), renduEffets.compiler?.()])
+      // Premiers dessins des objets, étalés sur quelques images : le premier dessin complet de la
+      // salle, qui suit, figeait sinon le rangement de la grille ≈ 0,1 s (mesuré le 04/11)
+      if (!fini) await premiersDessins(gl, scene, camera, objetsDe(scene), () => fini)
       for (let i = 0; i < 2 && !fini; i++) {
         advance(performance.now())
         await imageSuivante()
@@ -285,40 +397,9 @@ function PreparationPassage({ cle, children }: { cle: number; children: ReactNod
         await imageSuivante()
       }
       // Matières de la salle cachée, avec les lumières de toute la scène
-      if (!fini) await compilerCommeAuRendu(gl, g, camera, scene)
-      // Premier dessin de chaque objet, réduit à un pixel, un par image : le pilote graphique y
-      // prépare ses états de dessin (et ses textures), ≈ 0,2 à 0,4 s d'un coup sinon, à l'apparition
-      const objets: THREE.Object3D[] = []
-      g.traverse((o) => {
-        if ((o as THREE.Mesh).isMesh || (o as THREE.Points).isPoints) objets.push(o)
-      })
-      const autres: THREE.Object3D[] = []
-      for (const o of objets) {
-        await imageSuivante()
-        if (fini) return
-        scene.traverse((x) => {
-          if (((x as THREE.Mesh).isMesh || (x as THREE.Points).isPoints) && x.visible && x !== o && !objets.includes(x)) autres.push(x)
-        })
-        autres.forEach((x) => (x.visible = false))
-        objets.forEach((x) => (x.userData.visiblePreparation = x.visible))
-        objets.forEach((x) => (x.visible = x === o && x.userData.visiblePreparation))
-        g.visible = true
-        const ombres = gl.shadowMap.autoUpdate
-        gl.shadowMap.autoUpdate = false
-        // Dans le tampon des effets d'image s'ils sont actifs : les matières y sont compilées pour lui
-        const avant = gl.getRenderTarget()
-        if (renduEffets.cible) gl.setRenderTarget(renduEffets.cible)
-        gl.setScissorTest(true)
-        gl.setScissor(0, 0, 1, 1)
-        gl.render(scene, camera)
-        gl.setScissorTest(false)
-        gl.setRenderTarget(avant)
-        gl.shadowMap.autoUpdate = ombres
-        g.visible = false
-        objets.forEach((x) => (x.visible = x.userData.visiblePreparation))
-        autres.forEach((x) => (x.visible = true))
-        autres.length = 0
-      }
+      if (!fini) await Promise.all([compilerCommeAuRendu(gl, g, camera, scene), compilerOmbres(gl, g, camera, scene)])
+      // Premiers dessins de ses objets (≈ 0,2 à 0,4 s d'un coup sinon, à l'apparition)
+      if (!fini && !(await premiersDessins(gl, scene, camera, objetsDe(g), () => fini, g))) return
       if (!fini) setPrete(true)
     })()
     // Par sécurité : au plus tard 2 s après le départ, ou dès qu'on y est arrivé

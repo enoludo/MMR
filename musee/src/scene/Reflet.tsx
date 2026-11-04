@@ -130,6 +130,27 @@ export function PasseReflet({
     return () => cible.dispose()
   }, [cible, uSol])
 
+  // La variante retournée de la sculpture (faces arrière, dans l'image du reflet) est compilée sans
+  // bloquer dès le montage : elle ne l'était qu'au premier dessin de la salle, d'un bloc (≈ 0,13 s
+  // figées pendant le rangement de la grille, mesuré le 04/11). La face ne compte qu'au moment de l'appel.
+  const camera = useThree((s) => s.camera)
+  const scene = useThree((s) => s.scene)
+  useEffect(() => {
+    if (uSol.uForceReflet.value <= 0) return
+    const avant = gl.getRenderTarget()
+    for (const m of materiaux) {
+      m.side = THREE.BackSide
+      m.needsUpdate = true
+    }
+    gl.setRenderTarget(cible)
+    gl.compileAsync(sculpture, camera, scene).catch(() => {})
+    gl.setRenderTarget(avant)
+    for (const m of materiaux) {
+      m.side = THREE.FrontSide
+      m.needsUpdate = true
+    }
+  }, [gl, camera, scene, sculpture, materiaux, cible, uSol])
+
   const taille = useMemo(() => new THREE.Vector2(), [])
   const fond = useMemo(() => new THREE.Color(), [])
 

@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { resolutionMax } from '../resolution'
 
 /**
  * Moteur de rendu des salles, créé une fois et gardé d'une salle à l'autre (comme celui de la
@@ -26,6 +27,10 @@ export function moteurSalles() {
     // compressés des lightmaps, KTX2Loader) figeait encore la page ≈ 0,08 s à l'entrée dans la salle
     const gl = moteur.getContext()
     gl.getSupportedExtensions()?.forEach((e) => gl.getExtension(e))
+    // À la taille que la première salle demandera (la fenêtre, en résolution pleine) : agrandir le
+    // canvas à l'entrée (300 × 150 px au départ) figeait la page ≈ 60 ms (mesuré le 04/11)
+    moteur.setPixelRatio(resolutionMax())
+    moteur.setSize(window.innerWidth, window.innerHeight)
   }
   return moteur
 }

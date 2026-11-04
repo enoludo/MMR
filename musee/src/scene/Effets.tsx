@@ -65,6 +65,8 @@ export const rendu = {
   /** Après un changement de résolution (captures en double résolution) */
   redimensionner: null as null | (() => void),
   cible: null as THREE.WebGLRenderTarget | null,
+  /** Compile sans bloquer les matières des effets d'image (préparation des salles, Experience) */
+  compiler: null as null | (() => Promise<void>),
   /** Captures en cours : sans grain */
   capture: false,
 }
@@ -209,11 +211,30 @@ export function Effets() {
     rendu.image = e.actifs ? () => outils.composer.render(0) : null
     rendu.redimensionner = () => outils.composer.setSize(size.width, size.height, false)
     rendu.cible = e.actifs ? outils.composer.inputBuffer : null
+    // L'anticrénelage (SMAA) a ses propres matières, compilées au premier dessin des effets, d'un
+    // bloc (≈ 0,1 s figées pendant le rangement de la grille, mesuré le 04/11) : on les compile
+    // d'avance, dans une image, comme elles seront dessinées
+    rendu.compiler = e.actifs
+      ? () => {
+          const temp = new THREE.Scene()
+          const forme = new THREE.PlaneGeometry(2, 2)
+          for (const m of outils.smaa.flatMap((a) => [a.edgeDetectionMaterial, a.weightsMaterial])) {
+            const maillage = new THREE.Mesh(forme, m)
+            maillage.frustumCulled = false
+            temp.add(maillage)
+          }
+          const avant = gl.getRenderTarget()
+          gl.setRenderTarget(outils.composer.inputBuffer)
+          const fait = gl.compileAsync(temp, camera)
+          gl.setRenderTarget(avant)
+          return fait.then(() => {}, () => {}).finally(() => forme.dispose())
+        }
+      : null
     return () => {
-      rendu.image = rendu.redimensionner = null
+      rendu.image = rendu.redimensionner = rendu.compiler = null
       rendu.cible = null
     }
-  }, [outils, e.actifs, size.width, size.height])
+  }, [outils, e.actifs, size.width, size.height, gl, camera])
 
   useEffect(() => () => outils.composer.dispose(), [outils])
   useEffect(() => {
