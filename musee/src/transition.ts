@@ -15,9 +15,17 @@ export const captureSalle: { courante: (() => HTMLCanvasElement | null) | null }
 /**
  * Entrée : cadre de la carte cliquée à l'écran, mis à jour par la spirale qui la recentre (Accueil) ;
  * `video` : la vidéo du survol de la grille y revient encore à sa première image (l'image de la
- * transition attend, ui/Transition.tsx)
+ * transition attend, ui/Transition.tsx) ; `dessinee` : l'image de la transition est à l'écran (la
+ * carte n'est cachée dessous qu'une fois l'image dessinée : les deux boucles, la spirale et la
+ * transition, ne tournent pas toujours dans le même ordre, et la carte disparaissait parfois une
+ * image trop tôt, un éclair au clic depuis la grille, 04/11)
  */
-export const carteVivante: { cadre: Cadre | null; zoom: number; video: boolean } = { cadre: null, zoom: 0, video: false }
+export const carteVivante: { cadre: Cadre | null; zoom: number; video: boolean; dessinee: boolean } = {
+  cadre: null,
+  zoom: 0,
+  video: false,
+  dessinee: false,
+}
 
 /** Depuis la spirale : la carte `carte` (à l'écran) grandit jusqu'à remplir l'écran, puis la salle apparaît. */
 export function entrer(oeuvre: string, carte: Cadre, retenue = false) {

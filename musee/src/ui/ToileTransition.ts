@@ -368,8 +368,8 @@ export class ToileTransition {
     this.rendu.initTexture(t)
   }
 
-  /** Dessine une image de la transition (les textures pas encore chargées sont demandées et sautées). */
-  dessiner(d: Dessin) {
+  /** Dessine une image de la transition (les textures pas encore chargées sont demandées et sautées) ; renvoie si quelque chose a été dessiné. */
+  dessiner(d: Dessin): boolean {
     const ratio = Math.min(window.devicePixelRatio, 2)
     const w = window.innerWidth
     const h = window.innerHeight
@@ -397,7 +397,10 @@ export class ToileTransition {
     const melange = d.photo ? (d.melange ?? 1) : 0
 
     // Sans image ni photo à montrer, on laisse voir la carte de la spirale
-    if (!image && melange <= 0) return this.effacer()
+    if (!image && melange <= 0) {
+      this.effacer()
+      return false
+    }
 
     const img = image?.image as { width: number; height: number } | undefined
     u.uImage.value = image ?? this.vide
@@ -424,6 +427,7 @@ export class ToileTransition {
     u.uAvancePhoto.value = d.recul
     u.uTanPhoto.value = Math.tan(THREE.MathUtils.degToRad(r.focale) / 2)
     this.rendu.render(this.scene, this.camera)
+    return true
   }
 
   effacer() {

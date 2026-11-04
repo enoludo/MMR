@@ -222,6 +222,7 @@ export function Transition() {
       const t = store.get().transition
       const o = oeuvres.find((x) => x.id === t?.oeuvre)
       if (!t || !o) return
+      carteVivante.dessinee = false
       if (t.phase === 'retour' || t.phase === 'photo') return t0.effacer()
       // Depuis la grille : la vidéo du survol revient encore à l'image de la carte, qu'on voit dans la spirale
       if (t.sens === 'entree' && t.phase === 'preparation' && carteVivante.video) return t0.effacer()
@@ -245,7 +246,7 @@ export function Transition() {
       const format = plein.largeur / plein.hauteur
       const champSalle = (champEntree(u, r.focale, format, rt.champEnPlus) * Math.PI) / 180
       const champ = ((2 * Math.atan(Math.tan(champSalle / 2) / partVisible(format))) * 180) / Math.PI
-      t0.dessiner({
+      carteVivante.dessinee = t0.dessiner({
         boite,
         image: o.image,
         vueEntree: o.vueEntree,
@@ -283,6 +284,7 @@ export function Transition() {
     return () => {
       gsap.ticker.remove(rendre)
       t0.effacer()
+      carteVivante.dessinee = false
       carteVivante.cadre = null
       if (spirale) spirale.style.transform = ''
       window.removeEventListener('wheel', bloquer, { capture: true })

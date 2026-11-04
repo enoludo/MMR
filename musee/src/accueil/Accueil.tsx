@@ -173,6 +173,8 @@ export function Accueil() {
       // La vidéo du survol revient à l'image de la carte pendant le rangement (demande de Ludovic, 03/11) ;
       // le zoom l'attend (plus bas, `departAller`)
       galerie.revenirEnSpirale(carteCliquee, galerie.carteGrille(id), reduitMouvement() ? 0 : reglagesGrille.departAller * reglagesGrille.duree)
+      // Dès le premier dessin de la transition (au clic), son image attend la fin de la vidéo
+      carteVivante.video = galerie.videoSurCarte(galerie.carteGrille(id))
       const d = dispositionGrille(toile.current!.clientWidth, toile.current!.clientHeight, cartesSpirale.length)
       galerie.grille.ordre = rangsDepuis(d, cartesSpirale.findIndex((c) => c.id === id))
       deroule?.kill()
@@ -351,8 +353,14 @@ export function Accueil() {
       // Tant que la vidéo du survol y revient à sa première image, c'est elle qu'on voit : la carte reste
       // visible et l'image de la transition attend (Transition.tsx, carteVivante.video)
       carteVivante.video = transition?.sens === 'entree' && galerie.videoSurCarte(slot)
+      // À l'entrée, la carte n'est cachée qu'une fois l'image de la transition dessinée par-dessus
+      // (transition.ts, `dessinee`)
       const aCacher =
-        transition && !(transition.sens === 'sortie' && transition.phase === 'fondu') && imagePrete(carte.imageTransition) && !carteVivante.video
+        transition &&
+        !(transition.sens === 'sortie' && transition.phase === 'fondu') &&
+        imagePrete(carte.imageTransition) &&
+        !carteVivante.video &&
+        (transition.sens !== 'entree' || carteVivante.dessinee)
           ? slot
           : null
       // (galerie.update la garde cachée aux images suivantes ; cette image-ci est déjà placée)
