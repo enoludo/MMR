@@ -67,7 +67,20 @@ function App() {
     const t = setTimeout(() => setSalleQuittee(null), DEMONTAGE_SALLE)
     return () => clearTimeout(t)
   }, [quittee])
-  const idSalle = idAdresse ?? salleQuittee
+  // Chaque entrée depuis la spirale ou la grille monte une salle neuve (`visite.n`, clé de la page) :
+  // cliquer une œuvre dans la seconde et demie qui suit un retour reprenait sinon la salle quittée,
+  // encore montée, avec sa caméra (04/11 : Huntington vu à la distance du Seuil, et l'inverse). La
+  // salle quittée est d'abord démontée (`coupure`, une image), puis la nouvelle montée : elle
+  // reprend ainsi le moteur de rendu partagé (scene/moteurSalles.ts) au lieu d'en créer un autre
+  const entreeDemandee = useEtat((e) => e.transition?.sens === 'entree')
+  const [visite, setVisite] = useState({ n: 0, entree: false, coupure: false })
+  if (entreeDemandee !== visite.entree) {
+    setVisite({ n: visite.n + (entreeDemandee ? 1 : 0), entree: entreeDemandee, coupure: entreeDemandee })
+  }
+  useEffect(() => {
+    if (visite.coupure) setVisite((v) => ({ ...v, coupure: false }))
+  }, [visite.coupure])
+  const idSalle = visite.coupure ? null : idAdresse ?? (entreeDemandee ? null : salleQuittee)
 
   // Touche M : panneau de réglages (Leva)
   useEffect(() => {
@@ -94,7 +107,7 @@ function App() {
       {dev && <CopieReglages />}
       {(pathname === '/' || zoomVersSalle || retourVersSpirale) && <Accueil />}
       <Suspense fallback={null}>
-        {idSalle && <PageOeuvre id={idSalle} />}
+        {idSalle && <PageOeuvre key={visite.n} id={idSalle} />}
         <Routes>
           <Route path="/" element={null} />
           <Route path="/oeuvre/:id" element={null} />
