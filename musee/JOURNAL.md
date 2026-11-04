@@ -17,7 +17,7 @@ Une entrée par session, la plus récente en haut. Le détail technique est dans
   - moteur des salles créé directement à la taille de la fenêtre, en résolution pleine (`moteurSalles.ts`), et la salle reprend cette résolution (`Experience.tsx`) ;
   - préparation : matières des ombres (`compilerOmbres`), faces retournées du reflet (`PasseReflet`, `Reflet.tsx`) et matières du SMAA (`rendu.compiler`, `Effets.tsx`) compilées en parallèle, sans bloquer ; puis premier dessin de chaque objet étalé sur plusieurs images, 6 ms au plus par image (`premiersDessins`), à l'entrée comme pour la salle d'arrivée d'un passage.
 - **Résultat** (3 essais) : pire image avant le zoom 119 à 149 ms → 50 à 61 ms ; tâches longues : 146 + 107 à 131 ms → une seule de 61 ms sur trois essais. Le serveur de dev (localhost:5173) reste plus lent que le site en ligne.
-- Vérifié : entrée par la grille, passage vers Huntington, aucune erreur. Non vu : mobile, Safari. Toujours sur la branche `moteur-salle-unique`, pas en ligne.
+- Vérifié : entrée par la grille, passage vers Huntington, aucune erreur. Non vu : mobile, Safari. Toujours sur la branche `moteur-salle-unique` (non fusionnée) ; **en ligne sur le labo mmr-lab** à la demande de Ludovic (04/11, avec les arrêts à l'entrée dans une salle, l'ordre des œuvres, le raccord du Seuil, la grille 477:1404 et l'éclair au clic).
 
 ## 04/11/2026 — Claude Code (arrêts à l'entrée dans une salle)
 
