@@ -2,7 +2,6 @@
   "rotonde": {
     "Navigation": {
       "rayon": 4.5,
-      "rayonLointain": 3.76,
       "rayonProche": 3,
       "vitesse": 1,
       "amorti": 3,
@@ -174,7 +173,6 @@
     },
     "Navigation": {
       "rayon": 9,
-      "rayonLointain": 12.83,
       "rayonProche": 5.5,
       "vitesse": 1,
       "amorti": 3,

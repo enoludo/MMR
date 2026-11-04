@@ -924,7 +924,6 @@ export function reglagesNavigation(config: SalleConfig): ReglagesNavigation {
     const p = config.parcours
     g = {
       rayon: p.rayon,
-      rayonLointain: p.rayonLointain,
       rayonProche: p.rayonProche,
       vitesse: 1,
       amorti: 3,
@@ -937,19 +936,26 @@ export function reglagesNavigation(config: SalleConfig): ReglagesNavigation {
       dureePassage: 8,
       rotationPassage: 90,
       ...(valeursEnregistrees(config, 'Navigation') as Partial<ReglagesNavigation>), // touche M, src/salles/reglages.json
+      // La vue d'arrivée est la position initiale réglée en vue libre (salles/points-de-vue.json) :
+      // un rayon enregistré par la touche M la contredisait au rechargement (04/11 : la transition
+      // depuis la spirale, capturée à 14,21 m, arrivait dans une salle à 12,83 m)
+      rayonLointain: p.rayonLointain,
     }
     navigationParSalle.set(config.id, g)
   }
   return g
 }
 
-/** Touche M : un dossier par salle (chaque salle a son parcours : une œuvre de 3 m n'est pas vue comme une œuvre de 10 m) */
+/**
+ * Touche M : un dossier par salle (chaque salle a son parcours : une œuvre de 3 m n'est pas vue comme
+ * une œuvre de 10 m). Le rayon de la vue d'arrivée n'y est plus : il vient de la position initiale,
+ * réglée en vue libre (touche V)
+ */
 function ReglagesNavigationSalle({ config }: { config: SalleConfig }) {
   const g = reglagesNavigation(config)
   const reglages = useControls(dossierSalle('Navigation', config), {
     ...boutonCopier(dossierSalle('Navigation', config)),
     rayon: { value: g.rayon, min: 3, max: 14, step: 0.1, label: 'rayon du cercle (m)' },
-    rayonLointain: { value: g.rayonLointain, min: 3, max: 14, step: 0.1, label: 'rayon de la vue d’arrivée (m)' },
     rayonProche: { value: g.rayonProche, min: 2, max: 9, step: 0.1, label: 'rayon du cercle réduit (m)' },
     vitesse: { value: g.vitesse, min: 0.2, max: 3, step: 0.05, label: 'vitesse du scroll' },
     amorti: { value: g.amorti, min: 0.5, max: 12, step: 0.1, label: 'réactivité du déplacement' },
