@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type TouchEvent } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type TouchEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useProgress } from '@react-three/drei'
 import { nouvelleCle, store, useEtat, type Sens } from '../store'
@@ -10,6 +10,7 @@ import { sortir } from '../transition'
 import { cliquer } from '../musique'
 import { avancer } from '../chargement'
 import { useApparition } from './apparition'
+import { couleurSpirale } from '../couleurSalle'
 
 
 /** Affiche le premier écran ou un popup, et envoie la caméra vers le point de vue associé (voir Oeuvre.vues). */
@@ -89,6 +90,17 @@ export function InterfaceSalle({ oeuvre }: { oeuvre: Oeuvre }) {
   const precedente = oeuvres[(i - 1 + oeuvres.length) % oeuvres.length]
   const suivante = oeuvres[(i + 1) % oeuvres.length]
 
+  // Mobile : fond des panneaux du bas (premier écran, popups) = fond de la spirale pour cette œuvre
+  // (demande de Ludovic, 05/11), en variable CSS --fond-salle ; #2f2922 de la maquette en attendant
+  const [fond, setFond] = useState('')
+  useEffect(() => {
+    let actuel = true
+    couleurSpirale(oeuvre).then((c) => actuel && setFond(c))
+    return () => {
+      actuel = false
+    }
+  }, [oeuvre])
+
   // Nouvelle œuvre : on repart du premier écran et du tour libre
   useEffect(() => {
     store.set({ onglet: 'info', demande: 'cercle' })
@@ -107,7 +119,9 @@ export function InterfaceSalle({ oeuvre }: { oeuvre: Oeuvre }) {
   }, [])
 
   return (
-    <div className={`salle-ui ${enPassage ? 'salle-ui--passage' : ''} ${enTransition ? 'salle-ui--transition' : ''} ${ouvert ? 'salle-ui--popup' : ''}`}>
+    <div className={`salle-ui ${enPassage ? 'salle-ui--passage' : ''} ${enTransition ? 'salle-ui--transition' : ''} ${ouvert ? 'salle-ui--popup' : ''}`}
+      style={fond ? ({ '--fond-salle': fond } as CSSProperties) : undefined}
+    >
       <div className="salle-ui__vignette" aria-hidden />
       {/* Mobile : voile noir en haut et en bas de l'écran (maquette 520:1179) */}
       <div className="salle-ui__degrade" aria-hidden />
@@ -199,7 +213,7 @@ export function InterfaceSalle({ oeuvre }: { oeuvre: Oeuvre }) {
  * pendant le geste elle suit le doigt au pixel près (hauteurs mesurées : --h-cartouches, --h-bas),
  * puis elle rejoint 0 ou 1 en transition. Un geste rapide l'emporte sur la position.
  */
-const ECART_BLOCS = 16 // marge au-dessus des cartouches et du bas, déplié (style.css)
+const ECART_BLOCS = 24 // marge au-dessus des cartouches et du bas, déplié (style.css)
 function useFeuille(
   section: React.RefObject<HTMLElement | null>,
   deplie: boolean,

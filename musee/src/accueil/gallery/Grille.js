@@ -36,6 +36,13 @@ export const reglagesGrille = {
   departRetour: 0.75,
 };
 
+/**
+ * Écran étroit (moins de 423 px, style.css) : les onglets Spirale / Grille ne tiennent pas au centre du
+ * header et passent dessous (48 px et 8 px d'écart) : la grille descend d'autant.
+ */
+const ONGLETS_DESSOUS = 423;
+const HAUT_ONGLETS = 56;
+
 /** Sous la vignette (maquette 477:1404) : 16 px, le titre (26), 6 px, les étiquettes (24) */
 const LEGENDE = 72;
 const FORMAT = CONFIG.cardHeight / CONFIG.cardWidth;
@@ -48,14 +55,15 @@ export function dispositionGrille(largeur, hauteur, n) {
   const l = (largeur - 2 * marge - (colonnes - 1) * r.ecart) / colonnes;
   const h = l * FORMAT;
   const pas = h + LEGENDE + r.ecartLignes;
+  const haut = r.haut + (largeur < ONGLETS_DESSOUS ? HAUT_ONGLETS : 0);
   const cases = [];
   for (let i = 0; i < n; i += 1) {
     const c = i % colonnes;
     const rangee = Math.floor(i / colonnes);
-    cases.push({ x: marge + c * (l + r.ecart), y: r.haut + rangee * pas, l, h });
+    cases.push({ x: marge + c * (l + r.ecart), y: haut + rangee * pas, l, h });
   }
   const rangees = Math.ceil(n / colonnes);
-  const total = r.haut + rangees * pas - r.ecartLignes + r.bas;
+  const total = haut + rangees * pas - r.ecartLignes + r.bas;
   return { cases, total, defilementMax: Math.max(0, total - hauteur) };
 }
 

@@ -39,7 +39,7 @@ faut savoir est dans `CLAUDE.md`, `JOURNAL.md` et ce fichier.
 
 1. **Anticrénelage par défaut** : proposé « ×2 + SMAA basse » ou garder ×1 (il essaie avec la touche M et le
    compteur). Pour changer le défaut : `value` de `echantillons` (et de `smaa`) dans `Effets.tsx`.
-2. **Logo sur mobile** : petit sur l'accueil (24 px, à cause des onglets Spirale / Grille), grand dans les
+2. ~~**Logo sur mobile**~~ (tranché le 05/11 dans la nuit : même logo partout, 48 px comme la maquette ; onglets au centre s'ils tiennent, dès 423 px, sinon sous le header). Ancien choix : petit sur l'accueil (24 px, à cause des onglets Spirale / Grille), grand dans les
    salles (48 px, maquette) : il saute à l'entrée. Choix proposé : grand partout avec les onglets passés
    sous le header, ou petit partout.
 

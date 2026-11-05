@@ -527,16 +527,22 @@ button { font: inherit; color: inherit; }
 .salle-ui__degrade, .salle-accueil__poignee, .pied__retour { display: none; }
 
 /*
- * Mobile : maquette 520:1179 (iPhone 16, 393 × 852) : header à 16 px des bords (logo de 48 px,
- * boutons de 48) ; voile noir en haut et en bas ; premier écran en panneau du bas, replié sur le
+ * Mobile : maquette 520:1179 (iPhone 16 ; 393 × 852, puis 375 × 667 depuis la passe du 05/11 au soir) :
+ * header à 12 px du haut, 18 de la gauche et 12 de la droite (logo de 48 px, comme la maquette :
+ * demande de Ludovic, après un essai à 36 ; boutons de 48) ; voile noir en haut et en bas ; premier écran en panneau du bas, replié sur le
  * titre (écran 1), déplié par la poignée, le titre ou un glisser vers le haut (écran 2) ; en bas,
  * œuvre précédente, retour à la collection, œuvre suivante ; popups en panneau du bas (écran 3).
  */
 @media (max-width: 760px) {
   :root { --marge: 16px; }
   .onglets__onglet { height: 40px; padding: 0 12px; font-size: 13px; }
-  /* Accueil (hors maquette mobile) : petit logo, pour laisser la place aux onglets Spirale / Grille */
-  .accueil .entete__logo { height: 24px; margin-top: 12px; }
+  /* Logo MMR de 48 px de haut, comme la maquette (36 essayé le 05/11 puis abandonné) ; accueil
+     (spirale, grille) et salles ont le même header, pas de saut à l'entrée (05/11) ; les onglets Spirale / Grille restent au centre du header s'ils
+     tiennent entre le logo et les boutons, sinon ils passent juste dessous (fin du bloc mobile) */
+  .entete { top: 12px; left: 18px; right: 12px; }
+  /* Onglets centrés sur l'écran, pas sur le header (marges inégales : 3 px de décalage) */
+  .entete__centre { left: calc(50% - 3px); }
+  .menu { top: calc(12px + var(--haut) + 8px); right: 12px; }
   /* Dans une salle, le titre du header laisse la place au bouton retour du bas */
   .salle-ui .entete__centre { display: none; }
 
@@ -548,14 +554,16 @@ button { font: inherit; color: inherit; }
     background: linear-gradient(180deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 20%, rgba(0, 0, 0, 0) 80%, #000 100%);
   }
 
-  /* Panneau du bas : 40 px en haut, 24 sur les côtés, 92 en bas (place des boutons) ; coins de 32 */
+  /* Panneau du bas, opaque, de la couleur de fond de la spirale pour cette œuvre (--fond-salle,
+     InterfaceSalle.tsx ; #2f2922 de la maquette en attendant) : 40 px en haut, 24 sur les côtés, en bas 80 replié et 92 déplié
+     (place des boutons) ; coins de 32 */
   .salle-accueil {
     --p: 0px; --p-gauche: 0px;
     left: 0; right: 0; bottom: 0; top: auto; width: auto; transform: none;
     max-height: calc(100% - var(--marge) - var(--haut) - 16px);
-    padding: 40px 24px 92px; gap: 0; align-items: center; text-align: center;
+    padding: 40px 24px calc(80px + var(--feuille) * 12px); gap: 0; align-items: center; text-align: center;
     border-radius: 32px 32px 0 0; pointer-events: auto; overscroll-behavior: contain; touch-action: none;
-    background: var(--verre-sombre); -webkit-backdrop-filter: var(--flou); backdrop-filter: var(--flou);
+    background: var(--fond-salle, #2f2922); -webkit-backdrop-filter: none; backdrop-filter: none;
   }
   .salle-accueil--cache { transform: translateY(24px); }
   .salle-ui--passage .salle-accueil { transform: translateY(24px); }
@@ -569,23 +577,23 @@ button { font: inherit; color: inherit; }
     border-radius: 4px; background: rgba(255, 255, 255, 0.2);
   }
   .salle-accueil__haut { gap: 0; width: 100%; align-items: center; }
-  .salle-accueil__titre { font-size: 36px; line-height: 36px; cursor: pointer; text-wrap: balance; }
+  .salle-accueil__titre { font-size: 30px; line-height: 30px; cursor: pointer; text-wrap: balance; }
 
-  /* Replié : le titre seul ; déplié : cartouches, soutien et partage, 16 px entre les blocs.
+  /* Replié : le titre seul ; déplié : cartouches, soutien et partage, 24 px entre les blocs.
      --feuille (0 → 1) règle leur hauteur : elle suit le doigt pendant un glisser (useFeuille,
      InterfaceSalle.tsx, qui mesure --h-cartouches et --h-bas), sinon elle glisse vers 0 ou 1 avec la
      courbe des feuilles d'iOS */
-  .salle-accueil { --feuille: 0; transition: opacity 0.45s ease, visibility 0.45s, transform 0.6s cubic-bezier(.2,.7,.2,1), --feuille 0.5s cubic-bezier(.32,.72,0,1); }
+  .salle-accueil { --feuille: 0; transition: opacity 0.45s ease, visibility 0.45s, transform 0.6s cubic-bezier(.2,.7,.2,1), --feuille 0.5s cubic-bezier(.32,.72,0,1), background-color 1.2s ease; }
   /* Popup ouvert, passage : le panneau part après son contenu (mêmes délais que sur ordinateur) */
   .salle-accueil--cache, .salle-ui--passage .salle-accueil {
-    transition: opacity 0.4s ease 1.25s, visibility 0s 1.7s, transform 0.6s cubic-bezier(.2,.7,.2,1), --feuille 0.5s cubic-bezier(.32,.72,0,1);
+    transition: opacity 0.4s ease 1.25s, visibility 0s 1.7s, transform 0.6s cubic-bezier(.2,.7,.2,1), --feuille 0.5s cubic-bezier(.32,.72,0,1), background-color 1.2s ease;
   }
   .salle-accueil--deplie { --feuille: 1; }
   .salle-accueil--glisse { transition: none; }
   .salle-accueil__cartouches, .salle-accueil__bas {
     width: 100%; overflow: hidden;
     max-height: calc(var(--feuille) * var(--h-cartouches, 166px));
-    margin-top: calc(var(--feuille) * 16px);
+    margin-top: calc(var(--feuille) * 24px);
     opacity: clamp(0, calc(var(--feuille) * 1.6 - 0.3), 1);
   }
   .salle-accueil__bas { max-height: calc(var(--feuille) * var(--h-bas, 130px)); }
@@ -594,9 +602,9 @@ button { font: inherit; color: inherit; }
     visibility: hidden; transition: visibility 0s 0.5s;
   }
 
-  /* Cartouches côte à côte, 166 px de haut, 12 px d'écart */
-  .salle-accueil__cartouches { gap: 12px; }
-  .cartouche { flex: 1 1 0; min-width: 0; width: auto; height: 166px; padding: 24px; }
+  /* Cartouches côte à côte au format 172,5 × 108, 6 px d'écart, 12 px de marge en haut et en bas */
+  .salle-accueil__cartouches { gap: 6px; align-items: flex-start; } /* hauteur des cartouches par leur format, pas par la rangée (repliée à 0) */
+  .cartouche { flex: 1 1 0; min-width: 0; width: auto; height: auto; aspect-ratio: 172.5 / 108; padding: 12px 24px; }
   /* Pas de flou progressif : dans le panneau (lui-même flouté), il recouvrait toute la photo ;
      photo nette sous le dégradé, comme sur la maquette */
   .cartouche::before { display: none; }
@@ -606,12 +614,12 @@ button { font: inherit; color: inherit; }
   .cartouche__libelle { font-size: 12px; line-height: 21px; }
   .cartouche__titre { font-size: 16px; line-height: 20px; }
 
-  /* Soutien et partage, centrés, 16 px entre eux */
-  .salle-accueil__bas { flex-direction: column; align-items: center; gap: 16px; }
+  /* Soutien et partage, centrés, 24 px entre eux */
+  .salle-accueil__bas { flex-direction: column; align-items: center; gap: 24px; }
   .salle-accueil__bas > * { flex-shrink: 0; } /* gardent leur hauteur pendant le repli (mesure de useFeuille) */
   .soutien { align-items: center; gap: 6px; padding-bottom: 12px; }
-  .soutien__libelle { font-size: 14px; line-height: 18px; }
-  .soutien__logo { width: 162px; height: 24px; }
+  .soutien__libelle { font-size: 12px; line-height: 18px; }
+  .soutien__logo { width: 135px; height: 20px; }
 
   /* En bas : précédente, retour, suivante (48 px, 8 px d'écart), à 16 px du bord */
   .pied {
@@ -626,13 +634,13 @@ button { font: inherit; color: inherit; }
   /* Popup ouvert : le popup prend le bas de l'écran, les boutons s'effacent (écran 3) */
   .salle-ui--popup .pied { opacity: 0; visibility: hidden; }
 
-  /* Popup en panneau du bas : 40 px en haut, 24 ailleurs, coins de 32, fond plus sombre */
+  /* Popup en panneau du bas, opaque et de la même couleur que le premier écran : 40 px en haut, 24 ailleurs, coins de 32 */
   .popup {
     --marge-p: 24px;
     left: 0; right: 0; bottom: 0; top: auto; width: auto;
     max-height: calc(100% - var(--marge) - var(--haut) - 16px);
     padding: 40px 24px 24px; border-radius: 32px 32px 0 0;
-    background: rgba(0, 0, 0, 0.5); transform: translateY(24px);
+    background: var(--fond-salle, #2f2922); -webkit-backdrop-filter: none; backdrop-filter: none; transform: translateY(24px);
   }
   .popup--ouvert { transform: none; }
   /* Croix de 12 px à 24 px du coin */
@@ -642,11 +650,17 @@ button { font: inherit; color: inherit; }
   .popup__entete { padding-right: 0; align-items: center; text-align: center; }
   .popup__chiffre { align-items: center; text-align: center; }
   .popup__surtitre { font-size: 14px; line-height: 25px; }
-  .popup__titre { font-size: 36px; line-height: 36px; }
+  .popup__titre { font-size: 30px; line-height: 30px; }
   .popup__texte p { font-size: 14px; line-height: 21px; }
   .popup__chiffre dt { font-size: 12px; }
   .popup__chiffre dd { font-size: 20px; }
   .popup__lien { align-self: stretch; justify-content: center; margin-top: 0; }
+}
+/* Onglets de 127 px centrés sur l'écran, logo de 122 à 18 px du bord, boutons de 104 à 12 px, 8 px
+   d'écart au moins : au centre du header à partir de 423 px de large (le logo limite). En dessous, 8 px
+   sous le header ; la grille descend d'autant (ONGLETS_DESSOUS, Grille.js) */
+@media (max-width: 422px) {
+  .accueil .entete__centre { top: calc(var(--haut) + 8px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
