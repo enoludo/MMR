@@ -561,6 +561,8 @@ button { font: inherit; color: inherit; }
     --p: 0px; --p-gauche: 0px;
     left: 0; right: 0; bottom: 0; top: auto; width: auto; transform: none;
     max-height: calc(100% - var(--marge) - var(--haut) - 16px);
+    /* Hauteur réellement visible (barres de Safari comprises : iPhone SE 2, 05/11) */
+    max-height: calc(100dvh - var(--marge) - var(--haut) - 16px);
     padding: 40px 24px calc(80px + var(--feuille) * 12px); gap: 0; align-items: center; text-align: center;
     border-radius: 32px 32px 0 0; pointer-events: auto; overscroll-behavior: contain; touch-action: none;
     background: var(--fond-salle, #2f2922); -webkit-backdrop-filter: none; backdrop-filter: none;
@@ -588,7 +590,11 @@ button { font: inherit; color: inherit; }
   .salle-accueil--cache, .salle-ui--passage .salle-accueil {
     transition: opacity 0.4s ease 1.25s, visibility 0s 1.7s, transform 0.6s cubic-bezier(.2,.7,.2,1), --feuille 0.5s cubic-bezier(.32,.72,0,1), background-color 1.2s ease;
   }
-  .salle-accueil--deplie { --feuille: 1; }
+  /* Déplié : le contenu défile s'il dépasse (écrans peu hauts, barres du navigateur), barre fine ;
+     le glisser vers le bas depuis le haut replie toujours le panneau (useFeuille) */
+  .salle-accueil--deplie { --feuille: 1; touch-action: pan-y; }
+  /* Les blocs gardent leur hauteur : sinon ils se tassent (coupés) au lieu de faire défiler le panneau */
+  .salle-accueil > *, .salle-accueil__haut > * { flex-shrink: 0; }
   .salle-accueil--glisse { transition: none; }
   .salle-accueil__cartouches, .salle-accueil__bas {
     width: 100%; overflow: hidden;
@@ -639,6 +645,8 @@ button { font: inherit; color: inherit; }
     --marge-p: 24px;
     left: 0; right: 0; bottom: 0; top: auto; width: auto;
     max-height: calc(100% - var(--marge) - var(--haut) - 16px);
+    /* Hauteur réellement visible (barres de Safari comprises : iPhone SE 2, 05/11) */
+    max-height: calc(100dvh - var(--marge) - var(--haut) - 16px);
     padding: 40px 24px 24px; border-radius: 32px 32px 0 0;
     background: var(--fond-salle, #2f2922); -webkit-backdrop-filter: none; backdrop-filter: none; transform: translateY(24px);
   }

@@ -79,6 +79,10 @@ export function InterfaceSalle({ oeuvre }: { oeuvre: Oeuvre }) {
   const surMobile = () => window.matchMedia('(max-width: 760px)').matches
   if (ouvert && deplie) setDeplie(false)
   const feuille = useFeuille(premierEcran, deplie, setDeplie, surMobile, oeuvre.id)
+  // Replié (poignée, titre, glisser) : le contenu, s'il avait défilé, revient en haut
+  useEffect(() => {
+    if (!deplie) premierEcran.current?.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [deplie])
 
   // Le popup garde son contenu pendant qu'il disparaît
   const [contenu, setContenu] = useState<'maladie' | 'manifeste'>('maladie')
@@ -257,8 +261,11 @@ function useFeuille(
     const dy = y - g.y0
     if (!g.actif) {
       if (Math.abs(dy) < 6) return
-      // Déplié et défilé (petits écrans) : le geste fait défiler le contenu
-      if (deplie && el.scrollTop > 0) return void (geste.current = null)
+      // Déplié et plus haut que l'écran (iPhone SE dans Safari, par exemple) : le contenu défile
+      // (touch-action: pan-y, style.css) ; on ne replie qu'en tirant vers le bas depuis le haut du
+      // contenu, comme une feuille d'iOS
+      const defile = el.scrollHeight > el.clientHeight + 1
+      if (deplie && defile && (dy < 0 || el.scrollTop > 0)) return void (geste.current = null)
       g.actif = true
       el.classList.add('salle-accueil--glisse')
     }
