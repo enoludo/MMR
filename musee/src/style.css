@@ -272,6 +272,8 @@ button { font: inherit; color: inherit; }
 }
 
 .salle-accueil__haut { display: flex; flex-direction: column; gap: 48px; }
+/* En-tête du panneau mobile (poignée et titre) : sur ordinateur, le titre seul, dans la colonne */
+.salle-accueil__tete { display: contents; }
 .salle-accueil__titre {
   margin: 0; font-family: var(--titre); font-weight: 400; text-transform: uppercase;
   font-size: clamp(40px, 3.57vw, 60px); line-height: 1;
@@ -534,7 +536,15 @@ button { font: inherit; color: inherit; }
  * œuvre précédente, retour à la collection, œuvre suivante ; popups en panneau du bas (écran 3).
  */
 @media (max-width: 760px) {
-  :root { --marge: 16px; }
+  /* Enchaînement des panneaux du bas (premier écran ↔ popups, 05/11, demande de Ludovic) : le sortant
+     descend en accélérant, l'entrant monte dans la foulée, avant que le sortant ait fini, avec la
+     courbe des feuilles d'iOS ; sans fondu, le contenu solidaire de son panneau. Pendant ce temps, la
+     caméra rejoint sa vue (Navigation). */
+  :root {
+    --marge: 16px;
+    --sortie-feuille: 0.4s cubic-bezier(.4, 0, 1, 1);
+    --entree-feuille: 0.6s cubic-bezier(.32, .72, 0, 1) 0.28s;
+  }
   .onglets__onglet { height: 40px; padding: 0 12px; font-size: 13px; }
   /* Logo MMR de 48 px de haut, comme la maquette (36 essayé le 05/11 puis abandonné) ; accueil
      (spirale, grille) et salles ont le même header, pas de saut à l'entrée (05/11) ; les onglets Spirale / Grille restent au centre du header s'ils
@@ -563,12 +573,22 @@ button { font: inherit; color: inherit; }
     max-height: calc(100% - var(--marge) - var(--haut) - 16px);
     /* Hauteur réellement visible (barres de Safari comprises : iPhone SE 2, 05/11) */
     max-height: calc(100dvh - var(--marge) - var(--haut) - 16px);
-    padding: 40px 24px calc(80px + var(--feuille) * 12px); gap: 0; align-items: center; text-align: center;
+    padding: 0 24px 92px; gap: 0; align-items: center; text-align: center;
     border-radius: 32px 32px 0 0; pointer-events: auto; overscroll-behavior: contain; touch-action: none;
     background: var(--fond-salle, #2f2922); -webkit-backdrop-filter: none; backdrop-filter: none;
   }
-  .salle-accueil--cache { transform: translateY(24px); }
-  .salle-ui--passage .salle-accueil { transform: translateY(24px); }
+  /* Popup ouvert, passage vers l'œuvre précédente / suivante, transition avec la spirale ou la grille
+     (et écran d'accueil) : le panneau descend entier hors de l'écran, avec son contenu, sans fondu ; il
+     remonte à la fermeture du popup, à l'arrivée par le couloir ou à l'entrée dans la salle */
+  .salle-accueil--cache, .salle-ui--passage .salle-accueil, .salle-ui--transition .salle-accueil { transform: translateY(100%); opacity: 1; }
+  /* En-tête collant (poignée et titre) : reste en haut quand le panneau déplié défile ; même fond
+     que le panneau, le contenu passe dessous. 40 px au-dessus du titre, 24 dessous (écart des blocs) */
+  .salle-accueil__haut { display: contents; }
+  .salle-accueil__tete {
+    display: block; position: sticky; top: 0; z-index: 1; align-self: stretch;
+    margin: 0 -24px; padding: 40px 24px 24px; touch-action: none;
+    background: var(--fond-salle, #2f2922); transition: background-color 1.2s ease;
+  }
   /* Poignée : trait de 40 × 4 px à 12 px du haut, dans une zone de toucher plus large */
   .salle-accueil__poignee {
     display: block; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
@@ -578,31 +598,34 @@ button { font: inherit; color: inherit; }
     content: ''; position: absolute; top: 12px; left: 40px; width: 40px; height: 4px;
     border-radius: 4px; background: rgba(255, 255, 255, 0.2);
   }
-  .salle-accueil__haut { gap: 0; width: 100%; align-items: center; }
   .salle-accueil__titre { font-size: 30px; line-height: 30px; cursor: pointer; text-wrap: balance; }
 
-  /* Replié : le titre seul ; déplié : cartouches, soutien et partage, 24 px entre les blocs.
-     --feuille (0 → 1) règle leur hauteur : elle suit le doigt pendant un glisser (useFeuille,
-     InterfaceSalle.tsx, qui mesure --h-cartouches et --h-bas), sinon elle glisse vers 0 ou 1 avec la
-     courbe des feuilles d'iOS */
-  .salle-accueil { --feuille: 0; transition: opacity 0.45s ease, visibility 0.45s, transform 0.6s cubic-bezier(.2,.7,.2,1), --feuille 0.5s cubic-bezier(.32,.72,0,1), background-color 1.2s ease; }
-  /* Popup ouvert, passage : le panneau part après son contenu (mêmes délais que sur ordinateur) */
-  .salle-accueil--cache, .salle-ui--passage .salle-accueil {
-    transition: opacity 0.4s ease 1.25s, visibility 0s 1.7s, transform 0.6s cubic-bezier(.2,.7,.2,1), --feuille 0.5s cubic-bezier(.32,.72,0,1), background-color 1.2s ease;
+  /* Replié : le panneau entier glisse vers le bas et ne laisse voir que son en-tête (poignée, titre)
+     et 56 px dessous, occupés par les boutons du bas (--h-replie, mesurée par useFeuille) ; ses blocs
+     ne sont pas masqués, seulement estompés. --feuille (0 → 1) suit le doigt pendant un glisser
+     (useFeuille, InterfaceSalle.tsx), sinon elle glisse vers 0 ou 1 avec la courbe des feuilles d'iOS */
+  .salle-accueil {
+    --feuille: 0;
+    translate: 0 calc((1 - var(--feuille)) * (100% - var(--h-replie, 180px)));
+    overflow: hidden;
+    /* Retour (popup fermé, arrivée d'un passage, entrée dans la salle) : il remonte dans la foulée */
+    transition: opacity 0.45s ease, visibility 0.45s, transform var(--entree-feuille), --feuille 0.5s cubic-bezier(.32,.72,0,1), background-color 1.2s ease;
   }
-  /* Déplié : le contenu défile s'il dépasse (écrans peu hauts, barres du navigateur), barre fine ;
-     le glisser vers le bas depuis le haut replie toujours le panneau (useFeuille) */
-  .salle-accueil--deplie { --feuille: 1; touch-action: pan-y; }
+  .salle-accueil--cache, .salle-ui--passage .salle-accueil, .salle-ui--transition .salle-accueil {
+    visibility: hidden;
+    transition: visibility 0s 0.4s, transform var(--sortie-feuille), --feuille var(--sortie-feuille), background-color 1.2s ease;
+  }
+  /* Déplié : le contenu défile s'il dépasse (écrans peu hauts, barres du navigateur), sous l'en-tête
+     collant ; un glisser vers le bas depuis le haut du contenu, ou sur l'en-tête, replie le panneau */
+  .salle-accueil--deplie { --feuille: 1; overflow: hidden auto; touch-action: pan-y; }
   /* Les blocs gardent leur hauteur : sinon ils se tassent (coupés) au lieu de faire défiler le panneau */
   .salle-accueil > *, .salle-accueil__haut > * { flex-shrink: 0; }
   .salle-accueil--glisse { transition: none; }
   .salle-accueil__cartouches, .salle-accueil__bas {
-    width: 100%; overflow: hidden;
-    max-height: calc(var(--feuille) * var(--h-cartouches, 166px));
-    margin-top: calc(var(--feuille) * 24px);
+    width: 100%;
     opacity: clamp(0, calc(var(--feuille) * 1.6 - 0.3), 1);
   }
-  .salle-accueil__bas { max-height: calc(var(--feuille) * var(--h-bas, 130px)); }
+  .salle-accueil__bas { margin-top: 24px; }
   /* Replié et immobile : hors du parcours au clavier */
   .salle-accueil:not(.salle-accueil--deplie):not(.salle-accueil--glisse) :is(.salle-accueil__cartouches, .salle-accueil__bas) {
     visibility: hidden; transition: visibility 0s 0.5s;
@@ -637,8 +660,13 @@ button { font: inherit; color: inherit; }
   .fleche__libelle, .fleche--suivante .fleche__libelle, .fleche--precedente .fleche__libelle { width: var(--haut); transform: none; }
   .fleche__texte { display: none; }
   .pied__retour { display: grid; color: inherit; }
-  /* Popup ouvert : le popup prend le bas de l'écran, les boutons s'effacent (écran 3) */
-  .salle-ui--popup .pied { opacity: 0; visibility: hidden; }
+  /* Popup ouvert (écran 3), passage, transition avec la spirale : les boutons descendent avec le
+     premier écran et remontent avec lui */
+  .pied { transition: opacity 0.45s ease, visibility 0.45s, transform var(--entree-feuille); }
+  .salle-ui--popup .pied, .salle-ui--passage .pied, .salle-ui--transition .pied {
+    transform: translateY(100%); opacity: 1; visibility: hidden;
+    transition: visibility 0s 0.4s, transform var(--sortie-feuille);
+  }
 
   /* Popup en panneau du bas, opaque et de la même couleur que le premier écran : 40 px en haut, 24 ailleurs, coins de 32 */
   .popup {
@@ -648,9 +676,23 @@ button { font: inherit; color: inherit; }
     /* Hauteur réellement visible (barres de Safari comprises : iPhone SE 2, 05/11) */
     max-height: calc(100dvh - var(--marge) - var(--haut) - 16px);
     padding: 40px 24px 24px; border-radius: 32px 32px 0 0;
-    background: var(--fond-salle, #2f2922); -webkit-backdrop-filter: none; backdrop-filter: none; transform: translateY(24px);
+    background: var(--fond-salle, #2f2922); -webkit-backdrop-filter: none; backdrop-filter: none;
+    /* Monte depuis le bas de l'écran dans la foulée du premier écran qui descend, et redescend avant
+       qu'il remonte ; sans fondu, le contenu suit (pas de cascade sur mobile, Popup.tsx). Un glisser
+       vers le bas depuis le haut le ferme aussi, comme la croix */
+    opacity: 1; transform: translateY(100%);
+    transition: visibility 0s 0.4s, transform var(--sortie-feuille), background-color 1.2s ease;
   }
-  .popup--ouvert { transform: none; }
+  .popup--ouvert {
+    opacity: 1; transform: none;
+    transition: visibility 0s, transform var(--entree-feuille), background-color 1.2s ease;
+  }
+  /* En-tête collant (surtitre, titre et son filet) : le texte défile dessous ; pas de fondu en haut */
+  .popup__entete {
+    position: sticky; top: 0; z-index: 1;
+    background: var(--fond-salle, #2f2922); transition: background-color 1.2s ease;
+  }
+  .popup__defilement--haut { --fondu-haut: 0px; }
   /* Croix de 12 px à 24 px du coin */
   .popup__fermer { top: 6px; right: 6px; }
   .popup__barre { right: 0; top: 40px; }

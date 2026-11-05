@@ -56,6 +56,11 @@ export function InterfaceSalle({ oeuvre }: { oeuvre: Oeuvre }) {
   }
   const premierEcran = useRef<HTMLElement>(null)
   const titre = useRef<HTMLHeadingElement>(null)
+  // Mobile : à l'ouverture d'un popup, pendant un passage vers l'œuvre précédente / suivante et au
+  // retour vers la spirale ou la grille, le panneau descend d'un bloc avec son contenu, qui reste en
+  // place (pas de cascade) ; il remonte de même à la fermeture, à l'arrivée par le couloir (titre de
+  // la nouvelle œuvre) et à l'entrée depuis la spirale, la grille ou l'écran d'accueil (style.css)
+  const mobile = window.matchMedia('(max-width: 760px)').matches
   useApparition({
     conteneur: premierEcran,
     titre,
@@ -63,10 +68,10 @@ export function InterfaceSalle({ oeuvre }: { oeuvre: Oeuvre }) {
     autres: '.cartouche, .salle-accueil__bas > *',
     // Vers l'œuvre précédente / suivante ou à l'ouverture d'un popup : il part dès le clic,
     // élément par élément ; il revient à l'arrivée dans la salle suivante ou à la fermeture
-    visible: !enTransition && !enPassage && !ouvert,
-    cascade: enPassage || ouvert,
+    visible: mobile || (!enTransition && !enPassage && !ouvert),
+    cascade: !mobile && (enPassage || ouvert),
     // À la fermeture d'un popup, on attend que son contenu soit parti
-    delai: popupFerme.current ? 0.35 : 0,
+    delai: popupFerme.current && !mobile ? 0.35 : 0,
   })
   useEffect(() => {
     popupFerme.current = false // une seule fois, à la fermeture
@@ -159,17 +164,19 @@ export function InterfaceSalle({ oeuvre }: { oeuvre: Oeuvre }) {
         onTouchEnd={feuille.fin}
         onTouchCancel={feuille.fin}
       >
-        {/* Mobile seulement (masquée sur ordinateur) */}
-        <button
-          type="button"
-          className="salle-accueil__poignee"
-          aria-expanded={deplie}
-          aria-label={deplie ? 'Replier la présentation' : 'Déplier la présentation'}
-          onClick={() => setDeplie(!deplie)}
-        />
         <div className="salle-accueil__haut">
-          {/* Écrit et découpé en lettres par useApparition */}
-          <h1 className="salle-accueil__titre" ref={titre} onClick={() => surMobile() && setDeplie(!deplie)} />
+          {/* Mobile : poignée et titre, en-tête collant du panneau (sur ordinateur, le titre seul) */}
+          <div className="salle-accueil__tete">
+            <button
+              type="button"
+              className="salle-accueil__poignee"
+              aria-expanded={deplie}
+              aria-label={deplie ? 'Replier la présentation' : 'Déplier la présentation'}
+              onClick={() => setDeplie(!deplie)}
+            />
+            {/* Écrit et découpé en lettres par useApparition */}
+            <h1 className="salle-accueil__titre" ref={titre} onClick={() => surMobile() && setDeplie(!deplie)} />
+          </div>
           <div className="salle-accueil__cartouches">
             <Cartouche
               oeuvre={oeuvre}
@@ -213,11 +220,12 @@ export function InterfaceSalle({ oeuvre }: { oeuvre: Oeuvre }) {
 
 /**
  * Mobile : le panneau du bas suit le doigt (feuille d'iOS). Son ouverture (0 replié, 1 déplié) est la
- * variable CSS --feuille, qui règle la hauteur des blocs repliables (style.css, section Mobile) ;
- * pendant le geste elle suit le doigt au pixel près (hauteurs mesurées : --h-cartouches, --h-bas),
- * puis elle rejoint 0 ou 1 en transition. Un geste rapide l'emporte sur la position.
+ * variable CSS --feuille : le panneau entier glisse vers le bas d'autant (translate, style.css, section
+ * Mobile), sans masquer ses blocs ; replié, il ne laisse voir que son en-tête (poignée et titre) et
+ * 56 px sous lui (--h-replie). Pendant le geste elle suit le doigt au pixel près, puis elle rejoint
+ * 0 ou 1 en transition. Un geste rapide l'emporte sur la position.
  */
-const ECART_BLOCS = 24 // marge au-dessus des cartouches et du bas, déplié (style.css)
+const SOUS_LE_TITRE = 56 // replié : de l'en-tête (et ses 24 px sous le titre) au bas de l'écran, 80 px sous le titre
 function useFeuille(
   section: React.RefObject<HTMLElement | null>,
   deplie: boolean,
@@ -225,21 +233,15 @@ function useFeuille(
   surMobile: () => boolean,
   cle: string,
 ) {
-  const geste = useRef<{ y0: number; o0: number; o: number; course: number; y: number; t: number; vitesse: number; actif: boolean } | null>(null)
+  const geste = useRef<{ y0: number; o0: number; o: number; course: number; y: number; t: number; vitesse: number; actif: boolean; tete: boolean } | null>(null)
+  /** Course du panneau entre replié et déplié (px) ; pose --h-replie, la hauteur visible repliée */
   const mesurer = () => {
     const el = section.current
     if (!el) return 1
-    const c = el.querySelector<HTMLElement>('.salle-accueil__cartouches')
-    const b = el.querySelector<HTMLElement>('.salle-accueil__bas')
-    // Hauteurs de mise en page (offsetHeight), sans les décalages des animations d'apparition
-    // (transform), que scrollHeight compterait
-    const enfants = (x: HTMLElement | null) => (x ? [...x.children].map((n) => (n as HTMLElement).offsetHeight) : [])
-    const hc = Math.max(0, ...enfants(c))
-    const lb = enfants(b)
-    const hb = lb.reduce((a, h) => a + h, 0) + ECART_BLOCS * Math.max(0, lb.length - 1)
-    el.style.setProperty('--h-cartouches', `${hc}px`)
-    el.style.setProperty('--h-bas', `${hb}px`)
-    return Math.max(1, 2 * ECART_BLOCS + hc + hb)
+    const tete = el.querySelector<HTMLElement>('.salle-accueil__tete')
+    const replie = (tete?.offsetHeight ?? 124) + SOUS_LE_TITRE
+    el.style.setProperty('--h-replie', `${replie}px`)
+    return Math.max(1, el.offsetHeight - replie)
   }
   useLayoutEffect(() => {
     mesurer()
@@ -251,7 +253,9 @@ function useFeuille(
     if (!surMobile()) return
     const y = e.touches[0].clientY
     const o = deplie ? 1 : 0
-    geste.current = { y0: y, o0: o, o, course: mesurer(), y, t: e.timeStamp, vitesse: 0, actif: false }
+    // Pris par l'en-tête (poignée, titre) : le panneau suit toujours le doigt, même défilé
+    const tete = e.target instanceof Element && !!e.target.closest('.salle-accueil__tete')
+    geste.current = { y0: y, o0: o, o, course: mesurer(), y, t: e.timeStamp, vitesse: 0, actif: false, tete }
   }
   const mouvement = (e: TouchEvent) => {
     const g = geste.current
@@ -265,7 +269,7 @@ function useFeuille(
       // (touch-action: pan-y, style.css) ; on ne replie qu'en tirant vers le bas depuis le haut du
       // contenu, comme une feuille d'iOS
       const defile = el.scrollHeight > el.clientHeight + 1
-      if (deplie && defile && (dy < 0 || el.scrollTop > 0)) return void (geste.current = null)
+      if (deplie && defile && !g.tete && (dy < 0 || el.scrollTop > 0)) return void (geste.current = null)
       g.actif = true
       el.classList.add('salle-accueil--glisse')
     }

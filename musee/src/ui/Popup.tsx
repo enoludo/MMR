@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, type PointerEvent as PointeurReact, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, type PointerEvent as PointeurReact, type ReactNode, type TouchEvent as ToucherReact } from 'react'
 import gsap from 'gsap'
 import { SplitText } from 'gsap/SplitText'
 import { IconeCroix } from './icones'
@@ -62,7 +62,8 @@ export function Popup({
     anim.current = null
     const croix = fermer.current
     const blocs = gsap.utils.toArray<HTMLElement>(racine.querySelectorAll(BLOCS))
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    // Mobile : le popup monte et descend d'un bloc, son contenu le suit sans cascade (style.css)
+    if (window.matchMedia('(prefers-reduced-motion: reduce), (max-width: 760px)').matches) {
       gsap.set([...blocs, croix], { clearProps: 'opacity,transform' })
       return
     }
@@ -171,6 +172,21 @@ export function Popup({
     }
   }, [ouvert])
 
+  // Mobile (panneau du bas) : un glisser vers le bas depuis le haut du contenu, ou sur l'en-tête
+  // collant, ferme le popup, comme la croix
+  const toucher = useRef<{ y: number; haut: boolean } | null>(null)
+  const debutToucher = (e: ToucherReact) => {
+    const zone = defilement.current
+    const surTete = e.target instanceof Element && !!e.target.closest('.popup__entete')
+    toucher.current = { y: e.touches[0].clientY, haut: surTete || !zone || zone.scrollTop <= 0 }
+  }
+  const finToucher = (e: ToucherReact) => {
+    const t = toucher.current
+    toucher.current = null
+    if (!t?.haut || !window.matchMedia('(max-width: 760px)').matches) return
+    if (e.changedTouches[0].clientY - t.y > 80) quandFermer.current()
+  }
+
   // Barre saisie à la souris ou au doigt : un clic à côté du curseur l'y amène, puis il suit
   const saisir = (e: PointeurReact<HTMLDivElement>) => {
     const zone = defilement.current
@@ -203,7 +219,14 @@ export function Popup({
   }
 
   return (
-    <aside ref={cadre} className={`popup ${ouvert ? 'popup--ouvert' : ''}`} inert={!ouvert} aria-label={etiquette}>
+    <aside
+      ref={cadre}
+      className={`popup ${ouvert ? 'popup--ouvert' : ''}`}
+      inert={!ouvert}
+      aria-label={etiquette}
+      onTouchStart={debutToucher}
+      onTouchEnd={finToucher}
+    >
       <button type="button" ref={fermer} className="bouton-rond popup__fermer" aria-label="Fermer" onClick={onFermer}>
         <IconeCroix />
       </button>
