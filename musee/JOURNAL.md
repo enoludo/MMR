@@ -11,6 +11,10 @@ Une entrée par session, la plus récente en haut. Le détail technique est dans
 
 ---
 
+## 05/11/2026 — Claude Code (passation vers un autre compte Claude)
+
+- `PASSATION.md` réécrite pour la reprise sur un autre compte Claude (état au 05/11, points ouverts, connecteurs à rajouter, mise en ligne sur le labo pas à pas) ; en-tête et points ouverts de `CLAUDE.md` mis à jour.
+
 ## 04/11/2026 — Claude Code (vue d'arrivée trop lointaine en revenant sur Huntington)
 
 - **[à voir] Vue d'arrivée fausse après un retour vers la grille (vu par Ludovic : Huntington vu de beaucoup trop loin, transition cassée), corrigé.** Une salle quittée reste montée 1,5 s après le retour (`DEMONTAGE_SALLE`) ; cliquer une œuvre pendant ce temps réutilisait cette salle, avec sa caméra : Huntington à la distance du Seuil (14,21 m au lieu de 3,76), le Seuil collé à la statue dans l'autre sens (reproduit sur le labo). D'où le bug intermittent : il fallait cliquer juste après la fin du retour. Désormais chaque entrée depuis la spirale ou la grille monte une salle neuve, la quittée démontée une image avant pour garder le moteur de rendu partagé (`main.tsx`). Vérifié, clic aussitôt le retour fini : Huntington → Seuil (14,21 m), Seuil → Huntington et Huntington → Huntington (3,76 m), même moteur, passage par les flèches, aucune erreur. **En ligne sur le labo et envoyé sur GitHub** (04/11, demande de Ludovic).
