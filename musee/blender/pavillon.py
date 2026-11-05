@@ -1,0 +1,515 @@
+"""
+Pavillon (plan de Ludovic du 05/11, plans/Fichier 2.svg ; plan coté et aperçu : plans/salle-pavillon.html),
+pour « Souffle d'éclats » : géométrie, précalcul de la lumière et export, comme rotonde.py.
+
+    blender -b --python-use-system-env -P pavillon.py -- [resolution] [echantillons] [echantillons du mobilier]
+    puis : PYLIB=… ./chaine.sh RES pavillon
+
+Produit dans salle-pavillon/ : salle.blend, lightmap.exr, lightmap-mobilier.exr, salle-raw.glb, avec les objets
+« Salle » (grande salle, dehors de l'espace central ; atlas « salle »), « Mobilier » (dedans de l'espace central,
+bancs, socle ; atlas « mobilier »), et sans lightmap : « Huisseries » (acier noir), « Dehors » (sol clair) et
+« Ciel » (ciel autour de la salle, vu par les baies). Plus de lampes dans l'espace central depuis le 05/11 : il est
+éclairé par ses ouvertures, quatre projecteurs discrets dans ses angles et la lueur de l'œuvre (souffle.py),
+comptée dans le précalcul. Plus de socle ni de gorge lumineuse depuis le 05/11 (l'œuvre flotte).
+Mêmes cotes que l'aperçu (apercu-pavillon.py) et le plan (plans/generer-plan-pavillon.py) : les garder identiques.
+
+Décisions de Ludovic (05/11) : grande salle de 40 m à 17,5 m, sans puits ni fentes, murs de 1,6 m percés de
+8 baies de 10 × 14 m (huisseries acier noir) ; espace central couvert à 6 m, deux ouvertures de 5,66 m
+(nord-est, sud-ouest), éclairage artificiel, socle de Huntington sans statue ; couloirs inchangés ;
+dehors très lumineux et simple ; vue d'arrivée dans l'espace central à 8,5 m.
+Unités : mètres. Repère Blender : Z vers le haut (Y du site = Z Blender, Z du site = -Y Blender).
+"""
+import bpy, bmesh, sys, os, time, math
+from mathutils import Vector
+
+argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:]
+RES = int(argv[0]) if len(argv) > 0 else 2048
+SAMPLES = int(argv[1]) if len(argv) > 1 else 256
+SAMPLES_MOB = int(argv[2]) if len(argv) > 2 else SAMPLES
+HERE = os.path.dirname(os.path.abspath(__file__))
+OUT = os.path.join(HERE, "salle-pavillon")
+os.makedirs(OUT, exist_ok=True)
+
+# --- Grande salle --------------------------------------------------------------------------------------
+C, H = 40.0, 17.5
+h = C / 2
+T = 1.6                       # murs épais : embrasures profondes des baies
+PORTE, SAS = 4.0, 1.0         # portes dans les angles ; sas fermé derrière le mur (masqué par le site)
+BAIES = [(-13.0, -3.0), (3.0, 13.0)]
+BAIE_H = 14.0
+VITRE = 0.3                   # plan des huisseries : à 0,3 m de la face extérieure
+MENEAU_PAS, TRAVERSE_PAS = 2.5, 3.5
+MENEAU_E, MENEAU_P = 0.06, 0.35
+TRAVERSE_P, DORMANT, DORMANT_P = 0.15, 0.12, 0.22
+# Lumière : celle de l'aperçu, ramenée à l'exposition du site (3,4 ; l'aperçu était rendu 1,5 diaph en dessous)
+ECHELLE = 2 ** -1.5
+SOLEIL_HAUTEUR, SOLEIL_ANGLE = 30.0, 5.0       # du sud-est, bas, voilé
+SOLEIL = Vector((-math.cos(math.radians(SOLEIL_HAUTEUR)) / math.sqrt(2),
+                 math.cos(math.radians(SOLEIL_HAUTEUR)) / math.sqrt(2),
+                 -math.sin(math.radians(SOLEIL_HAUTEUR)))).normalized()
+SOLEIL_FORCE, CIEL_FORCE = 5.0 * ECHELLE, 1.0 * ECHELLE
+SOLEIL_COULEUR, CIEL_COULEUR = "#fff1dc", "#c9d6e6"
+
+# --- Espace central --------------------------------------------------------------------------------------
+INT, EXT, PLAT, CONGE = 15.5, 18.971, 16.0, 1.0
+OUV = 4 * math.sqrt(2)
+H_INT, TOIT = 6.0, 1.0
+# Plus de socle depuis le 05/11 (demande de Ludovic) : l'œuvre flotte à la même hauteur (pied du modèle à OEUVRE_Z)
+OEUVRE_Z = 0.8
+# Éclairages discrets dans les quatre angles de l'espace central (05/11, demande de Ludovic) : projecteurs
+# encastrés au sol, à COIN_RETRAIT de l'angle sur sa bissectrice, tournés vers le haut et vers l'angle ; blanc chaud
+COIN_RETRAIT, COIN_INCLINAISON, COIN_CONE = 0.7, 12.0, 75.0
+COIN_FORCE, COIN_COULEUR = 200.0 * ECHELLE, "#ffd9ae"
+BANC_R, BANC_P, BANC_H = 6.47, 0.76, 0.45
+BANCS = [(-45 - 22.5, -45 + 22.5), (135 - 22.5, 135 + 22.5)]
+# L'œuvre (souffle.py), au-dessus du sol, face avant vers la vue d'arrivée (sud-ouest) comme dans le site ; sa lueur
+OEUVRE_ROTATION = -45.0
+# (rouge faible : à 5, les milliers de vaisseaux teintaient toute la salle en magenta ; sur l'image, la pénombre
+# reste neutre avec des reflets bleus)
+# (bleu ramené de 0,8 à 0,15 et rouge à 0,3 le 05/11 : il teintait trop la salle pour Ludovic ; bleu remonté à 0,3 ensuite, à sa demande, avec les projecteurs des angles de 120 à 200)
+OEUVRE_BLEU, OEUVRE_BLEU_FORCE = (0.08, 0.2, 1.0, 1), 0.3 * ECHELLE
+OEUVRE_ROUGE, OEUVRE_ROUGE_FORCE = (1.0, 0.04, 0.15, 1), 0.3 * ECHELLE
+GRILLE = 1.5
+DEHORS_R, CIEL_H = 100.0, 60.0          # sous la limite de vue de la caméra du site (150 m)
+ECRAN = 32.0                            # écran du ciel autour de la salle (voir plus bas)
+HAUT_COULOIR = 17.7                     # haut des couloirs du site (plafond de 0,2 m sur 17,5 m)
+# Section de chaque couloir, relevée dans le site (en Blender : nord x 15,8 → 20,5, ouest y 15,8 → 20,5,
+# sud x -20,2 → -15,5, est y -20,5 → -15,8), ramenée au mur nord (x de -ECRAN à ECRAN), d'où tourner() la
+# remet en place ; le couloir sud n'est pas le nord tourné (fentes de l'autre côté)
+TROUS_COULOIRS = {"nord": (15.8, 20.5), "ouest": (15.8, 20.5), "sud": (15.5, 20.2), "est": (15.8, 20.5)}
+
+bpy.ops.wm.read_factory_settings(use_empty=True)
+scn = bpy.context.scene
+
+
+def lineaire(hexa):
+    c = [int(hexa[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+    return tuple(v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4 for v in c)
+
+
+def mat(name, color, rough=0.9):
+    m = bpy.data.materials.new(name); m.use_nodes = True
+    b = m.node_tree.nodes["Principled BSDF"]
+    b.inputs["Base Color"].default_value = (*color, 1); b.inputs["Roughness"].default_value = rough
+    return m
+
+
+# Albédos = couleurs du site (salle provisoire) ; rugosités à peine différentes pour que gltf-transform
+# ne fusionne pas des matières de même couleur (elles n'ont pas le même atlas)
+MATS = [mat("Mur", lineaire("#c1bcb4")), mat("Sol", lineaire("#a09b96"), 0.6), mat("Plafond", lineaire("#bab6b1")),
+        mat("SolCentre", lineaire("#a09b96"), 0.61), mat("Banc", lineaire("#b1aca5")),
+        mat("MurCentre", lineaire("#c1bcb4"), 0.91), mat("PlafondCentre", lineaire("#bab6b1"), 0.91)]
+MUR, SOL, PLAF, SOL_C, BANC, MUR_C, PLAF_C = range(7)
+ACIER = mat("Acier", lineaire("#161616"), 0.45)
+ACIER.node_tree.nodes["Principled BSDF"].inputs["Metallic"].default_value = 0.7
+DEHORS = mat("Dehors", lineaire("#d9d2c6"), 0.95)
+
+
+def emission(nom, couleur, force):
+    m = bpy.data.materials.new(nom); m.use_nodes = True
+    e = m.node_tree.nodes.new("ShaderNodeEmission")
+    e.inputs["Color"].default_value = couleur; e.inputs["Strength"].default_value = force
+    m.node_tree.links.new(e.outputs[0], m.node_tree.nodes["Material Output"].inputs["Surface"])
+    return m
+
+
+# --- Outils de construction ----------------------------------------------------------------------------
+def objet(nom, bm):
+    me = bpy.data.meshes.new(nom); bm.to_mesh(me); bm.free()
+    o = bpy.data.objects.new(nom, me); scn.collection.objects.link(o)
+    return o
+
+
+def aire(contour):
+    return sum(x0 * y1 - x1 * y0 for (x0, y0), (x1, y1) in zip(contour, contour[1:] + contour[:1])) / 2
+
+
+def prisme(nom, contour, z0, z1, bm=None):
+    """Prisme sur un contour ; dans un bmesh donné (plusieurs pièces dans un objet), ou un objet à lui."""
+    if aire(contour) < 0:
+        contour = contour[::-1]
+    b = bm or bmesh.new()
+    bas = [b.verts.new((x, y, z0)) for x, y in contour]
+    haut = [b.verts.new((x, y, z1)) for x, y in contour]
+    b.faces.new(bas[::-1]); b.faces.new(haut)
+    n = len(contour)
+    for i in range(n):
+        j = (i + 1) % n
+        b.faces.new([bas[i], bas[j], haut[j], haut[i]])
+    return None if bm else objet(nom, b)
+
+
+def rect(x0, y0, x1, y1):
+    return [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+
+
+def tourner(pts, quarts):
+    for _ in range(quarts % 4):
+        pts = [(-y, x) for x, y in pts]
+    return pts
+
+
+def cercle(r, n=180, cx=0, cy=0):
+    return [(cx + r * math.cos(2 * math.pi * k / n), cy + r * math.sin(2 * math.pi * k / n)) for k in range(n)]
+
+
+def arc(a0, a1, r, pas=2.0):
+    n = max(2, math.ceil(abs(a1 - a0) / pas))
+    return [(r * math.cos(math.radians(a0 + (a1 - a0) * k / n)), r * math.sin(math.radians(a0 + (a1 - a0) * k / n)))
+            for k in range(n + 1)]
+
+
+def conge(p, c, n, r=CONGE, k=8):
+    def unit(a, b):
+        l = math.hypot(b[0] - a[0], b[1] - a[1])
+        return ((b[0] - a[0]) / l, (b[1] - a[1]) / l)
+    u, v = unit(c, p), unit(c, n)
+    theta = math.acos(max(-1, min(1, u[0] * v[0] + u[1] * v[1])))
+    d = r / math.tan(theta / 2)
+    t1 = (c[0] + u[0] * d, c[1] + u[1] * d)
+    t2 = (c[0] + v[0] * d, c[1] + v[1] * d)
+    return [((1 - s) ** 2 * t1[0] + 2 * (1 - s) * s * c[0] + s * s * t2[0],
+             (1 - s) ** 2 * t1[1] + 2 * (1 - s) * s * c[1] + s * s * t2[1]) for s in [i / k for i in range(k + 1)]]
+
+
+def moitie_pavillon():
+    """Moitié est du mur de l'espace central (l'autre : la même, tournée d'un demi-tour)."""
+    m = (INT / 2, INT / 2)
+    d = OUV / 2 / math.sqrt(2)
+    A = (m[0] + d, m[1] - d)
+    B = (-INT / 2 + d, -INT / 2 - d)
+    k = (EXT - INT) / 2
+    A2, B2 = (A[0] + k, A[1] + k), (B[0] - k, B[1] - k)
+    c = EXT - PLAT
+    suite = [B2, (-c, -PLAT), (c, -PLAT), (PLAT, -c), (PLAT, c), A2]
+    ext = [B2]
+    for i in range(1, len(suite) - 1):
+        ext += conge(suite[i - 1], suite[i], suite[i + 1])
+    ext.append(A2)
+    return [A, (INT, 0), (0, -INT), B] + ext, [A, (INT, 0), (0, -INT), B]
+
+
+def contour_pavillon():
+    c = EXT - PLAT
+    coins = [(c, -PLAT), (PLAT, -c), (PLAT, c), (c, PLAT), (-c, PLAT), (-PLAT, c), (-PLAT, -c), (-c, -PLAT)]
+    pts = []
+    for i in range(8):
+        pts += conge(coins[i - 1], coins[i], coins[(i + 1) % 8])
+    return pts
+
+
+def booleen(o, op, cible):
+    m = o.modifiers.new(op, "BOOLEAN"); m.operation, m.solver = op, "EXACT"
+    if isinstance(cible, bpy.types.Collection):
+        m.operand_type, m.collection = "COLLECTION", cible
+    else:
+        m.object = cible
+    bpy.context.view_layer.objects.active = o
+    bpy.ops.object.modifier_apply(modifier=m.name)
+
+
+def collection(nom, objets):
+    c = bpy.data.collections.new(nom)
+    for o in objets:
+        scn.collection.objects.unlink(o); c.objects.link(o)
+    return c
+
+
+def jeter(c):
+    for o in list(c.objects):
+        bpy.data.objects.remove(o)
+
+
+# --- Volumes : un bloc de pierre creusé --------------------------------------------------------------------
+# Volume intérieur, moins l'espace central (murs et toit) et les bancs : ils deviennent de la
+# pierre pleine (pas de sol caché sous eux)
+interieur = prisme("Interieur", rect(-h, -h, h, h), 0, H)
+pleins = []
+faces_int = []
+for q in (0, 2):
+    contour, dedans = moitie_pavillon()
+    pleins.append(prisme(f"Pavillon{q}", tourner(contour, q), -1, H_INT + 0.5))
+    faces_int.append(tourner(dedans, q))
+pleins.append(prisme("Toit", contour_pavillon(), H_INT, H_INT + TOIT))
+pleins += [prisme("Banc", arc(a0, a1, BANC_R + BANC_P, 3) + arc(a1, a0, BANC_R, 3), -1, BANC_H) for a0, a1 in BANCS]
+c_pleins = collection("Pleins", pleins)
+booleen(interieur, "DIFFERENCE", c_pleins)
+jeter(c_pleins)
+
+bloc = prisme("Pierre", rect(-h - T, -h - T, h + T, h + T), -0.5, H + 0.8)
+outils = [interieur]
+for q in range(4):
+    # sas fermé derrière chaque porte (bloque le ciel ; masqué par le site, où le couloir prend le relais)
+    sas = prisme(f"SasBloc{q}", tourner(rect(h - PORTE - 0.5, h, h + 0.5, h + T + SAS + 0.5), q), -0.5, H + 0.8)
+    booleen(bloc, "UNION", sas)
+    bpy.data.objects.remove(sas)
+    outils.append(prisme(f"Porte{q}", tourner(rect(h - PORTE, h - 0.01, h, h + T + SAS), q), 0, H))
+    for a, b in BAIES:
+        outils.append(prisme(f"Baie{q}", tourner(rect(a, h - 0.01, b, h + T + 0.01), q), 0, BAIE_H))
+c_outils = collection("Outils", outils)
+booleen(bloc, "DIFFERENCE", c_outils)
+jeter(c_outils)
+
+# --- Nettoyage, découpe en grille, matières -----------------------------------------------------------
+bm = bmesh.new(); bm.from_mesh(bloc.data)
+bpy.data.objects.remove(bloc)
+bm.normal_update()
+
+
+def exterieure(f):
+    """Faces jamais vues de l'intérieur : dessous, dessus, faces extérieures des murs, dessus du toit central."""
+    c, n = f.calc_center_median(), f.normal
+    if c.z < -0.45 or (n.z > 0.9 and c.z > H + 0.5):
+        return True
+    if n.z > 0.9 and abs(c.z - (H_INT + TOIT)) < 1e-3:
+        return True
+    lim = h + T - 0.01
+    return (abs(c.x) > lim and n.x * math.copysign(1, c.x) > 0.9) or (abs(c.y) > lim and n.y * math.copysign(1, c.y) > 0.9)
+
+
+bmesh.ops.delete(bm, geom=[f for f in bm.faces if exterieure(f)], context="FACES")
+bmesh.ops.dissolve_limit(bm, angle_limit=math.radians(0.5), verts=bm.verts[:], edges=bm.edges[:])
+lignes = [k * GRILLE for k in range(-int((h + 5) / GRILLE), int((h + 5) / GRILLE) + 1)]
+for v in lignes:
+    for no in ((1, 0, 0), (0, 1, 0)):
+        geom = bm.verts[:] + bm.edges[:] + bm.faces[:]
+        bmesh.ops.bisect_plane(bm, geom=geom, plane_co=Vector(no) * v, plane_no=Vector(no), dist=1e-5)
+for z in (3.0, 6.0, 9.0, 12.0, 15.0):
+    geom = bm.verts[:] + bm.edges[:] + bm.faces[:]
+    bmesh.ops.bisect_plane(bm, geom=geom, plane_co=Vector((0, 0, z)), plane_no=Vector((0, 0, 1)), dist=1e-5)
+# Découpe aussi le long des quatre faces intérieures de l'espace central (|x| + |y| = INT) : le noir du dedans
+# s'arrête net sur l'arête, sans dents de scie dans le plafond et le sol des ouvertures (vu par Ludovic le 05/11 :
+# les triangles de la grille, alignés sur les axes, prenaient la couleur du côté de leur centre)
+for nx, ny, d in ((1, 1, INT), (1, 1, -INT), (1, -1, INT), (1, -1, -INT)):
+    geom = bm.verts[:] + bm.edges[:] + bm.faces[:]
+    co = Vector((d / 2, d / 2 * ny, 0))
+    bmesh.ops.bisect_plane(bm, geom=geom, plane_co=co, plane_no=Vector((nx, ny, 0)).normalized(), dist=1e-5)
+bmesh.ops.remove_doubles(bm, verts=bm.verts[:], dist=1e-5)
+bmesh.ops.triangulate(bm, faces=bm.faces[:], quad_method="BEAUTY", ngon_method="BEAUTY")
+bm.normal_update()
+
+
+def dans_centre(c, marge=0.0):
+    """Dans l'espace central (carré sur la pointe, demi-diagonale INT), sous son plafond."""
+    return abs(c.x) + abs(c.y) < INT + marge and c.z < H_INT + 1e-3
+
+
+def matiere(f):
+    c, n = f.calc_center_median(), f.normal
+    if abs(c.z) < 1e-3 and n.z > 0.9:
+        return SOL_C if dans_centre(c) else SOL
+    if math.hypot(c.x, c.y) < BANC_R + BANC_P + 0.1 and 1e-3 < c.z < BANC_H + 1e-3:
+        return BANC
+    # Dedans de l'espace central : faces intérieures des murs (tournées vers le centre), plafond
+    if dans_centre(c, 0.01) and c.z > 1e-3:
+        vers_centre = -(n.x * c.x + n.y * c.y) / max(math.hypot(c.x, c.y), 1e-6)
+        if n.z < -0.9:
+            return PLAF_C
+        if abs(n.z) < 0.1 and vers_centre > 0.3 and abs(c.x) + abs(c.y) > INT - 0.05:
+            return MUR_C
+    if n.z < -0.3:
+        return PLAF
+    return MUR
+
+
+groupes = {"Salle": bmesh.new(), "Mobilier": bmesh.new()}
+
+
+def ajouter(dst, f, mi):
+    vs = [dst.verts.new(v.co) for v in f.verts]
+    nf = dst.faces.new(vs); nf.material_index = mi
+
+
+for f in bm.faces:
+    m = matiere(f)
+    ajouter(groupes["Mobilier"] if m in (SOL_C, BANC, MUR_C, PLAF_C) else groupes["Salle"], f, m)
+bm.free()
+
+
+def finir(nom, b, materiaux, uv=True):
+    bmesh.ops.remove_doubles(b, verts=b.verts[:], dist=1e-5)
+    o = objet(nom, b)
+    for m in materiaux:
+        o.data.materials.append(m)
+    if uv:
+        o.data.uv_layers.new(name="lightmap")
+        for x in scn.objects: x.select_set(False)
+        bpy.context.view_layer.objects.active = o; o.select_set(True)
+        bpy.ops.object.mode_set(mode="EDIT"); bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.uv.smart_project(angle_limit=math.radians(30), island_margin=8 / RES, area_weight=0.0,
+                                 correct_aspect=True, scale_to_bounds=False)
+        bpy.ops.object.mode_set(mode="OBJECT")
+    return o
+
+
+room = finir("Salle", groupes["Salle"], MATS)
+mobilier = finir("Mobilier", groupes["Mobilier"], MATS)
+print("FACES", len(room.data.polygons), len(mobilier.data.polygons))
+
+# --- Huisseries des baies (acier noir ; dans le précalcul, elles portent leur ombre) ------------------------
+yv = h + T - VITRE
+b = bmesh.new()
+for q in range(4):
+    for a, bb in BAIES:
+        pieces = [
+            (a, yv - DORMANT_P + 0.05, a + DORMANT, yv + 0.05, 0, BAIE_H),
+            (bb - DORMANT, yv - DORMANT_P + 0.05, bb, yv + 0.05, 0, BAIE_H),
+            (a + DORMANT, yv - DORMANT_P + 0.05, bb - DORMANT, yv + 0.05, BAIE_H - DORMANT, BAIE_H),
+            (a + DORMANT, yv - DORMANT_P + 0.05, bb - DORMANT, yv + 0.05, 0, 0.1),
+        ]
+        for i in range(1, round((bb - a) / MENEAU_PAS)):
+            x = a + i * MENEAU_PAS
+            pieces.append((x - MENEAU_E / 2, yv - MENEAU_P, x + MENEAU_E / 2, yv + 0.03, 0.1, BAIE_H - DORMANT))
+        for j in range(1, round(BAIE_H / TRAVERSE_PAS)):
+            z = j * TRAVERSE_PAS
+            for i in range(round((bb - a) / MENEAU_PAS)):
+                x0 = max(a + i * MENEAU_PAS + MENEAU_E / 2, a + DORMANT)
+                x1 = min(a + (i + 1) * MENEAU_PAS - MENEAU_E / 2, bb - DORMANT)
+                pieces.append((x0, yv - TRAVERSE_P, x1, yv + 0.03, z - MENEAU_E / 2, z + MENEAU_E / 2))
+        for x0, y0, x1, y1, z0, z1 in pieces:
+            prisme("", tourner(rect(x0, y0, x1, y1), q), z0, z1, b)
+huisseries = objet("Huisseries", b); huisseries.data.materials.append(ACIER)
+
+# --- L'œuvre dans le précalcul : sa lueur seulement (le verre laisse passer la lumière et luit en bleu, les
+# vaisseaux luisent en rouge) ; elle colore le socle, le sol et les murs proches. Depuis le 05/11, plus de lumière
+# ronde au plafond ni de gorge en haut des murs, ni de socle (demande de Ludovic) : l'espace central est éclairé
+# par ses ouvertures, les projecteurs des angles et l'œuvre. Modèle : blender/souffle.py (sculpture-souffle/souffle.blend).
+with bpy.data.libraries.load(os.path.join(HERE, "sculpture-souffle", "souffle.blend")) as (src, dst):
+    dst.objects = ["Verre", "Vaisseaux"]
+for o in dst.objects:
+    scn.collection.objects.link(o)
+    o.location = (0, 0, OEUVRE_Z)
+    o.rotation_euler = (0, 0, math.radians(OEUVRE_ROTATION))
+    o.data.materials.clear()
+    if o.name.startswith("Verre"):
+        mv = bpy.data.materials.new("VerreLueur"); mv.use_nodes = True
+        nt = mv.node_tree
+        for n in list(nt.nodes):
+            if n.type != "OUTPUT_MATERIAL":
+                nt.nodes.remove(n)
+        tr, em, ad = nt.nodes.new("ShaderNodeBsdfTransparent"), nt.nodes.new("ShaderNodeEmission"), nt.nodes.new("ShaderNodeAddShader")
+        em.inputs["Color"].default_value = OEUVRE_BLEU; em.inputs["Strength"].default_value = OEUVRE_BLEU_FORCE
+        nt.links.new(tr.outputs[0], ad.inputs[0]); nt.links.new(em.outputs[0], ad.inputs[1])
+        nt.links.new(ad.outputs[0], nt.nodes["Material Output"].inputs["Surface"])
+        o.data.materials.append(mv)
+    else:
+        o.data.materials.append(emission("VaisseauxLueur", OEUVRE_ROUGE, OEUVRE_ROUGE_FORCE))
+
+# Dehors : sol minéral clair (il renvoie la lumière par les baies)
+b = bmesh.new()
+f = b.faces.new([b.verts.new((x, y, -0.02)) for x, y in cercle(DEHORS_R, 96)])
+f.normal_update()
+if f.normal.z < 0:
+    f.normal_flip()
+dehors = objet("Dehors", b); dehors.data.materials.append(DEHORS)
+
+# Projecteurs des angles de l'espace central (angles intérieurs aux sommets du carré sur la pointe)
+for nom, (ax, ay) in (("N", (0, INT)), ("E", (INT, 0)), ("S", (0, -INT)), ("O", (-INT, 0))):
+    vers = Vector((ax, ay, 0)).normalized()
+    ld = bpy.data.lights.new(f"Coin{nom}", "SPOT")
+    ld.energy = COIN_FORCE; ld.color = lineaire(COIN_COULEUR)
+    ld.spot_size = math.radians(COIN_CONE); ld.spot_blend = 1.0; ld.shadow_soft_size = 0.15
+    lo = bpy.data.objects.new(f"Coin{nom}", ld); scn.collection.objects.link(lo)
+    lo.location = Vector((ax, ay, 0.05)) - vers * COIN_RETRAIT
+    axe = (Vector((0, 0, 1)) * math.cos(math.radians(COIN_INCLINAISON)) + vers * math.sin(math.radians(COIN_INCLINAISON)))
+    lo.rotation_euler = axe.to_track_quat("-Z", "Y").to_euler()
+
+# --- Soleil et ciel ----------------------------------------------------------------------------------------
+sun_d = bpy.data.lights.new("Soleil", "SUN"); sun_d.energy = SOLEIL_FORCE; sun_d.angle = math.radians(SOLEIL_ANGLE)
+sun_d.color = lineaire(SOLEIL_COULEUR)
+sun = bpy.data.objects.new("Soleil", sun_d); scn.collection.objects.link(sun)
+sun.rotation_euler = SOLEIL.to_track_quat("-Z", "Y").to_euler()
+w = bpy.data.worlds.new("Ciel"); scn.world = w; w.use_nodes = True
+bg = w.node_tree.nodes["Background"]
+bg.inputs["Color"].default_value = (*lineaire(CIEL_COULEUR), 1); bg.inputs["Strength"].default_value = CIEL_FORCE
+
+# --- Essai (4e argument « essai ») : quelques vues rendues, sans précalcul, pour régler la lumière ---------------
+ESSAI = len(argv) > 3 and argv[3] == "essai"
+
+# --- Précalcul ---------------------------------------------------------------------------------------------
+scn.render.engine = "CYCLES"; scn.cycles.device = "CPU"
+try:
+    pr = bpy.context.preferences.addons["cycles"].preferences
+    pr.compute_device_type = "METAL"; pr.get_devices()
+    for d in pr.devices:
+        d.use = True
+    if any(d.type == "METAL" for d in pr.devices):
+        scn.cycles.device = "GPU"
+except Exception as e:
+    print("GPU indisponible :", e)
+scn.cycles.max_bounces = 5; scn.cycles.sample_clamp_indirect = 2.0
+if ESSAI:
+    scn.render.resolution_x, scn.render.resolution_y = 960, 540
+    scn.cycles.samples = SAMPLES; scn.cycles.use_denoising = True
+    scn.view_settings.view_transform = "AgX"; scn.view_settings.exposure = math.log2(3.4)
+    vues = {"arrivee": ((-6.01, -6.01, 1.7), (0, 0, 2.6)), "coin-est": ((-2, 2, 1.7), (INT, 0, 2.0)),
+            "coin-nord": ((4, -4, 1.7), (0, INT, 2.0))}
+    cd = bpy.data.cameras.new("Essai"); cd.lens = 18
+    cam = bpy.data.objects.new("Essai", cd); scn.collection.objects.link(cam); scn.camera = cam
+    for nom, (pos, cible) in vues.items():
+        cam.location = pos
+        cam.rotation_euler = (Vector(cible) - Vector(pos)).to_track_quat("-Z", "Y").to_euler()
+        scn.render.filepath = os.path.join(HERE, "..", "plans", "captures", f"pavillon-essai-{nom}.png")
+        bpy.ops.render.render(write_still=True)
+    sys.exit(0)
+scn.render.bake.margin = 8
+for obj, fichier, ech in ((room, "lightmap.exr", SAMPLES), (mobilier, "lightmap-mobilier.exr", SAMPLES_MOB)):
+    scn.cycles.samples = ech
+    img = bpy.data.images.new(fichier, RES, RES, float_buffer=True)
+    for m in MATS:
+        for n in list(m.node_tree.nodes):
+            if n.type == "TEX_IMAGE": m.node_tree.nodes.remove(n)
+        n = m.node_tree.nodes.new("ShaderNodeTexImage"); n.image = img; m.node_tree.nodes.active = n
+    for o in scn.objects: o.select_set(False)
+    obj.select_set(True); bpy.context.view_layer.objects.active = obj
+    t = time.time()
+    bpy.ops.object.bake(type="DIFFUSE", pass_filter={"DIRECT", "INDIRECT"})
+    print("BAKE", obj.name, round(time.time() - t), "s")
+    img.filepath_raw = os.path.join(OUT, fichier); img.file_format = "OPEN_EXR"; img.save()
+
+for m in MATS:
+    for n in list(m.node_tree.nodes):
+        if n.type == "TEX_IMAGE": m.node_tree.nodes.remove(n)
+
+# Ciel vu par les baies (après le précalcul : il cacherait le ciel de Blender). Un écran à ECRAN du centre,
+# plus près que les salles voisines (elles commencent au bout des couloirs, à 34 m) : pendant un passage, on
+# ne les voit pas par les baies (demande de Ludovic du 05/11). Il est percé exactement à la section de chaque
+# couloir (relevée dans le site, Couloir.tsx : 17,7 m de haut, paroi de 0,5 m d'un côté et 0,2 de l'autre),
+# qui bouche l'ouverture ; faces tournées vers l'intérieur.
+CIEL = emission("Ciel", (*lineaire(CIEL_COULEUR), 1), CIEL_FORCE)
+b = bmesh.new()
+
+
+def plan_ciel(coins):
+    f = b.faces.new([b.verts.new(c) for c in coins])
+    f.normal_update()
+    centre = f.calc_center_median()
+    if f.normal.dot(Vector((-centre.x, -centre.y, CIEL_H / 2 - centre.z))) < 0:
+        f.normal_flip()
+
+
+E = ECRAN
+for cote, (t0, t1) in TROUS_COULOIRS.items():
+    # Écran de chaque côté, dans le repère du mur nord (u le long du mur, de -E à E ; à v = E), puis tourné
+    q = {"nord": 0, "ouest": 1, "sud": 2, "est": 3}[cote]
+    for u0, u1, z0, z1 in ((-E, t0, -1, CIEL_H), (t1, E, -1, CIEL_H), (t0, t1, HAUT_COULOIR, CIEL_H)):
+        (x0, y0), (x1, y1) = tourner([(u0, E), (u1, E)], q)
+        plan_ciel([(x0, y0, z0), (x1, y1, z0), (x1, y1, z1), (x0, y0, z1)])
+plan_ciel([(-E, -E, CIEL_H), (E, -E, CIEL_H), (E, E, CIEL_H), (-E, E, CIEL_H)])
+ciel = objet("Ciel", b); ciel.data.materials.append(CIEL)
+
+bpy.ops.file.pack_all()
+bpy.ops.wm.save_as_mainfile(filepath=os.path.join(OUT, "salle.blend"))
+
+# Export (voir salle.py : image factice pour que l'exporteur écrive les UV de lightmap)
+factice = bpy.data.images.new("factice", 4, 4)
+for m in MATS:
+    nt = m.node_tree; b_ = nt.nodes["Principled BSDF"]
+    t_ = nt.nodes.new("ShaderNodeTexImage"); t_.image = factice
+    u_ = nt.nodes.new("ShaderNodeUVMap"); u_.uv_map = "lightmap"
+    nt.links.new(u_.outputs[0], t_.inputs[0]); nt.links.new(t_.outputs[0], b_.inputs["Emission Color"])
+for o in scn.objects: o.select_set(o in (room, mobilier, huisseries, dehors, ciel))
+bpy.ops.export_scene.gltf(filepath=os.path.join(OUT, "salle-raw.glb"), export_format="GLB",
+                          use_selection=True, export_materials="EXPORT", export_image_format="JPEG")
+print("SOLEIL", tuple(round(c, 4) for c in SOLEIL))
+print("OK")

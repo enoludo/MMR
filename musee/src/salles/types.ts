@@ -93,7 +93,10 @@ export interface SalleConfig {
   /** `echelle` : agrandissement du modèle (le même que ECHELLE_OEUVRE dans blender/salle.py) */
   /** `reflet` : false pour une œuvre sur socle (pas de reflet au sol) */
   sculpture: {
-    modele: string
+    /** Modèle de l'œuvre ; absent : pas d'œuvre en 3D (socle seul, salle du pavillon) */
+    modele?: string
+    /** Œuvre de verre (matières « Verre » et « Vaisseaux » du modèle, voir scene/OeuvreVerre.tsx) */
+    verre?: boolean
     position: Vec3
     rotationY: number
     echelle?: number
@@ -153,6 +156,16 @@ export interface SalleConfig {
    * comprise. Les bancs n'en sont pas : la caméra passe au-dessus.
    */
   obstacles?: { centre: [number, number]; rayon: number }[]
+  /**
+   * false : pas de faisceau du puits dans l'air ni de poussière (salle sans puits, comme le pavillon,
+   * éclairé par ses baies). Le soleil reste décrit pour l'éclairage de l'œuvre.
+   */
+  faisceau?: false
+  /**
+   * true : la salle a un vrai dehors, vu par ses baies (pavillon : sol et ciel dans son modèle). Ses
+   * couloirs n'ont alors pas leur paroi ensoleillée factice derrière les fentes, qu'on verrait par les baies.
+   */
+  dehors?: boolean
   /** Ouvertures sur le ciel (vues depuis l'intérieur) : centre et taille [x, z] */
   ciel: { centre: Vec3; taille: [number, number] }[]
 }

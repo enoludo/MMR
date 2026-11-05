@@ -7,6 +7,7 @@ import { AMBIANCE_CHAUDE, PARTIE_COULEURS, appliquerCouleurs, schemaCouleurs } f
 import { reglagesSalle, useReglagesSalle } from '../reglages'
 import { Faisceau, tableFaisceau } from './Faisceau'
 import { Poussiere } from './Poussiere'
+import { OeuvreVerre } from './OeuvreVerre'
 import { MAX_PORTES, appliquerPierre, creerUniformsSalle, reglerPierre } from './pierre'
 import { configActuelle, configArriveeLue, groupesSalles, poidsArrivee, salleActuelle, salleArrivee } from './passage'
 import { prechargerLightmaps, useLightmaps } from './lightmaps'
@@ -145,10 +146,19 @@ export function Salle({ config }: { config: SalleConfig }) {
     <group ref={racine}>
       <primitive object={scene} />
       <Ciel config={config} />
-      <Sculpture config={config} uSol={uReflet} longueurReflet={reflet.longueur} />
+      {config.sculpture.modele &&
+        (config.sculpture.verre ? (
+          <OeuvreVerre config={config} modele={config.sculpture.modele} />
+        ) : (
+          <Sculpture config={config} modele={config.sculpture.modele} uSol={uReflet} longueurReflet={reflet.longueur} />
+        ))}
       {config.sculpture.lueur && <Lueur config={config} lueur={config.sculpture.lueur} />}
-      <Faisceau config={config} />
-      <Poussiere config={config} />
+      {config.faisceau !== false && (
+        <>
+          <Faisceau config={config} />
+          <Poussiere config={config} />
+        </>
+      )}
     </group>
   )
 }
@@ -238,14 +248,16 @@ const DECOLLEMENT_CIEL = 0.05
 
 function Sculpture({
   config,
+  modele,
   uSol,
   longueurReflet,
 }: {
   config: SalleConfig
+  modele: string
   uSol: ReturnType<typeof creerUniformsReflet>
   longueurReflet: number
 }) {
-  const gltf = useGLTF(config.sculpture.modele)
+  const gltf = useGLTF(modele)
   // Copie avec ses propres matières : chaque salle chargée règle son reflet séparément
   const scene = useMemo(() => {
     const copie = gltf.scene.clone()
@@ -513,7 +525,7 @@ export function prechargerSalle(config: SalleConfig) {
   if (prechargees.has(config.id)) return
   prechargees.add(config.id)
   useGLTF.preload(config.modele)
-  useGLTF.preload(config.sculpture.modele)
-  tableFaisceau(config.soleil)
+  if (config.sculpture.modele) useGLTF.preload(config.sculpture.modele)
+  if (config.faisceau !== false) tableFaisceau(config.soleil)
   prechargerLightmaps(Object.keys(config.lightmaps).map((n) => config.lightmaps[n].image))
 }

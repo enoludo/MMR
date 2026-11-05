@@ -404,10 +404,13 @@ export function Couloir({
   return (
     <group position={placement.position} rotation-y={placement.rotationY} scale-x={placement.miroir ? -1 : 1}>
       <mesh geometry={geometrie} material={pierre} />
-      {/* Le dehors, vu par les fentes : une paroi ensoleillée (sans dépasser dans les salles) */}
-      <mesh material={dehors} position={[-W / 2 - c.epaisseur - 1.5, H / 2 + 2, -L / 2]} rotation-y={Math.PI / 2}>
-        <planeGeometry args={[L, H + 6]} />
-      </mesh>
+      {/* Le dehors, vu par les fentes : une paroi ensoleillée (sans dépasser dans les salles) ; pas dans
+          une salle qui a un vrai dehors, vu par ses baies (on verrait la paroi) */}
+      {!config.dehors && (
+        <mesh material={dehors} position={[-W / 2 - c.epaisseur - 1.5, H / 2 + 2, -L / 2]} rotation-y={Math.PI / 2}>
+          <planeGeometry args={[L, H + 6]} />
+        </mesh>
+      )}
       {zenithale && (
         // Un peu au-dessus du haut de la fente et un peu plus grand qu'elle (voir Ciel, Salle.tsx)
         <mesh material={ciel} position={[W / 2 - FENTE_ZENITHALE[0] / 2, H + FENTE_ZENITHALE[1] + 0.05, (zenith.x + zenith.y) / 2]} rotation-x={Math.PI / 2}>

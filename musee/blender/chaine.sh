@@ -1,6 +1,7 @@
 #!/bin/zsh
 # Chaîne lightmap après salle.py : chaine.sh RES [oeuvre]   (oeuvre : seuil par défaut, huntington, ou
-# rotonde : la rotonde de Huntington, faite par rotonde.py, aux faces triangulées)
+# rotonde : la rotonde de Huntington, faite par rotonde.py, aux faces triangulées ;
+# pavillon : la salle de « Souffle d'éclats », faite par pavillon.py, aux faces triangulées)
 set -e
 RES=$1
 OE=${2:-seuil}
@@ -11,7 +12,7 @@ PYLIB=${PYLIB:?indiquer dans PYLIB le dossier où Pillow est installé}
 S=${TMPDIR:-/tmp}
 cd /Users/ludovicenault/MMR/musee/blender
 run() { $B -b --python-use-system-env -P "$@" 2>&1 | grep -E "Error|Traceback|error:" || true; }
-if [[ $OE == rotonde ]]; then FORME=triangles; else FORME=""; fi
+if [[ $OE == rotonde || $OE == pavillon ]]; then FORME=triangles; else FORME=""; fi
 run masque.py -- $D/salle.blend Salle $RES $D/lightmap-masque.exr $FORME
 run masque.py -- $D/salle.blend Mobilier $RES $D/lightmap-mobilier-masque.exr $FORME
 run denoise.py -- $D/lightmap.exr $D/lightmap-dn.exr $D/lightmap-masque.exr
@@ -24,7 +25,7 @@ fi
 export PYTHONPATH=$PYLIB
 run lightmap.py -- $D/lightmap-dn.exr ../public/models/${P}salle-lightmap.webp
 # Percentile de l'échelle du mobilier : plus bas quand le socle a une lueur (écrêtée, voir lightmap.py)
-if [[ $OE == huntington || $OE == rotonde ]]; then PCT=98; else PCT=99.95; fi
+if [[ $OE == huntington || $OE == rotonde || $OE == pavillon ]]; then PCT=98; else PCT=99.95; fi
 run lightmap.py -- $D/lightmap-mobilier-dn.exr ../public/models/${P}salle-lightmap-mobilier.webp $PCT
 mv ../public/models/${P}salle-lightmap.json ../src/salles/provisoire/${P}lightmap.json
 mv ../public/models/${P}salle-lightmap-mobilier.json ../src/salles/provisoire/${P}lightmap-mobilier.json

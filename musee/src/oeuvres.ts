@@ -1,6 +1,7 @@
 import type { SalleConfig } from './salles/types'
 import { salleProvisoire } from './salles/provisoire/config'
 import { salleRotonde } from './salles/rotonde/config'
+import { sallePavillon } from './salles/pavillon/config'
 import { avecPointsDeVue } from './salles/pointsDeVue'
 import { avecCouleurs } from './salles/couleurs'
 import { reglagesTransition } from './entree'
@@ -161,6 +162,17 @@ export const oeuvres: Oeuvre[] = [
     vues: VUES_PROVISOIRES,
   },
   {
+    id: 'souffle-d-eclats',
+    titre: "Souffle d'éclats",
+    maladie: '',
+    image: versionne('/assets/images/souffle-declats.webp'),
+    maladieTexte: maladieAVenir('À venir'),
+    manifeste: A_VENIR,
+    // Pavillon (05/11, demande de Ludovic) : le socle de Huntington, sans œuvre en 3D pour l'instant
+    salle: sallePavillon,
+    vues: VUES_PROVISOIRES,
+  },
+  {
     id: 'l-entre-deux',
     titre: "L'entre-deux",
     maladie: '',
@@ -190,16 +202,6 @@ export const oeuvres: Oeuvre[] = [
     salle: salleProvisoire,
     vues: VUES_PROVISOIRES,
   },
-  {
-    id: 'souffle-d-eclats',
-    titre: "Souffle d'éclats",
-    maladie: '',
-    image: versionne('/assets/images/souffle-declats.webp'),
-    maladieTexte: maladieAVenir('À venir'),
-    manifeste: A_VENIR,
-    salle: salleProvisoire,
-    vues: VUES_PROVISOIRES,
-  },
 ]
 
 // Points de vue réglés en vue libre (touche V, salles/pointsDeVue.ts) : ils remplacent ceux des configs
@@ -220,7 +222,7 @@ export const lienOeuvre = (o: Oeuvre) => `/oeuvre/${o.id}`
  * collection (spirale, grille, flèches des salles), avec leurs boutons d'accès désactivés ; leur
  * adresse ramène à l'accueil (main.tsx, PageOeuvre).
  */
-const SALLES_OUVERTES = new Set(['le-seuil-des-proportions', 'la-maladie-de-huntington'])
+const SALLES_OUVERTES = new Set(['le-seuil-des-proportions', 'la-maladie-de-huntington', 'souffle-d-eclats'])
 export const salleOuverte = (id: string) => SALLES_OUVERTES.has(id)
 
 /**
@@ -232,7 +234,8 @@ export const musiqueSpirale = versionne('/assets/musiques/spirale.m4a')
 /**
  * Cartes de la spirale d'accueil (format attendu par src/accueil/gallery), dans l'ordre des
  * œuvres : « Le seuil des proportions », « La maladie de Huntington », puis les autres (demande
- * de Ludovic du 04/11 ; c'est aussi l'ordre des cases de la grille et des flèches des salles).
+ * de Ludovic du 04/11), « Souffle d'éclats » en troisième depuis le 05/11 (salle ouverte : on y passe
+ * depuis Huntington par les flèches ; c'est aussi l'ordre des cases de la grille et des flèches des salles).
  */
 export const cartesSpirale = oeuvres.map((o) => ({
   id: o.id,

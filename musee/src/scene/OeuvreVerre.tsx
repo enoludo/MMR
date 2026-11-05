@@ -1,0 +1,415 @@
+import { useEffect, useMemo } from 'react'
+import { useFrame, useThree } from '@react-three/fiber'
+import { useGLTF } from '@react-three/drei'
+import * as THREE from 'three'
+import type { SalleConfig } from '../salles/types'
+import { useReglagesSalle } from '../reglages'
+import { CALQUE_REFLET } from './Reflet'
+
+/**
+ * Œuvre de verre (« Souffle d'éclats », blender/souffle.py) : poumons de verre épais (deux surfaces) et vaisseaux
+ * lumineux, sans éclairage calculé, d'après l'image de l'œuvre. Refait le 05/11 (« on dirait un gros ballon en
+ * plastique ») : ce qui fait le verre, ce sont des arêtes de lumière nettes et des reflets précis, pas un dégradé.
+ * - « Verre », en deux passes, ses deux faces :
+ *   1. réfraction (depuis le 05/11) : la salle, rendue sans l'œuvre dans une image à part, est vue au travers,
+ *      déviée, un peu irisée, bleuie (davantage au bord) ; avec « réfraction » à 0, simple absorption : ce qu'on
+ *      voit au travers est assombri et bleui, sans déviation ;
+ *   2. lumière ajoutée : arêtes cyan fines (Fresnel serré ; le verre épais les double), masse bleue nuageuse
+ *      (poches sombres, zones claires), reflets de la lumière du hall par les ouvertures, modelé d'une lumière
+ *      bleue venue d'en haut et ses éclats, qui accrochent les bosses et les scissures ;
+ * - « Vaisseaux » : dessinés en dernier (rouge pur, ni absorbé ni teinté), en verre rouge depuis le 05/11
+ *   (demande de Ludovic) : transparents au centre des tubes, denses au bord, reflets blancs (un trait de la
+ *   lumière du modelé le long de chaque tube, les ouvertures de la salle) ; lacis fin presque opaque. Plus de
+ *   fibres, d'anneaux sur la trachée ni d'éclats dessinés (retirés le 05/11).
+ *   Le modèle donne pour chaque tube : UV = (tour, longueur en m), UV2 = (rayon, 1 pour la trachée), V retourné
+ *   par l'export glTF (1 − v).
+ * Réglages : touche M, « Verre · <salle> ». Les maillages sont sur le calque de l'œuvre : un clic dessus mène au
+ * cercle réduit, comme pour les autres œuvres (Navigation).
+ */
+
+const GLSL_ENTOURAGE = /* glsl */ `
+  // Ce qui se reflète : la lumière du hall par les deux ouvertures de l'espace central (au sud-ouest et au
+  // nord-est, à 11 m : ≈ 30° de large, jusqu'à 20° au-dessus de l'horizon), et la pénombre autour
+  // (plus de lampes au plafond depuis le 05/11)
+  float ouverture(vec3 r, vec2 cap) {
+    vec2 h = normalize(r.xz + 1e-5);
+    return smoothstep(0.955, 0.975, dot(h, cap)) * smoothstep(-0.18, -0.05, r.y) * (1.0 - smoothstep(0.3, 0.38, r.y));
+  }
+  vec3 entourage(vec3 r) {
+    float baies = ouverture(r, normalize(vec2(-1.0, 1.0))) + ouverture(r, normalize(vec2(1.0, -1.0)));
+    return vec3(1.0, 0.95, 0.88) * baies * 2.2 + vec3(0.03 + 0.05 * max(r.y, 0.0));
+  }`
+
+const SOMMETS = /* glsl */ `
+  varying vec3 vNormale;
+  varying vec3 vVue;
+  varying vec3 vLocal;
+  void main() {
+    vec4 p = modelMatrix * vec4(position, 1.0);
+    vNormale = normalize(mat3(modelMatrix) * normal);
+    vVue = cameraPosition - p.xyz;
+    vLocal = position;
+    gl_Position = projectionMatrix * viewMatrix * p;
+  }`
+
+/** Bruit lisse en 3D (valeurs au hasard aux nœuds d'une grille, interpolées) et sa somme sur trois octaves */
+const GLSL_BRUIT = /* glsl */ `
+  float hasard(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+  float bruit(vec3 p) {
+    vec3 i = floor(p), f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(mix(hasard(i), hasard(i + vec3(1, 0, 0)), f.x), mix(hasard(i + vec3(0, 1, 0)), hasard(i + vec3(1, 1, 0)), f.x), f.y),
+               mix(mix(hasard(i + vec3(0, 0, 1)), hasard(i + vec3(1, 0, 1)), f.x), mix(hasard(i + vec3(0, 1, 1)), hasard(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+  }
+  float nuages(vec3 p) { return 0.55 * bruit(p) + 0.3 * bruit(p * 2.1 + 3.1) + 0.15 * bruit(p * 4.3 + 7.7); }`
+
+// Valeurs basses : l'exposition de la salle (×3,4) s'applique aussi à l'œuvre ; au-delà de ≈ 1 après exposition,
+// la courbe de couleurs pâlit le rouge en saumon et le bleu en lavande
+export function OeuvreVerre({ config, modele }: { config: SalleConfig; modele: string }) {
+  const gltf = useGLTF(modele)
+  const r = useReglagesSalle(config, 'Verre', {
+    teinte: { value: '#1a3dff', label: 'bleu du verre' },
+    aretes: { value: '#5fd2ff', label: 'arêtes' },
+    bords: { value: 0.75, min: 0, max: 10, step: 0.05, label: 'arêtes lumineuses' },
+    finesse: { value: 12, min: 1, max: 20, step: 0.5, label: 'finesse des arêtes' },
+    masse: { value: 0.04, min: 0, max: 1, step: 0.01, label: 'lumière dans la masse' },
+    nuages: { value: 1, min: 0, max: 1, step: 0.01, label: 'nuages dans la masse' },
+    reflets: { value: 0.6, min: 0, max: 8, step: 0.05 },
+    modele: { value: 0.06, min: 0, max: 2, step: 0.01, label: 'modelé (volume)' },
+    eclats: { value: 0.3, min: 0, max: 4, step: 0.01, label: 'éclats sur les bosses' },
+    arriere: { value: 0.35, min: 0, max: 1, step: 0.01, label: 'faces arrière' },
+    absorption: { value: '#0a1890', label: 'teinte absorbée' },
+    densite: { value: 0.7, min: 0, max: 1, step: 0.01, label: 'densité du verre' },
+    refraction: { value: 0.7, min: -2, max: 2, step: 0.01, label: 'réfraction (0 : sans)' },
+    dispersion: { value: 0.08, min: 0, max: 0.4, step: 0.01, label: 'irisation' },
+    rouge: { value: '#ff0848', label: 'gros vaisseaux' },
+    rougeFin: { value: '#ff0a50', label: 'lacis fin' },
+    eclat: { value: 0.45, min: 0, max: 5, step: 0.01, label: 'éclat des gros vaisseaux' },
+    eclatFin: { value: 0.25, min: 0, max: 5, step: 0.01, label: 'éclat du lacis' },
+    transparence: { value: 0.6, min: 0, max: 1, step: 0.01, label: 'transparence des vaisseaux' },
+    refletsVaisseaux: { value: 1, min: 0, max: 5, step: 0.01, label: 'reflets des vaisseaux' },
+  })
+
+  // 1. Absorption : multiplie ce qu'on voit au travers par la teinte du verre
+  const absorbe = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        name: 'VerreAbsorbe',
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        blending: THREE.CustomBlending,
+        blendEquation: THREE.AddEquation,
+        blendSrc: THREE.ZeroFactor,
+        blendDst: THREE.SrcColorFactor,
+        uniforms: { uTeinte: { value: new THREE.Color() }, uDensite: { value: 0.9 } },
+        vertexShader: SOMMETS,
+        fragmentShader: /* glsl */ `
+          uniform vec3 uTeinte;
+          uniform float uDensite;
+          varying vec3 vNormale;
+          varying vec3 vVue;
+          void main() {
+            float c = abs(dot(normalize(vNormale), normalize(vVue)));
+            gl_FragColor = vec4(mix(vec3(1.0), uTeinte, uDensite * (0.75 + 0.25 * pow(1.0 - c, 1.2))), 1.0);
+          }`,
+      }),
+    [],
+  )
+
+  // 1 bis. Réfraction (05/11, essai demandé par Ludovic) : la salle, rendue sans l'œuvre dans une image à part
+  // (moitié de la résolution, `fond`), est vue au travers du verre, déviée selon l'orientation de sa surface et
+  // un peu irisée (rouge, vert et bleu déviés différemment). D'abord le dessous du verre est mis au noir, puis
+  // chaque face tournée vers la caméra y ajoute la moitié de l'image déviée : un rayon traverse deux faces
+  // tournées vers lui (dehors de la paroi proche, dedans de la paroi du fond), le résultat ne dépend pas de
+  // l'ordre de dessin ; au ras du bord, une seule face : plus sombre, comme la tranche d'un verre épais.
+  const noir = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        name: 'VerreNoir',
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        blending: THREE.CustomBlending,
+        blendEquation: THREE.AddEquation,
+        blendSrc: THREE.ZeroFactor,
+        blendDst: THREE.ZeroFactor,
+        vertexShader: SOMMETS,
+        fragmentShader: /* glsl */ `void main() { gl_FragColor = vec4(0.0); }`,
+      }),
+    [],
+  )
+  const refracte = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        name: 'VerreRefracte',
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        uniforms: {
+          uFond: { value: null },
+          uTaille: { value: new THREE.Vector2(1, 1) },
+          uRefraction: { value: 0.35 },
+          uDispersion: { value: 0.08 },
+          uTeinte: { value: new THREE.Color() },
+          uDensite: { value: 0.9 },
+        },
+        vertexShader: SOMMETS,
+        fragmentShader: /* glsl */ `
+          uniform sampler2D uFond;
+          uniform vec2 uTaille;
+          uniform float uRefraction, uDispersion, uDensite;
+          uniform vec3 uTeinte;
+          varying vec3 vNormale;
+          varying vec3 vVue;
+          void main() {
+            vec3 n = normalize(vNormale);
+            float c = clamp(dot(n, normalize(vVue)), 0.0, 1.0);
+            // Déviation à l'écran : orientation de la surface vue de la caméra, moindre de loin
+            vec3 nv = normalize((viewMatrix * vec4(n, 0.0)).xyz);
+            vec2 d = nv.xy * uRefraction / max(length(vVue), 0.5);
+            vec2 uv = gl_FragCoord.xy / uTaille;
+            vec3 fond = vec3(texture2D(uFond, uv - d * (1.0 - uDispersion)).r,
+                             texture2D(uFond, uv - d).g,
+                             texture2D(uFond, uv - d * (1.0 + uDispersion)).b);
+            vec3 t = mix(vec3(1.0), uTeinte, uDensite * (0.75 + 0.25 * pow(1.0 - c, 1.2)));
+            gl_FragColor = vec4(fond * t * t * 0.5, 1.0);
+            #include <tonemapping_fragment>
+            #include <colorspace_fragment>
+          }`,
+      }),
+    [],
+  )
+
+  // 2. Lumière du verre, ajoutée à l'image
+  const verre = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        name: 'Verre',
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+        uniforms: {
+          uTeinte: { value: new THREE.Color() },
+          uAretes: { value: new THREE.Color() },
+          uBords: { value: 3 },
+          uFinesse: { value: 6 },
+          uMasse: { value: 0.16 },
+          uNuages: { value: 0.8 },
+          uReflets: { value: 2.5 },
+          uArriere: { value: 0.5 },
+          uModele: { value: 0.35 },
+          uEclats: { value: 0.8 },
+        },
+        vertexShader: SOMMETS,
+        fragmentShader: /* glsl */ `
+          ${GLSL_BRUIT}
+          uniform vec3 uTeinte, uAretes;
+          uniform float uBords, uFinesse, uMasse, uNuages, uReflets, uArriere, uModele, uEclats;
+          varying vec3 vNormale;
+          varying vec3 vVue;
+          varying vec3 vLocal;
+          ${GLSL_ENTOURAGE}
+          void main() {
+            vec3 n = normalize(vNormale) * (gl_FrontFacing ? 1.0 : -1.0);
+            vec3 v = normalize(vVue);
+            float c = clamp(dot(n, v), 0.0, 1.0);
+            // Arêtes : Fresnel serré, en traits fins le long des contours (doublés par le verre épais)
+            float arete = pow(1.0 - c, uFinesse);
+            // Masse : bleu nuageux, poches sombres et zones claires
+            float nu = nuages(vLocal * 1.7);
+            float masse = uMasse * mix(1.0, 0.12 + 2.4 * smoothstep(0.35, 0.75, nu), uNuages);
+            vec3 couleur = uTeinte * masse + uAretes * arete * uBords;
+            // Reflets (Schlick) : nets, ils glissent sur les bosses
+            float fresnel = 0.04 + 0.96 * pow(1.0 - c, 5.0);
+            couleur += entourage(reflect(-v, n)) * fresnel * uReflets;
+            // Modelé : une lumière bleue venue d'en haut, du côté de la vue d'arrivée (sud-ouest), éclaire les
+            // lobes et laisse les creux sombres ; ses éclats, très serrés, accrochent les bosses
+            vec3 l = normalize(vec3(-0.5, 0.85, 0.5));
+            couleur += vec3(0.3, 0.55, 1.0) * pow(max(dot(n, l), 0.0), 2.0) * uModele;
+            couleur += vec3(0.75, 0.9, 1.0) * pow(max(dot(n, normalize(l + v)), 0.0), 140.0) * uEclats;
+            if (!gl_FrontFacing) couleur *= uArriere;
+            gl_FragColor = vec4(couleur, 1.0);
+            #include <tonemapping_fragment>
+            #include <colorspace_fragment>
+          }`,
+      }),
+    [],
+  )
+
+  // 3. Vaisseaux, dessinés en dernier (ordre 3, parmi les objets transparents mais opaques)
+  const vaisseaux = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        name: 'Vaisseaux',
+        transparent: true,
+        defines: { USE_UV1: '' },
+        // Verre rouge : ce qu'il y a derrière se voit au centre des tubes (prémultiplié : la couleur est déjà
+        // pondérée par l'opacité, les reflets blancs s'y ajoutent)
+        premultipliedAlpha: true,
+        depthWrite: false,
+        uniforms: {
+          uRouge: { value: new THREE.Color() },
+          uRougeFin: { value: new THREE.Color() },
+          uEclat: { value: 5.5 },
+          uEclatFin: { value: 1.6 },
+          uTransparence: { value: 0.6 },
+          uRefletsV: { value: 1 },
+        },
+        vertexShader: /* glsl */ `
+          varying vec3 vNormale;
+          varying vec3 vVue;
+          varying vec2 vDonnees;
+          void main() {
+            vec4 p = modelMatrix * vec4(position, 1.0);
+            vNormale = normalize(mat3(modelMatrix) * normal);
+            vVue = cameraPosition - p.xyz;
+            vDonnees = uv1;
+            gl_Position = projectionMatrix * viewMatrix * p;
+          }`,
+        fragmentShader: /* glsl */ `
+          uniform vec3 uRouge, uRougeFin;
+          uniform float uEclat, uEclatFin, uTransparence, uRefletsV;
+          varying vec3 vNormale;
+          varying vec3 vVue;
+          varying vec2 vDonnees;
+          ${GLSL_ENTOURAGE}
+          void main() {
+            vec3 n = normalize(vNormale);
+            vec3 v = normalize(vVue);
+            float c = clamp(abs(dot(n, v)), 0.0, 1.0);
+            float rayon = vDonnees.x;
+            // Le lacis, trop fin pour un modelé, reste d'une couleur égale et presque opaque (sinon il scintille)
+            float gros = smoothstep(0.006, 0.05, rayon);
+            // Tube de verre : plus transparent au centre, plus rouge et plus dense au bord (trajet plus long)
+            float bord = pow(1.0 - c, 1.5);
+            float alpha = mix(0.9, mix(1.0 - uTransparence, 1.0, bord), gros);
+            vec3 corps = mix(uRougeFin * uEclatFin, uRouge * uEclat, gros) * mix(1.0, 0.55 + 0.9 * bord, gros);
+            // Reflets blancs : la lumière du modelé (en haut, côté sud-ouest) en un trait le long de chaque tube, et
+            // les ouvertures de l'espace central (Fresnel)
+            vec3 l = normalize(vec3(-0.5, 0.85, 0.5));
+            float trait = pow(max(dot(n, normalize(l + v)), 0.0), 90.0);
+            float fresnel = 0.04 + 0.96 * pow(1.0 - c, 5.0);
+            vec3 reflet = (vec3(1.0, 0.95, 0.95) * trait * 1.4 + entourage(reflect(-v, n)) * fresnel) * uRefletsV * gros;
+            gl_FragColor = vec4(corps * alpha + reflet, alpha);
+            #include <tonemapping_fragment>
+            #include <colorspace_fragment>
+          }`,
+      }),
+    [],
+  )
+
+  absorbe.uniforms.uTeinte.value.set(r.absorption)
+  absorbe.uniforms.uDensite.value = r.densite
+  const ur = refracte.uniforms
+  ur.uTeinte.value.set(r.absorption)
+  ur.uDensite.value = r.densite
+  ur.uRefraction.value = r.refraction
+  ur.uDispersion.value = r.dispersion
+  const u = verre.uniforms
+  u.uTeinte.value.set(r.teinte)
+  u.uAretes.value.set(r.aretes)
+  u.uBords.value = r.bords
+  u.uFinesse.value = r.finesse
+  u.uMasse.value = r.masse
+  u.uNuages.value = r.nuages
+  u.uReflets.value = r.reflets
+  u.uArriere.value = r.arriere
+  u.uModele.value = r.modele
+  u.uEclats.value = r.eclats
+  const w = vaisseaux.uniforms
+  w.uRouge.value.set(r.rouge)
+  w.uRougeFin.value.set(r.rougeFin)
+  w.uEclat.value = r.eclat
+  w.uEclatFin.value = r.eclatFin
+  w.uTransparence.value = r.transparence
+  w.uRefletsV.value = r.refletsVaisseaux
+
+  // Copie du modèle ; le verre y est doublé : d'abord l'absorption, puis la lumière ajoutée
+  const scene = useMemo(() => {
+    const copie = gltf.scene.clone()
+    const verres: THREE.Mesh[] = []
+    copie.traverse((o) => {
+      const mesh = o as THREE.Mesh
+      if (mesh.isMesh && (mesh.material as THREE.Material).name === 'Verre') verres.push(mesh)
+    })
+    const absorptions: THREE.Mesh[] = []
+    const refractions: THREE.Mesh[] = []
+    for (const v of verres) {
+      const a = new THREE.Mesh(v.geometry, absorbe)
+      const n = new THREE.Mesh(v.geometry, noir)
+      const f = new THREE.Mesh(v.geometry, refracte)
+      a.renderOrder = n.renderOrder = 1
+      f.renderOrder = 1.5
+      v.renderOrder = 2
+      v.add(a, n, f)
+      absorptions.push(a)
+      refractions.push(n, f)
+    }
+    copie.userData.passes = { absorptions, refractions }
+    return copie
+  }, [gltf.scene, absorbe, noir, refracte])
+
+  // Image de la salle sans l'œuvre, pour la réfraction : après la navigation et le reflet (caméra à jour), avant
+  // les effets d'image (priorité 1). Image linéaire (cible en demi-flottants : three n'y applique ni courbe ni
+  // conversion), comme celle des effets d'image.
+  const gl = useThree((s) => s.gl)
+  const fond = useMemo(() => {
+    const cible = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: true })
+    cible.texture.minFilter = cible.texture.magFilter = THREE.LinearFilter
+    cible.texture.generateMipmaps = false
+    return cible
+  }, [])
+  useEffect(() => {
+    refracte.uniforms.uFond.value = fond.texture
+    return () => fond.dispose()
+  }, [fond, refracte])
+  const taille = useMemo(() => new THREE.Vector2(), [])
+  const couleurFond = useMemo(() => new THREE.Color(), [])
+  useFrame(({ scene: monde, camera }) => {
+    const avecRefraction = r.refraction !== 0
+    const { absorptions, refractions } = scene.userData.passes as { absorptions: THREE.Mesh[]; refractions: THREE.Mesh[] }
+    for (const m of absorptions) m.visible = !avecRefraction
+    for (const m of refractions) m.visible = avecRefraction
+    if (!avecRefraction || !scene.visible) return
+    gl.getDrawingBufferSize(taille)
+    refracte.uniforms.uTaille.value.copy(taille)
+    const w = Math.max(1, Math.round(taille.x / 2))
+    const h = Math.max(1, Math.round(taille.y / 2))
+    if (fond.width !== w || fond.height !== h) fond.setSize(w, h)
+    const avant = gl.getRenderTarget()
+    const alpha = gl.getClearAlpha()
+    gl.getClearColor(couleurFond)
+    const ombres = gl.shadowMap.autoUpdate
+    gl.shadowMap.autoUpdate = false
+    scene.visible = false
+    gl.setRenderTarget(fond)
+    gl.setClearColor(0x000000, 1)
+    gl.clear()
+    gl.render(monde, camera)
+    gl.setRenderTarget(avant)
+    scene.visible = true
+    gl.shadowMap.autoUpdate = ombres
+    gl.setClearColor(couleurFond, alpha)
+  }, -0.5)
+  useEffect(() => {
+    scene.traverse((o) => {
+      const mesh = o as THREE.Mesh
+      if (!mesh.isMesh || mesh.material === absorbe || mesh.material === noir || mesh.material === refracte) return
+      const nom = (mesh.material as THREE.Material).name
+      mesh.material = nom === 'Vaisseaux' ? vaisseaux : verre
+      if (nom === 'Vaisseaux') mesh.renderOrder = 3
+      mesh.castShadow = mesh.receiveShadow = false
+      mesh.layers.enable(CALQUE_REFLET) // clic sur l'œuvre (Navigation)
+    })
+  }, [scene, verre, vaisseaux, absorbe, noir, refracte])
+
+  return (
+    <primitive
+      object={scene}
+      position={config.sculpture.position}
+      rotation-y={THREE.MathUtils.degToRad(config.sculpture.rotationY)}
+    />
+  )
+}
