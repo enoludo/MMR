@@ -3,6 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import type * as THREE from 'three'
 import { store, useEtat } from '../store'
 import { volLibre } from './VolLibre'
+import { decentrage } from '../entree'
 
 /**
  * Décentre l'image pour que l'œuvre reste au milieu de l'espace laissé libre par
@@ -21,6 +22,9 @@ export function Decentrage() {
   const onglet = useEtat((e) => e.onglet)
   const cible = useRef({ x: 0, y: 0 })
   const actuel = useRef({ x: 0, y: 0 })
+  // Première mesure : le décalage s'applique tout de suite (la salle arrive déjà décalée, comme l'image
+  // de la transition), sans glisser depuis zéro pendant le fondu
+  const mesuree = useRef(false)
 
   useEffect(() => {
     const mesurer = () => {
@@ -34,6 +38,11 @@ export function Decentrage() {
       if (!lateral) cible.current = { x: 0, y: Math.max(0, window.innerHeight - r.top) / 2 }
       else if (onglet === 'info') cible.current = { x: 0, y: 0 }
       else cible.current = { x: (-Math.max(0, window.innerWidth - r.left) / 2) * PART_DECALAGE, y: 0 }
+      decentrage.y = cible.current.y
+      if (!mesuree.current) {
+        mesuree.current = true
+        actuel.current = { ...cible.current }
+      }
     }
     mesurer()
     // Le popup apparaît en 0,5 s : on remesure à la fin

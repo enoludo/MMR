@@ -44,6 +44,10 @@ export type Dessin = {
   melange?: number
   /** Vignette sombre de la salle, posée sur la boîte (0 → 1) : elle va et vient avec le plein écran */
   vignette: number
+  /** Décalage vertical du contenu (part de la demi-hauteur de la boîte, vers le haut) : celui de la salle (Decentrage) */
+  decalage?: number
+  /** Décalage avec lequel la photo de la salle a été prise (même unité, plein écran) */
+  decalagePhoto?: number
   /** Éclairage de l'image (lumière linéaire, 1 = telle quelle) : celui de la carte de la spirale, plus sombre */
   eclairage: number
   opacite: number
@@ -73,6 +77,8 @@ uniform float uAvance;    // m
 uniform vec2 uInvZ;       // 1 / zProche, 1 / zLoin
 uniform float uOpacite;
 uniform float uVignette;
+uniform float uDecalage; // contenu remonté de cette part de la demi-hauteur de la boîte (Decentrage)
+uniform float uDecalagePhoto; // décalage avec lequel la photo de la salle a été prise (même unité)
 uniform float uMobile;   // 1 : voile du mobile (.salle-ui__degrade) au lieu de la vignette radiale
 uniform float uEclairage;
 uniform float uAvancePhoto; // m
@@ -155,7 +161,7 @@ void main() {
   float formatBoite = uBoite.z / uBoite.w;
 
   // Image de l'œuvre, ou capture de sa salle vue de la caméra avancée
-  vec2 qv = couvrir(b, formatBoite, uFormatImage) * uTan / uZoom;
+  vec2 qv = couvrir(b + vec2(0.0, uDecalage), formatBoite, uFormatImage) * uTan / uZoom;
   vec2 q = qv;
   // Distance (dans l'axe) de la caméra avancée à la surface vue, servie aussi à la photo
   float lambda = 1.0 / uInvZ.y;
@@ -181,6 +187,9 @@ void main() {
       } else part = 0.0; // derrière elle : pas sur la photo
     }
     vec2 n = vec2(qp.x / uFormatPhoto, qp.y) / uTanPhoto;
+    // La photo est l'écran de la salle, prise décalée (Decentrage) : ses rayons sont remontés de tout le
+    // décalage, quelle que soit la taille de la boîte
+    n.y += uDecalagePhoto;
     // Hors du cadre de la photo, l'image seule (bord adouci)
     part *= 1.0 - smoothstep(0.985, 1.0, max(abs(n.x), abs(n.y)));
     vec3 photo = texture2D(uPhoto, clamp(n * 0.5 + 0.5, 0.0, 1.0)).rgb;
@@ -361,6 +370,8 @@ export class ToileTransition {
         uOpacite: { value: 1 },
         uVignette: { value: 0 },
         uMobile: { value: 0 },
+        uDecalage: { value: 0 },
+        uDecalagePhoto: { value: 0 },
         uEclairage: { value: 1 },
         uAvancePhoto: { value: TRANSITION_DEFAUT.recul },
         uTanPhoto: { value: 1 },
@@ -432,6 +443,8 @@ export class ToileTransition {
     u.uInvZ.value.set(1 / r.zProche, 1 / r.zLoin)
     u.uOpacite.value = d.opacite
     u.uVignette.value = d.vignette
+    u.uDecalage.value = d.decalage ?? 0
+    u.uDecalagePhoto.value = d.decalagePhoto ?? 0
     u.uMobile.value = window.matchMedia('(max-width: 760px)').matches ? 1 : 0
     u.uEclairage.value = d.eclairage
     // La photo est prise à la vue initiale (avancée du recul de la salle), avec la focale de la salle

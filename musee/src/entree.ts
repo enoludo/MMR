@@ -151,3 +151,10 @@ export function champEntree(u: number, focale: number, formatEcran: number, cham
   const depart = 2 * Math.atan(Math.tan(rad(focale + champEnPlus) / 2) * partVisible(formatEcran))
   return THREE.MathUtils.radToDeg(THREE.MathUtils.lerp(depart, rad(focale), u))
 }
+
+/**
+ * Décalage vertical visé de la salle (px, vers le haut ; scene/Decentrage.tsx) : sur mobile, au-dessus
+ * du panneau du bas. L'image des transitions avec la spirale (ui/Transition.tsx) se décale d'autant
+ * pour rester superposée à la salle (sinon l'œuvre apparaissait en double pendant le fondu, 05/11).
+ */
+export const decentrage = { y: 0 }
