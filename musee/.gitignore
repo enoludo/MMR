@@ -38,3 +38,9 @@ blender/salle-rotonde/*.blend1
 
 # Rotonde : sortie intermédiaire du lissage (blender/lissage.py)
 blender/salle-rotonde/lightmap-lisse.exr
+
+# Pavillon de « Souffle d'éclats » : calculs de lumière bruts (recalculables avec pavillon.py), aperçu
+# (apercu-pavillon.py), export brut de l'œuvre (souffle.py)
+blender/salle-pavillon/*.exr
+blender/pavillon-apercu.blend
+blender/sculpture-souffle/souffle-raw.glb
