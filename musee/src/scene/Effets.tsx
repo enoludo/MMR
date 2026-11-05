@@ -35,7 +35,8 @@ import {
  * champ seule) ; le halo est aussi calculé en demi-résolution.
  * Réglages propres à chaque salle (champ `effets` de la config, touche M « Effets · <salle> ») ; pendant un
  * passage, ils glissent de la salle quittée à la salle d'arrivée (la courbe de couleurs aussi : `Courbe`).
- * Touche M, dossier « Effets (toutes les salles) » : effets actifs, anticrénelage. Les captures (outils/capture.ts) et la photo du retour vers la
+ * Touche M, dossier « Effets (toutes les salles) » : effets actifs, anticrénelage (qualité du SMAA et
+ * suréchantillonnage ×2, ×4, ×6, 05/11 : `PasseScene`). Les captures (outils/capture.ts) et la photo du retour vers la
  * spirale passent par `rendu.image` : elles ont les mêmes effets que l'écran (sans le grain).
  */
 
@@ -111,6 +112,131 @@ export function ReglagesEffetsSalle({ config }: { config: SalleConfig }) {
   return null
 }
 
+/**
+ * Suréchantillonnage (05/11, demande de Ludovic : plus de marge pour l'anticrénelage) : la scène est
+ * dessinée 2, 4 ou 6 fois plus de pixels (√2, 2 ou √6 fois plus large et plus haute), puis réduite à la
+ * taille de l'image avant les effets. La réduction moyenne les échantillons de chaque pixel en donnant
+ * moins de poids aux plus lumineux (moyenne de Karis) : l'image est encore en lumière brute, avant la
+ * courbe de couleurs, et une simple moyenne laissait les bords clairs sur fond sombre en escalier.
+ * C'est aussi pour cela que le multi-échantillonnage de la carte graphique (MSAA), essayé d'abord, ne
+ * servait à rien ici (et il s'arrête à ×4 sur un Mac M1). Le coût suit le nombre d'échantillons (scène
+ * seulement : les effets restent à la taille de l'image). Profondeur recopiée (profondeur de champ).
+ * Le reflet du sol est lu au pixel : il suit `surEchantillonnage.echelle`. La poussière (`dessinsDirects`) est
+ * dessinée après la réduction, à la taille de l'image : ses grains, souvent plus petits qu'un pixel,
+ * perdaient leur éclat dans la moyenne.
+ */
+export const surEchantillonnage = { echelle: 1 }
+/** Objets dessinés à la taille de l'image, après la réduction (profondeur de la scène réduite) */
+export const dessinsDirects = new Set<THREE.Object3D>()
+
+/** Au plus 40 millions d'échantillons (captures en 5120 × 2880 : ×6 demanderait plus d'un Go) */
+const ECHANTILLONS_MAX = 40e6
+
+/** Visible avec tous ses parents (une salle cachée garde sa poussière visible) */
+function estVisible(o: THREE.Object3D | null): boolean {
+  for (; o; o = o.parent) if (!o.visible) return false
+  return true
+}
+
+class PasseScene extends RenderPass {
+  echantillons = 1
+  private grand: THREE.WebGLRenderTarget | null = null
+  private reduction = new THREE.ShaderMaterial({
+    uniforms: {
+      tCouleur: { value: null },
+      tProfondeur: { value: null },
+      uTexel: { value: new THREE.Vector2() },
+      uEchelle: { value: 1 },
+      uExposition: { value: 1 },
+      uPrises: { value: 2 },
+    },
+    vertexShader: /* glsl */ `
+      varying vec2 vUv;
+      void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+    fragmentShader: /* glsl */ `
+      uniform sampler2D tCouleur;
+      uniform sampler2D tProfondeur;
+      uniform vec2 uTexel;
+      uniform float uEchelle;
+      uniform float uExposition;
+      uniform int uPrises;
+      varying vec2 vUv;
+      void main() {
+        // prises réparties sur la surface du pixel (2 × 2 ou 3 × 3), lues avec le filtre linéaire
+        vec4 somme = vec4(0.0);
+        float poids = 0.0;
+        for (int i = 0; i < 3; i++) for (int j = 0; j < 3; j++) {
+          if (i >= uPrises || j >= uPrises) continue;
+          vec2 o = (vec2(float(i), float(j)) + 0.5) / float(uPrises) - 0.5;
+          vec4 c = texture2D(tCouleur, vUv + o * uEchelle * uTexel);
+          float w = 1.0 / (1.0 + max(c.r, max(c.g, c.b)) * uExposition);
+          somme += c * w;
+          poids += w;
+        }
+        gl_FragColor = somme / poids;
+        gl_FragDepth = texture2D(tProfondeur, vUv).r;
+      }`,
+    depthTest: true,
+    depthWrite: true,
+    depthFunc: THREE.AlwaysDepth,
+  })
+  private ecran = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.reduction)
+  private camOrtho = new THREE.OrthographicCamera()
+
+  constructor(scene: THREE.Scene, camera: THREE.Camera) {
+    super(scene, camera)
+    this.ecran.frustumCulled = false
+  }
+
+  render(renderer: THREE.WebGLRenderer, inputBuffer: THREE.WebGLRenderTarget, outputBuffer: THREE.WebGLRenderTarget, delta?: number, stencil?: boolean) {
+    const { width: w, height: h } = inputBuffer
+    const max = renderer.capabilities.maxTextureSize
+    const s = Math.min(Math.sqrt(this.echantillons), Math.sqrt(ECHANTILLONS_MAX / (w * h)), max / w, max / h)
+    if (s <= 1.01 || this.renderToScreen) {
+      surEchantillonnage.echelle = 1
+      if (this.grand) this.grand = (this.grand.dispose(), null)
+      return super.render(renderer, inputBuffer, outputBuffer, delta, stencil)
+    }
+    const gw = Math.round(w * s)
+    const gh = Math.round(h * s)
+    if (!this.grand) {
+      this.grand = new THREE.WebGLRenderTarget(gw, gh, {
+        type: THREE.HalfFloatType,
+        minFilter: THREE.LinearFilter,
+        magFilter: THREE.LinearFilter,
+        depthBuffer: true,
+        depthTexture: new THREE.DepthTexture(gw, gh, THREE.FloatType),
+      })
+      this.grand.texture.generateMipmaps = false
+    } else if (this.grand.width !== gw || this.grand.height !== gh) this.grand.setSize(gw, gh)
+    surEchantillonnage.echelle = gw / w
+    for (const o of dessinsDirects) o.visible = false
+    super.render(renderer, this.grand, outputBuffer, delta, stencil)
+    for (const o of dessinsDirects) o.visible = true
+    const u = this.reduction.uniforms
+    u.tCouleur.value = this.grand.texture
+    u.tProfondeur.value = this.grand.depthTexture
+    u.uTexel.value.set(1 / gw, 1 / gh)
+    u.uEchelle.value = gw / w
+    u.uExposition.value = renderer.toneMappingExposure
+    u.uPrises.value = this.echantillons > 4 ? 3 : 2
+    renderer.setRenderTarget(inputBuffer)
+    renderer.render(this.ecran, this.camOrtho)
+    // Poussière : par-dessus, testée contre la profondeur réduite (sans fond ni ombres recalculés)
+    const ombres = renderer.shadowMap.autoUpdate
+    renderer.shadowMap.autoUpdate = false
+    for (const o of dessinsDirects) if (estVisible(o)) renderer.render(o, this.camera!)
+    renderer.shadowMap.autoUpdate = ombres
+  }
+
+  dispose() {
+    this.grand?.dispose()
+    this.reduction.dispose()
+    this.ecran.geometry.dispose()
+    super.dispose()
+  }
+}
+
 const melange = (a: number, b: number, w: number) => a + (b - a) * w
 
 /**
@@ -156,8 +282,14 @@ export function Effets() {
   const e = useControls('Effets (toutes les salles)', {
     ...boutonCopier('Effets (toutes les salles)'),
     actifs: { value: true, label: 'effets actifs' },
-    smaa: { value: true, label: 'anticrénelage SMAA' },
+    smaa: {
+      value: SMAAPreset.LOW as number,
+      options: { aucun: -1, basse: SMAAPreset.LOW, moyenne: SMAAPreset.MEDIUM, haute: SMAAPreset.HIGH, ultra: SMAAPreset.ULTRA },
+      label: 'SMAA',
+    },
+    echantillons: { value: 1, options: { '×1': 1, '×2': 2, '×4': 4, '×6': 6 }, label: 'échantillons' },
   })
+  const avecSmaa = e.smaa >= 0
 
   const outils = useMemo(() => {
     const composer = new EffectComposer(gl, { frameBufferType: THREE.HalfFloatType, multisampling: 0 })
@@ -173,7 +305,7 @@ export function Effets() {
     const nouveauGrain = () => new NoiseEffect({ blendFunction: BlendFunction.OVERLAY, premultiply: false })
     const grain = [nouveauGrain(), nouveauGrain()]
     const passes = { avecFlou: [] as EffectPass[], sansFlou: [] as EffectPass[] }
-    return { composer, dof, bloom, courbe, smaa, grain, passes, rendu: new RenderPass(scene, camera) }
+    return { composer, dof, bloom, courbe, smaa, grain, passes, rendu: new PasseScene(scene, camera) }
   }, [gl, scene, camera])
 
   // Passes, refaites quand on active ou coupe l'anticrénelage. Chaque passe relit et réécrit toute
@@ -183,7 +315,7 @@ export function Effets() {
   // Les deux jeux sont là, un seul actif à la fois (on passe de l'un à l'autre sans recompiler).
   useEffect(() => {
     const { composer, dof, bloom, courbe, smaa, grain, passes } = outils
-    const aa = (i: number) => (e.smaa ? [smaa[i]] : [])
+    const aa = (i: number) => (avecSmaa ? [smaa[i]] : [])
     composer.removeAllPasses()
     composer.addPass(outils.rendu)
     passes.avecFlou = [new EffectPass(camera, dof, bloom[0], courbe[0]), new EffectPass(camera, ...aa(0), grain[0])]
@@ -191,7 +323,17 @@ export function Effets() {
     for (const p of [...passes.avecFlou, ...passes.sansFlou]) composer.addPass(p)
     // Le composeur n'envoie à l'écran que la dernière passe : ici, la dernière de chaque jeu
     passes.avecFlou[1].renderToScreen = true
-  }, [outils, camera, e.smaa])
+  }, [outils, camera, avecSmaa])
+
+  // Qualité du SMAA (basse jusqu'au 05/11) : plus haute, il suit mieux les bords fins et en biais
+  useEffect(() => {
+    if (avecSmaa) for (const a of outils.smaa) a.applyPreset(e.smaa as SMAAPreset)
+  }, [outils, avecSmaa, e.smaa])
+
+  // Suréchantillonnage (05/11) : 1, 2, 4 ou 6 échantillons par pixel
+  useEffect(() => {
+    outils.rendu.echantillons = e.actifs ? e.echantillons : 1
+  }, [outils, e.actifs, e.echantillons])
 
   // La courbe de couleurs passe dans les effets : la scène est dessinée sans (sinon, deux fois)
   useEffect(() => {

@@ -314,8 +314,8 @@ export function ReglagesTransitionSalle({ config }: { config: SalleConfig }) {
     finSalle: { value: rt.finSalle, min: 0.5, max: 5, step: 0.05, label: 'entrée : fin dans la salle (s)' },
     zoomSortie: { value: rt.zoomSortie, min: 0.3, max: 4, step: 0.05, label: 'retour : réduction (s)' },
     fonduSortie: { value: rt.fonduSortie, min: 0.1, max: 2, step: 0.05, label: 'retour : fondu sur la carte (s)' },
-    recul: { value: rt.recul, min: 0, max: 6, step: 0.05, label: 'recul de la vue d’entrée (m, refaire la capture)' },
-    champEnPlus: { value: rt.champEnPlus, min: 0, max: 30, step: 0.5, label: 'champ en plus à l’entrée (°, refaire la capture)' },
+    recul: { value: rt.recul, min: 0, max: 6, step: 0.05, label: 'recul à l’entrée (m, recapturer)' },
+    champEnPlus: { value: rt.champEnPlus, min: 0, max: 30, step: 0.5, label: 'champ en plus à l’entrée (°, recapturer)' },
     regard: { value: rt.regard, min: 0, max: 1, step: 0.01, label: 'regard de la vue initiale (0 bas → 1 haut)' },
     zoomCarte: { value: rt.zoomCarte, min: 1, max: 3, step: 0.05, label: 'agrandissement dans la carte (au rechargement)' },
   })

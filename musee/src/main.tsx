@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { Leva } from 'leva'
 import { CopieReglages } from './ui/CopieReglages'
+import { Fps } from './ui/Fps'
 import '@fontsource-variable/google-sans-flex/wght.css'
 import { Accueil } from './accueil/Accueil'
 import { APropos } from './pages/APropos'
@@ -103,8 +104,15 @@ function App() {
 
   return (
     <>
-      <Leva hidden={!dev} collapsed={false} titleBar={{ title: 'Réglages (M)' }} />
+      <Leva
+        hidden={!dev}
+        collapsed={false}
+        titleBar={{ title: 'Réglages (M)' }}
+        // Panneau élargi (05/11, demande de Ludovic : intitulés coupés) : 280 px de large par défaut
+        theme={{ sizes: { rootWidth: '580px', controlWidth: '200px' } }}
+      />
       {dev && <CopieReglages />}
+      {dev && <Fps />}
       {(pathname === '/' || zoomVersSalle || retourVersSpirale) && <Accueil />}
       <Suspense fallback={null}>
         {idSalle && <PageOeuvre key={visite.n} id={idSalle} />}

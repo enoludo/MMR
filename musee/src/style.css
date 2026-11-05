@@ -698,3 +698,22 @@ html.vue-libre .salle-ui > :not(.salle-ui__vignette) { display: none; }
   border-radius: 24px; border: 1px dashed rgba(255, 255, 255, .5); background: rgba(255, 255, 255, .06);
   display: grid; place-items: center; color: rgba(255, 255, 255, .6); pointer-events: none;
 }
+
+/* Compteur d'images par seconde (touche M, ui/Fps.tsx) */
+.fps {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  z-index: 2000;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  font: 12px/1.2 ui-monospace, Menlo, monospace;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.fps:empty { display: none; }
+.fps[data-niveau='bon'] { color: #7ee08a; }
+.fps[data-niveau='moyen'] { color: #f2c94c; }
+.fps[data-niveau='faible'] { color: #ff7a6b; }

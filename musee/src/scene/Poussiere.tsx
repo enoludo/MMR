@@ -1,9 +1,9 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { SalleConfig } from '../salles/types'
 import { GLSL_LAMES, uniformsLames } from './lames'
-import { GLSL_SORTIE, uSortie } from './Effets'
+import { dessinsDirects, GLSL_SORTIE, uSortie } from './Effets'
 import { useReglagesSalle } from '../reglages'
 
 const MAX = 16000 // grains réservés (8000 avant le 29/10) ; le réglage « densité » n’en affiche qu’une partie
@@ -146,5 +146,14 @@ export function Poussiere({ config }: { config: SalleConfig }) {
     uniforms.uEchelle.value = (size.height * viewport.dpr * 0.5) / Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2)
   })
 
-  return <points geometry={geometrie} material={materiau} renderOrder={6} raycast={() => null} />
+  // Hors du suréchantillonnage (Effets) : les grains, souvent plus petits qu'un pixel, y perdaient leur éclat
+  const points = useRef<THREE.Points>(null)
+  useEffect(() => {
+    const p = points.current
+    if (!p) return
+    dessinsDirects.add(p)
+    return () => void dessinsDirects.delete(p)
+  }, [])
+
+  return <points ref={points} geometry={geometrie} material={materiau} renderOrder={6} raycast={() => null} />
 }

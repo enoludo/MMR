@@ -1,22 +1,47 @@
-# Passation — avant de retravailler plusieurs sujets
+# Passation — reprise sur un autre compte Claude
 
-Rédigée le 05/11/2026 au soir par Claude Code, à la demande de Ludovic (« on va retravailler plusieurs
-sujets »). À lire après `CLAUDE.md` (contexte, décisions de Ludovic, architecture) et le haut de
-`JOURNAL.md` (détail de chaque changement, avec son statut). Remplace la passation « reprise sur un autre
-compte Claude » (05/11 au matin), toujours lisible dans l'historique Git.
+Rédigée le 05/11/2026 en fin de soirée par Claude Code, à la demande de Ludovic (« je vais rebasculer sur
+un autre compte Claude »). À lire après `CLAUDE.md` (contexte, décisions de Ludovic, architecture) et le
+haut de `JOURNAL.md` (détail de chaque changement, avec son statut). Remplace la passation « avant de
+retravailler plusieurs sujets » (05/11 au soir), toujours lisible dans l'historique Git.
 
 Une nouvelle session n'a **ni l'historique des conversations ni la mémoire** des précédentes : tout ce qu'il
 faut savoir est dans `CLAUDE.md`, `JOURNAL.md` et ce fichier.
 
 ---
 
-## 1. Où en est-on (05/11 au soir)
+## 1. Où en est-on (05/11, fin de soirée)
 
-- **Branche principale** `claude/spirale-interactive-gallery-b4mzwd` : le site tel qu'il est en ligne sur le
-  labo (04/11), plus deux enregistrements locaux, **pas envoyés sur GitHub** : les fichiers bruts du pavillon
-  ignorés par Git (`.gitignore`) et cette passation. Les envoyer seulement à la demande de Ludovic.
-- **En ligne :** le labo `mmr-lab` (https://mmr-lab.labs.cubedesigners.com/) a la version du 04/11.
+- **Branche principale** `claude/spirale-interactive-gallery-b4mzwd` : tout est enregistré et **envoyé sur
+  GitHub** (dernier enregistrement : anticrénelage, panneau M, compteur d'images, cette passation).
+- **En ligne :** le labo `mmr-lab` (https://mmr-lab.labs.cubedesigners.com/) a encore **la version du
+  04/11**. Ludovic a demandé la mise en ligne de la session du 05/11 (« git, github et labs »), mais le
+  connecteur Fluidbook Toolbox n'était pas branché dans la session : **à faire en premier si le connecteur
+  est là** (section 4, depuis la branche principale à jour).
 - **Accès GitHub :** par le trousseau du Mac (`credential.helper osxkeychain`). `gh` n'est pas installé.
+
+### Faits le 05/11 (tous « à voir » avec Ludovic, détail dans `JOURNAL.md`)
+
+- Ombres précalculées du Seuil et de Huntington à 2048 échantillons, lignes dans les ombres corrigées
+  (`masque.py`) ; Huntington en « calcaire doré » puis un peu moins chaud ; captures des deux salles refaites.
+- Spirale : pause de 5 s après un geste, reprise douce. Salles : cliquer-glisser pour tourner autour de
+  l'œuvre (sens inversé à la souris et au doigt). Carré bleu au toucher sur Android supprimé.
+- Mobile d'après la maquette Figma `520:1179` (panneau du bas qui suit le doigt, popups en panneau du bas,
+  voile de la maquette) ; transitions spirale / grille ↔ salle raccordées sur mobile ; survol des flèches
+  du bas de nouveau progressif.
+- **Anticrénelage** (touche M, « Effets (toutes les salles) ») : qualité du SMAA et **échantillons ×1 / ×2 /
+  ×4 / ×6** (suréchantillonnage, `PasseScene` dans `Effets.tsx`). Coût sur le M1 : 30 → 22 / 16 / 10
+  images/s. Par défaut inchangé (SMAA basse, ×1).
+- Panneau de la touche M élargi (580 px) et **compteur d'images par seconde** en bas à gauche avec la touche M
+  (`ui/Fps.tsx`).
+
+### Décisions attendues de Ludovic
+
+1. **Anticrénelage par défaut** : proposé « ×2 + SMAA basse » ou garder ×1 (il essaie avec la touche M et le
+   compteur). Pour changer le défaut : `value` de `echantillons` (et de `smaa`) dans `Effets.tsx`.
+2. **Logo sur mobile** : petit sur l'accueil (24 px, à cause des onglets Spirale / Grille), grand dans les
+   salles (48 px, maquette) : il saute à l'entrée. Choix proposé : grand partout avec les onglets passés
+   sous le header, ou petit partout.
 
 ### Le pavillon de « Souffle d'éclats » est mis de côté
 
@@ -49,7 +74,7 @@ te le demanderai explicitement. »
 
 ## 2. Sujets à retravailler
 
-**Pas de demande précise pour l'instant.** Demander à Ludovic par quoi il veut commencer. Les points ouverts
+Après la mise en ligne et les deux décisions ci-dessus, demander à Ludovic par quoi il veut continuer. Les points ouverts
 de la branche principale (détail dans `CLAUDE.md`, « Points ouverts », et dans `JOURNAL.md`), tous
 « à voir » :
 
@@ -67,7 +92,8 @@ de la branche principale (détail dans `CLAUDE.md`, « Points ouverts », et dan
 8. **Transitions spirale ↔ salles** : durées, raccords, parallaxe, effet sur mobile.
 9. **Contenus** : chiffres des popups Maladie à vérifier (Seuil : « 1/2M » et « ACVR1 » ne correspondent
    pas à l'acromégalie ; Huntington : prévalence et « 0 ») ; boutons « En savoir plus » sans lien.
-10. **Mobile et Safari** : jamais vérifiés depuis le 03/11 ; maquette mobile à demander.
+10. **Mobile et Safari** : salles faites d'après la maquette `520:1179`, jamais vues sur un vrai téléphone
+    ni dans Safari ; accueil (spirale, grille) sans maquette mobile.
 11. **Musique** : volume général, fondus, raccord des boucles.
 12. **Spirale** : deux fois, titre affiché et œuvre visée par « Découvrir » ne concordaient pas (non
     reproduit).
