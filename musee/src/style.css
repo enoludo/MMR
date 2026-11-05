@@ -326,7 +326,7 @@ button { font: inherit; color: inherit; }
  * contenu est plus haut, il défile dans la marge intérieure (barre fine dans la marge de droite,
  * dans l'axe de la croix, et fondu du texte au bord qui cache encore du contenu).
  */
-@property --ouverture { syntax: '<number>'; inherits: true; initial-value: 0; }
+@property --feuille { syntax: '<number>'; inherits: true; initial-value: 0; }
 @property --fondu-haut { syntax: '<length>'; inherits: false; initial-value: 0px; }
 @property --fondu-bas { syntax: '<length>'; inherits: false; initial-value: 0px; }
 .popup {
@@ -572,23 +572,23 @@ button { font: inherit; color: inherit; }
   .salle-accueil__titre { font-size: 36px; line-height: 36px; cursor: pointer; text-wrap: balance; }
 
   /* Replié : le titre seul ; déplié : cartouches, soutien et partage, 16 px entre les blocs.
-     --ouverture (0 → 1) règle leur hauteur : elle suit le doigt pendant un glisser (useFeuille,
+     --feuille (0 → 1) règle leur hauteur : elle suit le doigt pendant un glisser (useFeuille,
      InterfaceSalle.tsx, qui mesure --h-cartouches et --h-bas), sinon elle glisse vers 0 ou 1 avec la
      courbe des feuilles d'iOS */
-  .salle-accueil { --ouverture: 0; transition: opacity 0.45s ease, visibility 0.45s, transform 0.6s cubic-bezier(.2,.7,.2,1), --ouverture 0.5s cubic-bezier(.32,.72,0,1); }
+  .salle-accueil { --feuille: 0; transition: opacity 0.45s ease, visibility 0.45s, transform 0.6s cubic-bezier(.2,.7,.2,1), --feuille 0.5s cubic-bezier(.32,.72,0,1); }
   /* Popup ouvert, passage : le panneau part après son contenu (mêmes délais que sur ordinateur) */
   .salle-accueil--cache, .salle-ui--passage .salle-accueil {
-    transition: opacity 0.4s ease 1.25s, visibility 0s 1.7s, transform 0.6s cubic-bezier(.2,.7,.2,1), --ouverture 0.5s cubic-bezier(.32,.72,0,1);
+    transition: opacity 0.4s ease 1.25s, visibility 0s 1.7s, transform 0.6s cubic-bezier(.2,.7,.2,1), --feuille 0.5s cubic-bezier(.32,.72,0,1);
   }
-  .salle-accueil--deplie { --ouverture: 1; }
+  .salle-accueil--deplie { --feuille: 1; }
   .salle-accueil--glisse { transition: none; }
   .salle-accueil__cartouches, .salle-accueil__bas {
     width: 100%; overflow: hidden;
-    max-height: calc(var(--ouverture) * var(--h-cartouches, 166px));
-    margin-top: calc(var(--ouverture) * 16px);
-    opacity: clamp(0, calc(var(--ouverture) * 1.6 - 0.3), 1);
+    max-height: calc(var(--feuille) * var(--h-cartouches, 166px));
+    margin-top: calc(var(--feuille) * 16px);
+    opacity: clamp(0, calc(var(--feuille) * 1.6 - 0.3), 1);
   }
-  .salle-accueil__bas { max-height: calc(var(--ouverture) * var(--h-bas, 130px)); }
+  .salle-accueil__bas { max-height: calc(var(--feuille) * var(--h-bas, 130px)); }
   /* Replié et immobile : hors du parcours au clavier */
   .salle-accueil:not(.salle-accueil--deplie):not(.salle-accueil--glisse) :is(.salle-accueil__cartouches, .salle-accueil__bas) {
     visibility: hidden; transition: visibility 0s 0.5s;

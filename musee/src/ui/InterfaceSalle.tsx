@@ -195,7 +195,7 @@ export function InterfaceSalle({ oeuvre }: { oeuvre: Oeuvre }) {
 
 /**
  * Mobile : le panneau du bas suit le doigt (feuille d'iOS). Son ouverture (0 replié, 1 déplié) est la
- * variable CSS --ouverture, qui règle la hauteur des blocs repliables (style.css, section Mobile) ;
+ * variable CSS --feuille, qui règle la hauteur des blocs repliables (style.css, section Mobile) ;
  * pendant le geste elle suit le doigt au pixel près (hauteurs mesurées : --h-cartouches, --h-bas),
  * puis elle rejoint 0 ou 1 en transition. Un geste rapide l'emporte sur la position.
  */
@@ -249,7 +249,7 @@ function useFeuille(
       el.classList.add('salle-accueil--glisse')
     }
     g.o = Math.min(1, Math.max(0, g.o0 - dy / g.course))
-    el.style.setProperty('--ouverture', String(g.o))
+    el.style.setProperty('--feuille', String(g.o))
     // Vitesse (px/ms, vers le bas positive), amortie
     const dt = Math.max(1, e.timeStamp - g.t)
     g.vitesse = 0.7 * ((y - g.y) / dt) + 0.3 * g.vitesse
@@ -265,9 +265,9 @@ function useFeuille(
     // La transition reprend là où le doigt a laissé le panneau
     el.classList.remove('salle-accueil--glisse')
     void el.offsetHeight
-    el.style.setProperty('--ouverture', ouvrir ? '1' : '0')
+    el.style.setProperty('--feuille', ouvrir ? '1' : '0')
     setDeplie(ouvrir)
-    setTimeout(() => el.style.removeProperty('--ouverture'), 0)
+    setTimeout(() => el.style.removeProperty('--feuille'), 0)
   }
   return { debut, mouvement, fin }
 }
