@@ -69,6 +69,8 @@ const lerp = THREE.MathUtils.lerp
  * 01/11 ; autant que l'ancien réglage (0,0012 radian par pixel) sur un cercle de 9 m
  */
 const M_PAR_PIXEL = 0.0108
+/** Au-delà de ce déplacement (px), un appui est un glisser, plus un clic */
+const SEUIL_GLISSER = 8
 /** Flèches du clavier : un pas (m) */
 const PAS_CLAVIER = 1.8
 /** Au point de vue d'un popup : après avoir tourné de cet angle autour de l'œuvre, on regarde son axe */
@@ -545,10 +547,50 @@ export function Navigation({
       const s = n.current
       // Petite marge en haut et en bas : on atteint les extrêmes sans coller au bord
       s.souris = borner(1 - (e.clientY / window.innerHeight - 0.08) / 0.84) // souris en haut = regard vers le haut
-      s.sourisX = borner((e.clientX / window.innerWidth) * 2 - 1, -1, 1)
+      // Pendant un cliquer-glisser, le regard ne suit pas la souris de côté : seul le déplacement compte
+      if (!prise?.glisse) s.sourisX = borner((e.clientX / window.innerWidth) * 2 - 1, -1, 1)
     }
 
-    // Au doigt : glisser horizontal = avancer, glisser vertical = regard
+    // À la souris (05/11, demande de Ludovic) : cliquer-glisser horizontal = avancer autour de l'œuvre,
+    // dans le même sens qu'au doigt (sens choisi par Ludovic le 05/11) ; le regard suit toujours la hauteur de la souris. Un glisser
+    // n'est pas un clic : il ne rapproche pas de l'œuvre et ne ferme pas le popup (`ignorerClic`)
+    let prise: { id: number; x: number; distance: number; glisse: boolean } | null = null
+    let ignorerClic = false
+    const prendre = (e: PointerEvent) => {
+      if (e.pointerType !== 'mouse' || e.button !== 0 || store.get().libre) return
+      prise = { id: e.pointerId, x: e.clientX, distance: 0, glisse: false }
+    }
+    const tirer = (e: PointerEvent) => {
+      if (!prise || e.pointerId !== prise.id) return
+      if (!(e.buttons & 1)) return void (prise = null) // bouton relâché hors de la fenêtre
+      const dx = e.clientX - prise.x
+      prise.x = e.clientX
+      prise.distance += Math.abs(dx)
+      if (!prise.glisse && prise.distance >= SEUIL_GLISSER) {
+        prise.glisse = true
+        canvas.style.cursor = 'grabbing'
+      }
+      const s = n.current
+      if (s.mode !== 'cercle' && s.mode !== 'etape') return
+      avancer(-dx * r.current.glisser * M_PAR_PIXEL * r.current.vitesse)
+    }
+    const lacherPrise = (e: PointerEvent) => {
+      if (!prise || e.pointerId !== prise.id) return
+      if (prise.glisse) {
+        ignorerClic = true
+        setTimeout(() => (ignorerClic = false)) // le clic, s'il vient, suit aussitôt le relâchement
+        canvas.style.cursor = ''
+      }
+      prise = null
+    }
+    // Avant tout autre écouteur de clic (celui du popup, sur window) : premier de la phase de capture
+    const clicApresGlisser = (e: MouseEvent) => {
+      if (!ignorerClic) return
+      ignorerClic = false
+      e.stopImmediatePropagation()
+    }
+
+    // Au doigt : glisser horizontal = avancer (sens inversé le 05/11, comme à la souris : demande de Ludovic), glisser vertical = regard
     let doigt: { id: number; x: number; y: number; distance: number } | null = null
     const toucher = (e: PointerEvent) => {
       if (e.pointerType === 'mouse' || doigt) return
@@ -563,7 +605,7 @@ export function Navigation({
       doigt.distance += Math.hypot(dx, dy)
       const s = n.current
       if (s.mode !== 'cercle' && s.mode !== 'etape') return
-      avancer(dx * 2.2 * M_PAR_PIXEL * r.current.vitesse)
+      avancer(-dx * 2.2 * M_PAR_PIXEL * r.current.vitesse)
       s.souris = borner(s.souris + (dy / window.innerHeight) * 1.3)
     }
     const lacher = (e: PointerEvent) => {
@@ -577,14 +619,17 @@ export function Navigation({
     }
     const relacher = (e: PointerEvent) => {
       if (store.get().libre) return void (appui = null)
-      if (appui && Math.hypot(e.clientX - appui.x, e.clientY - appui.y) < 8) cliquer(e.clientX, e.clientY)
+      if (appui && Math.hypot(e.clientX - appui.x, e.clientY - appui.y) < SEUIL_GLISSER && !prise?.glisse) cliquer(e.clientX, e.clientY)
       appui = null
     }
     let dernierSurvol = 0
     const survoler = (e: PointerEvent) => {
       if (e.pointerType !== 'mouse' || e.timeStamp - dernierSurvol < 80) return
       dernierSurvol = e.timeStamp
-      canvas.style.cursor = n.current.mode === 'cercle' && surLOeuvre(e.clientX, e.clientY) ? 'pointer' : ''
+      if (prise?.glisse) return
+      const mode = n.current.mode
+      canvas.style.cursor =
+        mode === 'cercle' && surLOeuvre(e.clientX, e.clientY) ? 'pointer' : mode === 'cercle' || mode === 'etape' ? 'grab' : ''
     }
 
     const clavier = (e: KeyboardEvent) => {
@@ -609,7 +654,17 @@ export function Navigation({
     window.addEventListener('pointerup', lacher)
     window.addEventListener('pointercancel', lacher)
     window.addEventListener('keydown', clavier)
+    canvas.addEventListener('pointerdown', prendre)
+    window.addEventListener('pointermove', tirer)
+    window.addEventListener('pointerup', lacherPrise)
+    window.addEventListener('pointercancel', lacherPrise)
+    window.addEventListener('click', clicApresGlisser, true)
     return () => {
+      canvas.removeEventListener('pointerdown', prendre)
+      window.removeEventListener('pointermove', tirer)
+      window.removeEventListener('pointerup', lacherPrise)
+      window.removeEventListener('pointercancel', lacherPrise)
+      window.removeEventListener('click', clicApresGlisser, true)
       window.removeEventListener('wheel', molette)
       window.removeEventListener('pointermove', souris)
       canvas.removeEventListener('pointerdown', toucher)
@@ -899,6 +954,8 @@ export type ReglagesNavigation = {
   rayonLointain: number
   rayonProche: number
   vitesse: number
+  /** Cliquer-glisser à la souris : déplacement par pixel, en multiple de celui du scroll */
+  glisser: number
   amorti: number
   regardBas: number
   regardHaut: number
@@ -926,6 +983,7 @@ export function reglagesNavigation(config: SalleConfig): ReglagesNavigation {
       rayon: p.rayon,
       rayonProche: p.rayonProche,
       vitesse: 1,
+      glisser: 1.5,
       amorti: 3,
       regardBas: p.regard.bas,
       regardHaut: p.regard.haut,
@@ -958,6 +1016,7 @@ function ReglagesNavigationSalle({ config }: { config: SalleConfig }) {
     rayon: { value: g.rayon, min: 3, max: 14, step: 0.1, label: 'rayon du cercle (m)' },
     rayonProche: { value: g.rayonProche, min: 2, max: 9, step: 0.1, label: 'rayon du cercle réduit (m)' },
     vitesse: { value: g.vitesse, min: 0.2, max: 3, step: 0.05, label: 'vitesse du scroll' },
+    glisser: { value: g.glisser, min: 0.2, max: 5, step: 0.05, label: 'cliquer-glisser (× scroll)' },
     amorti: { value: g.amorti, min: 0.5, max: 12, step: 0.1, label: 'réactivité du déplacement' },
     regardBas: { value: g.regardBas, min: 0, max: 6, step: 0.1, label: 'regard le plus bas, souris en bas (m)' },
     regardHaut: { value: g.regardHaut, min: 1, max: 14, step: 0.1, label: 'regard le plus haut, souris en haut (m)' },

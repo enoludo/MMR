@@ -66,17 +66,17 @@
       "nuances": 0.13
     },
     "Couleurs": {
-      "soleil": "#fffaee",
-      "ambianceCiel": "#deecff",
-      "ambianceSol": "#f2edda",
-      "ambianceCouloir": "#d6e2ee",
-      "lueur": "#ffffff",
-      "matiereMur": "#d2dee8",
-      "matiereSol": "#6f7d8b",
-      "matierePlafond": "#a4b5c4",
-      "matiereSolCentre": "#6f7d8b",
-      "matiereBanc": "#9bacba",
-      "matiereFente": "#ffffff"
+      "soleil": "#f8f1e5",
+      "ambianceCiel": "#ede7dd",
+      "ambianceSol": "#e9e3d6",
+      "ambianceCouloir": "#e7e1d7",
+      "lueur": "#faf4eb",
+      "matiereMur": "#cdd4e6",
+      "matiereSol": "#767780",
+      "matierePlafond": "#aeb4c2",
+      "matiereSolCentre": "#79777b",
+      "matiereBanc": "#a6a4ab",
+      "matiereFente": "#faf5ee"
     },
     "Reflet au sol": {
       "force": 0.16,

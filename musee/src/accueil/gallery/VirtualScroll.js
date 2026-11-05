@@ -64,6 +64,8 @@ export class VirtualScroll {
     this.isUserInteracting = false;
     this.idleTimeout = null;
     this.snapTimeout = null;
+    // Heure où la rotation automatique reprend après un geste (null : à pleine vitesse, au chargement)
+    this.repriseDebut = null;
     this.isDragging = false;
     this.lastDragX = null;
     this.dragAnchor = null;
@@ -88,6 +90,7 @@ export class VirtualScroll {
     clearTimeout(this.idleTimeout);
     this.idleTimeout = setTimeout(() => {
       this.isUserInteracting = false;
+      this.repriseDebut = performance.now();
     }, CONFIG.idleDelayMs);
   }
 
@@ -189,10 +192,20 @@ export class VirtualScroll {
     this.scheduleSnap();
   }
 
-  /** Advance the target scroll height by the idle auto-scroll speed, if idle. */
+  /**
+   * Advance the target scroll height by the idle auto-scroll speed, if idle.
+   * Reprise en douceur après un geste : la vitesse part de 0 et rejoint sa vitesse de croisière en
+   * `CONFIG.autoRotateRampMs`, sur une courbe en S (départ et arrivée sans à-coup).
+   */
   tick() {
     if (!this.isUserInteracting) {
-      this.virtualOffset += CONFIG.autoRotateSpeed;
+      let part = 1;
+      if (this.repriseDebut !== null && CONFIG.autoRotateRampMs > 0) {
+        const u = Math.min(1, (performance.now() - this.repriseDebut) / CONFIG.autoRotateRampMs);
+        part = u * u * (3 - 2 * u);
+        if (u >= 1) this.repriseDebut = null;
+      }
+      this.virtualOffset += CONFIG.autoRotateSpeed * part;
     }
     return this.virtualOffset;
   }

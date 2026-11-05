@@ -27,11 +27,21 @@ export const salleRotonde: SalleConfig = {
     salle: { image: versionne('/models/rotonde-salle-lightmap.ktx2'), ...lightmapRotonde },
     mobilier: { image: versionne('/models/rotonde-salle-lightmap-mobilier.ktx2'), ...lightmapMobilierRotonde },
   },
-  // Mêmes couleurs que les albédos de rotonde.py (et la salle bleue de Huntington)
+  // Ambiance « calcaire doré » (choix de Ludovic du 05/11 ; gris bleu de la vignette avant) : la lumière
+  // précalculée avec les albédos beiges de rotonde.py est déjà chaude (rebonds) ; la pierre du site, presque
+  // neutre (un peu froide), ne la réchauffe pas une seconde fois (sinon : sable saturé) ; rendue encore moins chaude à la demande
+  // de Ludovic (05/11, « plus naturelle »), sans recalcul. Réglées aussi à la touche M
+  // (« Couleurs », src/salles/reglages.json, qui l'emporte)
   matieres: {
-    ...salleProvisoireBleue.matieres,
-    Fente: { couleur: '#eef3ff', lumineuse: 2.5 }, // FENTE_LUEUR dans rotonde.py
+    Mur: { couleur: '#cdd4e6', lightmap: 'salle' },
+    Sol: { couleur: '#767780', lightmap: 'salle' }, // plus sombre que les murs : la lueur du socle s'y lit
+    Plafond: { couleur: '#aeb4c2', lightmap: 'salle' },
+    SolCentre: { couleur: '#79777b', lightmap: 'mobilier' },
+    Banc: { couleur: '#a6a4ab', lightmap: 'mobilier' },
+    Fente: { couleur: '#faf5ee', lumineuse: 2.5 }, // FENTE_LUEUR dans rotonde.py
   },
+  sculpture: { ...salleProvisoireBleue.sculpture, lueur: { rayon: 1.1, couleur: '#faf4eb' } },
+  ambiance: { ciel: '#ede7dd', sol: '#e9e3d6', couloir: '#e7e1d7' },
   // Vue d'arrivée à 11 m, devant les colonnes (décision du 30/10) : le recul par défaut y tient
   transition: undefined,
   parcours: { ...salleProvisoireBleue.parcours, rayonLointain: 11 },
@@ -52,7 +62,7 @@ export const salleRotonde: SalleConfig = {
       douceur: 2.5,
     },
     force: 5,
-    couleur: '#eef3ff',
+    couleur: '#f8f1e5', // plus neutre que SOLEIL_COULEUR de rotonde.py (#fff0d8), moins chaud
   },
   ciel: [{ centre: [0, 27.5, 0], taille: [11, 11] }], // haut de l'oculus (les fentes sont fermées)
   // Portes au fond des pans coupés : on y va par l'axe du pan coupé, puis le milieu du carré de l'angle

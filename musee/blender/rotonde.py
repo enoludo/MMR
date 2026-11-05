@@ -45,7 +45,7 @@ COL_ANGLES = [a for a in range(0, 360, 30) if a % 90]
 BANC_R, BANC_P, BANC_H = 6.47, 0.76, 0.45
 BANCS = [(a - 22.5, a + 22.5) for a in (0, 90, 180, 270)]
 SOCLE_R, SOCLE_H, GORGE_H, GORGE_R = 1.2, 0.8, 0.12, 0.10
-LUEUR_FORCE, LUEUR_COULEUR = 6.0, (0.92, 0.96, 1.0, 1)
+LUEUR_FORCE, LUEUR_COULEUR = 6.0, (1.0, 0.95, 0.88, 1)  # blanc chaud (blanc froid avant le 05/11)
 ENFONCE = 0.005
 # Soleil propre à la salle, presque vertical (sud 4°, est 3°) : le faisceau de l'oculus centré tombe sur l'œuvre
 SOLEIL = Vector((-math.tan(math.radians(3)), math.tan(math.radians(4)), -1.0)).normalized()
@@ -75,10 +75,11 @@ def mat(name, color, rough=0.9):
     b = m.node_tree.nodes["Principled BSDF"]
     b.inputs["Base Color"].default_value = (*color, 1); b.inputs["Roughness"].default_value = rough
     return m
-# Albédos = couleurs de la salle dans le site (config de la rotonde) : mêmes rebonds
-MATS = [mat("Mur", lineaire("#aabccb")), mat("Sol", lineaire("#6f7d8b"), 0.6),
-        mat("Plafond", lineaire("#a4b5c4")), mat("SolCentre", lineaire("#6f7d8b"), 0.61),
-        mat("Banc", lineaire("#9bacba"))]
+# Albédos : ambiance « calcaire doré » (choix de Ludovic du 05/11 ; gris bleu avant), aussi
+# lumineux que les anciens pour garder la pénombre ; le site les éclaircit un peu (touche M « Couleurs »)
+MATS = [mat("Mur", lineaire("#c4b7a3")), mat("Sol", lineaire("#7d7163"), 0.6),
+        mat("Plafond", lineaire("#bfb2a0")), mat("SolCentre", lineaire("#7d7163"), 0.61),
+        mat("Banc", lineaire("#ad9f8c"))]
 MUR, SOL, PLAF, SOL_C, BANC = range(5)
 # SolCentre a une rugosité à peine différente de Sol : sinon gltf-transform fusionne les deux matières
 
@@ -88,7 +89,7 @@ def emission(nom, couleur, force):
     e.inputs["Color"].default_value = couleur; e.inputs["Strength"].default_value = force
     m.node_tree.links.new(e.outputs[0], m.node_tree.nodes["Material Output"].inputs["Surface"])
     return m
-SOLEIL_COULEUR = lineaire("#eef3ff")
+SOLEIL_COULEUR = lineaire("#fff0d8")  # blanc doré (#eef3ff, froid, avant le 05/11)
 FENTE_MAT = emission("Fente", (*SOLEIL_COULEUR, 1), FENTE_LUEUR)
 
 # --- Volumes ----------------------------------------------------------------------------------------
@@ -300,7 +301,8 @@ sun = bpy.data.objects.new("Soleil", sun_d); scn.collection.objects.link(sun)
 sun.rotation_euler = SOLEIL.to_track_quat("-Z", "Y").to_euler()
 w = bpy.data.worlds.new("Ciel"); scn.world = w; w.use_nodes = True
 bg = w.node_tree.nodes["Background"]
-bg.inputs["Color"].default_value = (*lineaire("#9fb6d6"), 1); bg.inputs["Strength"].default_value = CIEL_FORCE
+# Ciel à peine froid (#9fb6d6 avant le 05/11)
+bg.inputs["Color"].default_value = (*lineaire("#b9c0c8"), 1); bg.inputs["Strength"].default_value = CIEL_FORCE
 # Ruban lumineux dans la gorge du socle (précalculé seulement, comme dans salle.py)
 rl = SOCLE_R - GORGE_R + 0.01
 b = bmesh.new()

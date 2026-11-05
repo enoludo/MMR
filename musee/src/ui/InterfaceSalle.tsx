@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type TouchEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useProgress } from '@react-three/drei'
 import { nouvelleCle, store, useEtat, type Sens } from '../store'
@@ -71,6 +71,14 @@ export function InterfaceSalle({ oeuvre }: { oeuvre: Oeuvre }) {
     popupFerme.current = false // une seule fois, à la fermeture
   })
 
+  // Mobile (maquette 520:1179) : premier écran en panneau du bas, replié sur le titre ; on le déplie
+  // en touchant la poignée ou le titre, ou en le faisant glisser : il suit le doigt, comme une feuille
+  // d'iOS, puis se cale ouvert ou fermé selon sa position et la vitesse du geste
+  const [deplie, setDeplie] = useState(false)
+  const surMobile = () => window.matchMedia('(max-width: 760px)').matches
+  if (ouvert && deplie) setDeplie(false)
+  const feuille = useFeuille(premierEcran, deplie, setDeplie, surMobile, oeuvre.id)
+
   // Le popup garde son contenu pendant qu'il disparaît
   const [contenu, setContenu] = useState<'maladie' | 'manifeste'>('maladie')
   if (ouvert && onglet !== contenu) setContenu(onglet)
@@ -84,6 +92,7 @@ export function InterfaceSalle({ oeuvre }: { oeuvre: Oeuvre }) {
   // Nouvelle œuvre : on repart du premier écran et du tour libre
   useEffect(() => {
     store.set({ onglet: 'info', demande: 'cercle' })
+    setDeplie(false)
   }, [oeuvre.id])
 
   useEffect(() => {
@@ -98,8 +107,10 @@ export function InterfaceSalle({ oeuvre }: { oeuvre: Oeuvre }) {
   }, [])
 
   return (
-    <div className={`salle-ui ${enPassage ? 'salle-ui--passage' : ''} ${enTransition ? 'salle-ui--transition' : ''}`}>
+    <div className={`salle-ui ${enPassage ? 'salle-ui--passage' : ''} ${enTransition ? 'salle-ui--transition' : ''} ${ouvert ? 'salle-ui--popup' : ''}`}>
       <div className="salle-ui__vignette" aria-hidden />
+      {/* Mobile : voile noir en haut et en bas de l'écran (maquette 520:1179) */}
+      <div className="salle-ui__degrade" aria-hidden />
       <Chargement />
 
       <EnTete
@@ -122,13 +133,25 @@ export function InterfaceSalle({ oeuvre }: { oeuvre: Oeuvre }) {
       {/* Premier écran : on ouvre les popups depuis ses cartouches Maladie et Manifeste */}
       <section
         ref={premierEcran}
-        className={`salle-accueil ${ouvert ? 'salle-accueil--cache' : ''}`}
+        className={`salle-accueil ${ouvert ? 'salle-accueil--cache' : ''} ${deplie ? 'salle-accueil--deplie' : ''}`}
         inert={ouvert || enTransition || enPassage}
         aria-label={oeuvre.titre}
+        onTouchStart={feuille.debut}
+        onTouchMove={feuille.mouvement}
+        onTouchEnd={feuille.fin}
+        onTouchCancel={feuille.fin}
       >
+        {/* Mobile seulement (masquée sur ordinateur) */}
+        <button
+          type="button"
+          className="salle-accueil__poignee"
+          aria-expanded={deplie}
+          aria-label={deplie ? 'Replier la présentation' : 'Déplier la présentation'}
+          onClick={() => setDeplie(!deplie)}
+        />
         <div className="salle-accueil__haut">
           {/* Écrit et découpé en lettres par useApparition */}
-          <h1 className="salle-accueil__titre" ref={titre} />
+          <h1 className="salle-accueil__titre" ref={titre} onClick={() => surMobile() && setDeplie(!deplie)} />
           <div className="salle-accueil__cartouches">
             <Cartouche
               oeuvre={oeuvre}
@@ -152,10 +175,101 @@ export function InterfaceSalle({ oeuvre }: { oeuvre: Oeuvre }) {
 
       <nav className="pied" aria-label="Navigation dans la collection">
         <Fleche oeuvre={precedente} sens="precedente" desactivee={enPassage} />
+        {/* Mobile : retour à la collection entre les flèches (maquette 520:1179), à la place du titre du header */}
+        <Link
+          to="/"
+          className="bouton-rond pied__retour"
+          aria-label={`${oeuvre.titre} : retour à la collection`}
+          onClick={(e) => {
+            cliquer()
+            if (sortir()) e.preventDefault()
+          }}
+        >
+          <IconeCroix />
+        </Link>
         <Fleche oeuvre={suivante} sens="suivante" desactivee={enPassage} />
       </nav>
     </div>
   )
+}
+
+/**
+ * Mobile : le panneau du bas suit le doigt (feuille d'iOS). Son ouverture (0 replié, 1 déplié) est la
+ * variable CSS --ouverture, qui règle la hauteur des blocs repliables (style.css, section Mobile) ;
+ * pendant le geste elle suit le doigt au pixel près (hauteurs mesurées : --h-cartouches, --h-bas),
+ * puis elle rejoint 0 ou 1 en transition. Un geste rapide l'emporte sur la position.
+ */
+const ECART_BLOCS = 16 // marge au-dessus des cartouches et du bas, déplié (style.css)
+function useFeuille(
+  section: React.RefObject<HTMLElement | null>,
+  deplie: boolean,
+  setDeplie: (d: boolean) => void,
+  surMobile: () => boolean,
+  cle: string,
+) {
+  const geste = useRef<{ y0: number; o0: number; o: number; course: number; y: number; t: number; vitesse: number; actif: boolean } | null>(null)
+  const mesurer = () => {
+    const el = section.current
+    if (!el) return 1
+    const c = el.querySelector<HTMLElement>('.salle-accueil__cartouches')
+    const b = el.querySelector<HTMLElement>('.salle-accueil__bas')
+    // Hauteurs de mise en page (offsetHeight), sans les décalages des animations d'apparition
+    // (transform), que scrollHeight compterait
+    const enfants = (x: HTMLElement | null) => (x ? [...x.children].map((n) => (n as HTMLElement).offsetHeight) : [])
+    const hc = Math.max(0, ...enfants(c))
+    const lb = enfants(b)
+    const hb = lb.reduce((a, h) => a + h, 0) + ECART_BLOCS * Math.max(0, lb.length - 1)
+    el.style.setProperty('--h-cartouches', `${hc}px`)
+    el.style.setProperty('--h-bas', `${hb}px`)
+    return Math.max(1, 2 * ECART_BLOCS + hc + hb)
+  }
+  useLayoutEffect(() => {
+    mesurer()
+    window.addEventListener('resize', mesurer)
+    return () => window.removeEventListener('resize', mesurer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cle])
+  const debut = (e: TouchEvent) => {
+    if (!surMobile()) return
+    const y = e.touches[0].clientY
+    const o = deplie ? 1 : 0
+    geste.current = { y0: y, o0: o, o, course: mesurer(), y, t: e.timeStamp, vitesse: 0, actif: false }
+  }
+  const mouvement = (e: TouchEvent) => {
+    const g = geste.current
+    const el = section.current
+    if (!g || !el) return
+    const y = e.touches[0].clientY
+    const dy = y - g.y0
+    if (!g.actif) {
+      if (Math.abs(dy) < 6) return
+      // Déplié et défilé (petits écrans) : le geste fait défiler le contenu
+      if (deplie && el.scrollTop > 0) return void (geste.current = null)
+      g.actif = true
+      el.classList.add('salle-accueil--glisse')
+    }
+    g.o = Math.min(1, Math.max(0, g.o0 - dy / g.course))
+    el.style.setProperty('--ouverture', String(g.o))
+    // Vitesse (px/ms, vers le bas positive), amortie
+    const dt = Math.max(1, e.timeStamp - g.t)
+    g.vitesse = 0.7 * ((y - g.y) / dt) + 0.3 * g.vitesse
+    g.y = y
+    g.t = e.timeStamp
+  }
+  const fin = () => {
+    const g = geste.current
+    const el = section.current
+    geste.current = null
+    if (!g?.actif || !el) return
+    const ouvrir = g.vitesse < -0.35 ? true : g.vitesse > 0.35 ? false : g.o > 0.5
+    // La transition reprend là où le doigt a laissé le panneau
+    el.classList.remove('salle-accueil--glisse')
+    void el.offsetHeight
+    el.style.setProperty('--ouverture', ouvrir ? '1' : '0')
+    setDeplie(ouvrir)
+    setTimeout(() => el.style.removeProperty('--ouverture'), 0)
+  }
+  return { debut, mouvement, fin }
 }
 
 /**

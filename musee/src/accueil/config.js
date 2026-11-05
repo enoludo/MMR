@@ -115,7 +115,11 @@ export const CONFIG = {
   dragSensitivity: 0.007,
   rotationLerp: 0.08,
   autoRotateSpeed: 0.0009,
-  idleDelayMs: 1500,
+  // Pause après un geste (molette, glisser, flèches) avant que la rotation automatique ne reprenne
+  // (5 s depuis le 05/11, demande de Ludovic ; 1,5 s avant), puis reprise en douceur : la vitesse
+  // monte de 0 à `autoRotateSpeed` en `autoRotateRampMs` (touche M « Rotation de la spirale »)
+  idleDelayMs: 5000,
+  autoRotateRampMs: 2500,
 
   // Magnetic snap: once wheel/drag input has been quiet for this long, the
   // virtual scroll value jumps to the nearest card's exact centered

@@ -73,6 +73,7 @@ uniform float uAvance;    // m
 uniform vec2 uInvZ;       // 1 / zProche, 1 / zLoin
 uniform float uOpacite;
 uniform float uVignette;
+uniform float uMobile;   // 1 : voile du mobile (.salle-ui__degrade) au lieu de la vignette radiale
 uniform float uEclairage;
 uniform float uAvancePhoto; // m
 uniform float uTanPhoto;    // tan(champ vertical de la photo / 2)
@@ -101,6 +102,14 @@ vec3 vignette(vec3 couleur, vec2 b) {
     : r < 0.75 ? mix(a, m, (r - 0.5) / 0.25)
     : mix(m, vec4(0.0, 0.0, 0.0, 1.0), clamp((r - 0.75) / 0.25, 0.0, 1.0));
   return couleur * (1.0 - 0.5 * uVignette * (v.a - v.rgb));
+}
+
+// Mobile (maquette 520:1179) : voile de .salle-ui__degrade, rapporté à la boîte : noir à 50 % en
+// haut, noir en bas, transparent de 20 à 80 % de la hauteur
+vec3 degrade(vec3 couleur, vec2 b) {
+  float t = b.y * 0.5 + 0.5; // 0 en haut, 1 en bas
+  float a = clamp(max(0.5 * (1.0 - t / 0.2), (t - 0.8) / 0.2), 0.0, 1.0);
+  return couleur * (1.0 - uVignette * a);
 }
 
 // Distance dans l'axe, depuis une caméra avancée de « avance », de la première surface de la capture
@@ -182,7 +191,7 @@ void main() {
     vec3 lin = mix(couleur / 12.92, pow((couleur + 0.055) / 1.055, vec3(2.4)), step(0.04045, couleur)) * uEclairage;
     couleur = mix(lin * 12.92, 1.055 * pow(lin, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, lin));
   }
-  if (uVignette > 0.0) couleur = vignette(couleur, b);
+  if (uVignette > 0.0) couleur = uMobile > 0.5 ? degrade(couleur, b) : vignette(couleur, b);
   gl_FragColor = vec4(couleur * alpha, alpha);
 }
 `
@@ -351,6 +360,7 @@ export class ToileTransition {
         uInvZ: { value: new THREE.Vector2(1, 1 / 60) },
         uOpacite: { value: 1 },
         uVignette: { value: 0 },
+        uMobile: { value: 0 },
         uEclairage: { value: 1 },
         uAvancePhoto: { value: TRANSITION_DEFAUT.recul },
         uTanPhoto: { value: 1 },
@@ -422,6 +432,7 @@ export class ToileTransition {
     u.uInvZ.value.set(1 / r.zProche, 1 / r.zLoin)
     u.uOpacite.value = d.opacite
     u.uVignette.value = d.vignette
+    u.uMobile.value = window.matchMedia('(max-width: 760px)').matches ? 1 : 0
     u.uEclairage.value = d.eclairage
     // La photo est prise à la vue initiale (avancée du recul de la salle), avec la focale de la salle
     u.uAvancePhoto.value = d.recul
