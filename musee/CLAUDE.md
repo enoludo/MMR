@@ -1,7 +1,7 @@
 # CLAUDE.md — Musée des Maladies Rares (MMR), site 3D
 
 Contexte de travail pour Claude Code. À lire en entier au début de chaque session.
-Dernière mise à jour : 05/11/2026 (reprise sur un autre compte Claude : lire aussi `PASSATION.md`).
+Dernière mise à jour : 05/11/2026 au soir (avant de retravailler plusieurs sujets : lire aussi `PASSATION.md`).
 
 ## Interlocuteur et façon de travailler
 
@@ -98,6 +98,7 @@ Depuis Claude Code, lancer les scripts avec le Blender de l'application : `/Appl
 
 ## Points ouverts
 
+- **Pavillon de « Souffle d'éclats » (05/11), mis de côté (décision de Ludovic) :** tout le travail est sur la branche locale `salle-pavillon` (commit `f7f6606`), sur ce Mac seulement. Ne pas l'envoyer sur GitHub, la fusionner ni la mettre en ligne sans demande explicite de Ludovic. Détail et reprise : `PASSATION.md`.
 - **Vidéo au survol des vignettes de la grille (03/11), système à généraliser (demande de Ludovic), à voir avec lui :** Seuil et Huntington ; de l'image de la carte à la vue Maladie, à la durée du trajet réel de la visite, retour à l'envers deux fois plus vite à la sortie de la souris, et au clic pendant que la grille se range en spirale (le zoom l'attend ; `revenirEnSpirale`, `carteVivante.video`) (`<id>-survol.mp4` et `<id>-survol-retour.mp4`, `videosSurvol` dans `oeuvres.ts` ; `SpiralGallery.survoler`, `finSurvol` ; enregistrées par `__visite.capturerSurvol(id)` ou le bouton « Vidéo du survol » de la vue libre, outils/capture.ts ; à refaire si la salle, la lumière, la vue d'entrée ou la vue Maladie changent). Grille seulement pour l'instant (pas sur la spirale).
 - **Fluidité au clic depuis la grille (04/11), à voir avec Ludovic :** moteur de rendu des salles unique, préparation sans arrêt (voir « Moteur de rendu des salles ») ; pire image 50 à 60 ms sur le site construit. Non vérifié sur mobile ni Safari.
 - **Design des popups (03/11), première passe, à voir avec Ludovic :** deuxième passe d'après la maquette `502:770` (576 px, marge intérieure 72 px), popup à 96 px au moins des bords de l'écran, barre de défilement fine et fondu, œuvre décalée de 70 % seulement vers le milieu de l'espace libre (`PART_DECALAGE`, `Decentrage.tsx`). Suite : ce qui le gêne encore (voir `JOURNAL.md`) ; points de vue Maladie et Manifeste à revoir avec le nouveau décalage (touche V).

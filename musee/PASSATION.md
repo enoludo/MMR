@@ -1,56 +1,84 @@
-# Passation — reprise sur un autre compte Claude
+# Passation — avant de retravailler plusieurs sujets
 
-Rédigée le 05/11/2026 par Claude Code, avant que Ludovic ne continue le travail depuis un autre compte
-Claude (même Mac, même dossier). À lire après `CLAUDE.md` (contexte, décisions de Ludovic, architecture)
-et le haut de `JOURNAL.md` (détail de chaque changement, avec son statut). Remplace la passation « avant de
-reprendre le design des popups » (03/11), toujours lisible dans l'historique Git.
+Rédigée le 05/11/2026 au soir par Claude Code, à la demande de Ludovic (« on va retravailler plusieurs
+sujets »). À lire après `CLAUDE.md` (contexte, décisions de Ludovic, architecture) et le haut de
+`JOURNAL.md` (détail de chaque changement, avec son statut). Remplace la passation « reprise sur un autre
+compte Claude » (05/11 au matin), toujours lisible dans l'historique Git.
 
-Le nouveau compte n'a **ni l'historique des conversations ni la mémoire** de l'ancien : tout ce qu'il faut
-savoir est dans `CLAUDE.md`, `JOURNAL.md` et ce fichier. Rien d'autre n'a été convenu oralement.
+Une nouvelle session n'a **ni l'historique des conversations ni la mémoire** des précédentes : tout ce qu'il
+faut savoir est dans `CLAUDE.md`, `JOURNAL.md` et ce fichier.
 
 ---
 
-## 1. Où en est-on (05/11)
+## 1. Où en est-on (05/11 au soir)
 
-- **Git :** tout est enregistré sur la branche principale `claude/spirale-interactive-gallery-b4mzwd` et
-  envoyé sur GitHub (`enoludo/MMR`). La branche de travail `moteur-salle-unique` y est fusionnée ; l'état
-  d'avant ce chantier est sous l'étiquette `avant-moteur-unique` (`1afa89f`).
-- **En ligne :** le labo `mmr-lab` (https://mmr-lab.labs.cubedesigners.com/) a la dernière version (04/11).
-- **Accès GitHub :** par le trousseau du Mac (`credential.helper osxkeychain`), indépendant du compte
-  Claude. `gh` n'est pas installé. Un envoi a été refusé une fois sans raison le 04/11, passé au second essai.
+- **Branche principale** `claude/spirale-interactive-gallery-b4mzwd` : le site tel qu'il est en ligne sur le
+  labo (04/11), plus deux enregistrements locaux, **pas envoyés sur GitHub** : les fichiers bruts du pavillon
+  ignorés par Git (`.gitignore`) et cette passation. Les envoyer seulement à la demande de Ludovic.
+- **En ligne :** le labo `mmr-lab` (https://mmr-lab.labs.cubedesigners.com/) a la version du 04/11.
+- **Accès GitHub :** par le trousseau du Mac (`credential.helper osxkeychain`). `gh` n'est pas installé.
 
-**Fait du 03/11 au 04/11** (tout est « à voir » dans le journal, rien n'est « validé ») :
-1. Popups d'après la maquette `502:770` (576 px, marge 72 px, barre de défilement fine), contenu réel de
-   démo pour Huntington, bouton « En savoir plus » sans lien.
-2. Vidéo au survol des vignettes de la grille (Seuil, Huntington), retour à l'envers au rollout et au clic.
-3. Fluidité au clic depuis la grille : moteur de rendu des salles unique, préparation de la salle sans
-   arrêt (mesures dans le journal).
-4. Ordre des œuvres : Seuil, Huntington, puis les autres.
-5. Raccord de la transition vers le Seuil après les nouvelles captures de Ludovic.
-6. Grille d'après la maquette `477:1404`.
-7. Éclair au clic sur une vignette, vue d'arrivée fausse en cliquant une œuvre juste après un retour.
+### Le pavillon de « Souffle d'éclats » est mis de côté
 
-**Pas de demande en cours.** Demander à Ludovic ce qu'il veut faire ; s'il ne sait pas, lui proposer les
-points « à voir » ci-dessous.
+**Décision de Ludovic (05/11) :** « garde cette salle de côté. On poussera cette partie du travail quand je
+te le demanderai explicitement. »
 
-## 2. Points ouverts (détail dans `CLAUDE.md`, section « Points ouverts »)
+- Tout le travail du pavillon est enregistré sur la branche locale **`salle-pavillon`** (commit `f7f6606`),
+  **sur ce Mac seulement** : pas envoyée sur GitHub, pas fusionnée, pas en ligne. Ne pas l'envoyer, la
+  fusionner ni la mettre en ligne sans une demande explicite de Ludovic.
+- Sur la branche principale, « Souffle d'éclats » est revenue à son état d'avant : salle provisoire,
+  fermée à la visite, dernière de la collection.
+- Ce que contient la branche : salle (`blender/pavillon.py`, `src/salles/pavillon/config.ts`), plan coté
+  (`plans/salle-pavillon.html`), œuvre en verre (`blender/souffle.py`, `src/scene/OeuvreVerre.tsx` :
+  poumons de verre bleu à vraie réfraction, vaisseaux en verre rouge, l'œuvre flotte sans socle), quatre
+  projecteurs dans les angles de l'espace central, lumière calculée en qualité, petites adaptations de
+  `Salle.tsx`, `Couloir.tsx`, `types.ts`, `chaine.sh`, `oeuvres.ts` (salle ouverte, en troisième). Le
+  détail est dans le `JOURNAL.md` et le `CLAUDE.md` **de cette branche** (`git show
+  salle-pavillon:musee/JOURNAL.md`).
+- Reste à faire sur le pavillon (quand Ludovic le reprendra) : captures (transition, cartouches, vignette,
+  vidéos du survol), points de vue Maladie et Manifeste, lueur de l'œuvre dans la lumière précalculée, avis
+  de Ludovic sur l'œuvre et la lumière (tout est « à voir »). Mesurer la réfraction sur une machine plus
+  faible et sur mobile (60 images/s sur le Mac en 1280 × 720).
+- **Pour la reprendre :** `git switch salle-pavillon` (pour la regarder), ou, sur sa demande, la fusionner
+  dans la branche principale (`git merge salle-pavillon` depuis la branche principale). Si la branche
+  principale a changé entre-temps, des conflits sont possibles dans `Salle.tsx`, `Couloir.tsx`,
+  `oeuvres.ts`, `types.ts`, `CLAUDE.md` et `JOURNAL.md` : les résoudre en gardant les deux.
+- Les calculs de lumière bruts (`blender/salle-pavillon/*.exr`, ≈ 330 Mo) restent dans le dossier, hors
+  Git. Pour relancer les scripts, Pillow et scikit-image doivent être réinstallés avec le Python de Blender
+  (voir `CLAUDE.md`, « Chaîne 3D ») : les dossiers utilisés le 05/11 étaient temporaires.
 
-- À montrer à Ludovic et faire valider : grille et ses transitions, vidéo au survol, fluidité.
-- Matière de la statue de Huntington (Jeff), trop sombre de face.
-- Chiffres des popups Maladie à vérifier (Seuil : « 1/2M » et « ACVR1 » ne correspondent pas à
-  l'acromégalie ; Huntington : prévalence et « 0 »).
-- Recherche et filtres de la grille (affichés, pas reliés).
-- Rotonde : bruit de la lumière sur les colonnes, approche de la porte d'entrée.
-- Mobile et Safari jamais vérifiés depuis le 03/11 ; maquette mobile à demander.
-- Spirale : deux fois, titre affiché et œuvre visée par « Découvrir » ne concordaient pas (non reproduit).
-- Ménage : `~/MMR/_to_delete/`, `musee/_a_supprimer/`, les zips et « Claude outputs » à la racine de `MMR`.
+## 2. Sujets à retravailler
 
-## 3. Outils dont le nouveau compte a besoin
+**Pas de demande précise pour l'instant.** Demander à Ludovic par quoi il veut commencer. Les points ouverts
+de la branche principale (détail dans `CLAUDE.md`, « Points ouverts », et dans `JOURNAL.md`), tous
+« à voir » :
 
-- **Connecteur Fluidbook Toolbox** (outil `lab_upload_zip`) : sans lui, pas de mise en ligne sur le labo.
-  Ludovic doit l'ajouter au nouveau compte (réglages de Claude, Connecteurs). À défaut : SFTP (accès
-  donnés par `lab_get`), ou Vercel (`Mettre en ligne.command`).
-- **Figma** (plugin et connecteur) : pour lire les maquettes ; à reconnecter si les outils Figma manquent.
+1. **Popups des salles** (03/11) : deuxième passe d'après la maquette `502:770`, à reprendre selon ce qui le
+   gêne ; points de vue Maladie et Manifeste à recadrer avec le décalage de l'œuvre (touche V).
+2. **Grille de l'accueil** (01/11, 04/11) : transitions, vidéo au survol (Seuil, Huntington ; à généraliser
+   à toutes les œuvres, demande de Ludovic), recherche et filtres Tags / Mécènes affichés mais pas reliés,
+   étiquette « thème » absente des données.
+3. **Fluidité** au clic depuis la grille (04/11) : pire image 50 à 60 ms sur le site construit.
+4. **Statue de Huntington (Jeff)** : matière trop sombre de face, à contre-jour (touche M « Sculpture »).
+5. **Rotonde de Huntington** : bruit de la lumière sur les colonnes, approche de la porte d'entrée.
+6. **Salle de 40 m** (Seuil) : contraste, lames, couloirs et impasses ; vue d'arrivée, points de vue et
+   anneaux repris de la salle de 30 m.
+7. **Effets d'image** (31/10) : choisir entre tout garder (−25 à −35 % d'images/s) et AgX seul.
+8. **Transitions spirale ↔ salles** : durées, raccords, parallaxe, effet sur mobile.
+9. **Contenus** : chiffres des popups Maladie à vérifier (Seuil : « 1/2M » et « ACVR1 » ne correspondent
+   pas à l'acromégalie ; Huntington : prévalence et « 0 ») ; boutons « En savoir plus » sans lien.
+10. **Mobile et Safari** : jamais vérifiés depuis le 03/11 ; maquette mobile à demander.
+11. **Musique** : volume général, fondus, raccord des boucles.
+12. **Spirale** : deux fois, titre affiché et œuvre visée par « Découvrir » ne concordaient pas (non
+    reproduit).
+13. **Ménage** : `~/MMR/_to_delete/`, `musee/_a_supprimer/`, les zips et « Claude outputs » à la racine de
+    `MMR`, `plans/~ai-…tmp` (fichier temporaire d'Illustrator).
+
+## 3. Outils
+
+- **Connecteur Fluidbook Toolbox** (outil `lab_upload_zip`) : pour mettre en ligne sur le labo. À défaut :
+  SFTP (accès donnés par `lab_get`), ou Vercel (`Mettre en ligne.command`).
+- **Figma** (plugin et connecteur) : pour lire les maquettes (fichier `BV6AsWeLSbWpCA7AarJGdr`).
 - **Navigateur intégré** de l'application : serveur de dev par `preview_start` avec le nom `dev`
   (`.claude/launch.json`), aperçu du site construit avec le nom `apercu`. Il doit être **visible** : masqué,
   ou fenêtre de Claude réduite dans le Dock, il fige les animations.
@@ -71,6 +99,8 @@ points « à voir » ci-dessous.
    d'envoi ; y envoyer le zip par `curl -sS -F "file=@$S/labo.zip" "<adresse>"`.
 4. Vérifier : `curl -s https://mmr-lab.labs.cubedesigners.com/ | grep -o 'assets/index-[^"]*\.js'` doit
    donner le même nom que `dist/index.html` ; puis ouvrir le site et entrer dans une salle.
+
+Toujours mettre en ligne **depuis la branche principale** (sans le pavillon), sauf demande contraire.
 
 ## 5. Rappels pratiques
 

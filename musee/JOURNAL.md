@@ -11,6 +11,11 @@ Une entrée par session, la plus récente en haut. Le détail technique est dans
 
 ---
 
+## 05/11/2026 — Claude Code (pavillon mis de côté, passation)
+
+- **Pavillon de « Souffle d'éclats » mis de côté** (décision de Ludovic : « garde cette salle de côté. On poussera cette partie du travail quand je te le demanderai explicitement ») : tout le travail du 05/11 (salle, œuvre de verre à réfraction, lumière calculée en qualité, journal détaillé) est enregistré sur la branche locale `salle-pavillon` (`f7f6606`), non envoyée sur GitHub. La branche principale est revenue à l'état d'avant : « Souffle d'éclats » fermée, dans la salle provisoire. Fichiers bruts du pavillon ignorés par Git.
+- `PASSATION.md` réécrite avant de retravailler plusieurs sujets (état, branche du pavillon et comment la reprendre, sujets ouverts, mise en ligne) ; en-tête et points ouverts de `CLAUDE.md` mis à jour.
+
 ## 05/11/2026 — Claude Code (passation vers un autre compte Claude)
 
 - `PASSATION.md` réécrite pour la reprise sur un autre compte Claude (état au 05/11, points ouverts, connecteurs à rajouter, mise en ligne sur le labo pas à pas) ; en-tête et points ouverts de `CLAUDE.md` mis à jour.
