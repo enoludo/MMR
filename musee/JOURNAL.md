@@ -11,6 +11,10 @@ Une entrée par session, la plus récente en haut. Le détail technique est dans
 
 ---
 
+## 06/11/2026 — Claude Code (curseurs de la maquette)
+
+- **[à voir] Curseurs de la maquette « CursorComponent » 538:1465** (demande de Ludovic) : flèche partout, main sur tout ce qui se clique (boutons, liens, onglets, cartouches, vignettes de la grille, cartes de la spirale), loupe + sur l'œuvre quand un clic rapproche (cercle réduit), loupe − quand on y est déjà, flèches de déplacement pour tourner autour de l'œuvre en glissant (salle, popup ouvert compris) et pour faire tourner la spirale (main ouverte / fermée avant). Halo noir à 50 % et tracé blanc ombré de la maquette, assemblés dans `src/ui/curseurs/` (version double pour les écrans Retina, `image-set`) ; variables `--curseur`, `--curseur-clic`, `--curseur-zoom-avant`, `--curseur-zoom-arriere`, `--curseur-deplacer` (`style.css`) ; choix dans la salle : `curseur()` de `Navigation.tsx` (la loupe s'inverse dès le clic). Fichiers non intégrés à la feuille de style (`?no-inline` : leurs ombres ne marchaient plus en ligne). Vérifié dans le navigateur (planche des cinq curseurs, loupe + puis − au clic sur l'œuvre, déplacement ailleurs). Le curseur lui-même n'apparaît pas sur les captures : à regarder par Ludovic.
+
 ## 05/11/2026 (nuit) — Claude Code (mise en ligne, header mobile de l'accueil)
 
 - **[à voir] Icône du bouton « Partager cette œuvre »** remplacée par celle de la maquette 531:1401 (« Network Share », trois cercles reliés ; demande de Ludovic, 06/11) : `IconePartage`, `ui/icones.tsx`, 17 px dans la case de 20, texte à la même place. Ordinateur et mobile. Enregistré dans Git, envoyé sur GitHub (`6b13277`) et **mis en ligne sur le labo** (version du labo `e15529e`), à la demande de Ludovic.

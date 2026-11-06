@@ -255,7 +255,7 @@ export function Accueil() {
       const ancre = galerie.pickDragAnchor(e.clientX, e.clientY)
       const i = ancre && galerie.grille.cartes?.get(ancre.slot)
       const id = i !== undefined && i !== null ? cartesSpirale[i].id : null
-      toile.current!.style.cursor = id && salleOuverte(id) ? 'pointer' : ''
+      toile.current!.style.cursor = id && salleOuverte(id) ? 'var(--curseur-clic)' : ''
       if (id !== (survol?.id ?? null)) survol = id ? { id, depuis: performance.now() } : null
       // Vidéo de la vignette survolée à la souris (essai du 03/11 : seule « Le seuil » en a une)
       const video = vueGrille && e.pointerType === 'mouse' && !e.buttons && !store.get().transition && id && salleOuverte(id)

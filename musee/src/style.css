@@ -22,9 +22,34 @@
   /* Google Sans de la maquette = Google Sans Flex, sa version libre (OFL) */
   --texte: 'Google Sans Flex Variable', 'Google Sans', system-ui, sans-serif;
   color-scheme: dark;
+  /*
+   * Curseurs de la maquette (« CursorComponent » 538:1465, 06/11) : flèche, main (tout ce qui se clique),
+   * loupe + et loupe − (clic sur l'œuvre pour s'approcher ou s'éloigner, Navigation.tsx), flèches de
+   * déplacement (glisser pour tourner autour de l'œuvre, et la spirale). Halo noir à 50 % et tracé
+   * blanc ombré, assemblés dans src/ui/curseurs/ ; version double pour les écrans Retina.
+   */
+  --curseur: url('./ui/curseurs/defaut.svg?no-inline') 6 3, auto;
+  --curseur-clic: url('./ui/curseurs/clic.svg?no-inline') 11 3, pointer;
+  --curseur-zoom-avant: url('./ui/curseurs/zoom-avant.svg?no-inline') 11 9, zoom-in;
+  --curseur-zoom-arriere: url('./ui/curseurs/zoom-arriere.svg?no-inline') 11 9, zoom-out;
+  --curseur-deplacer: url('./ui/curseurs/deplacer.svg?no-inline') 13 11, move;
+}
+/* Écrans Retina : version double, là où le navigateur accepte image-set (background-image testé) */
+@supports (background-image: image-set(linear-gradient(#000, #000) 1x)) {
+  :root {
+    --curseur: image-set(url('./ui/curseurs/defaut.svg?no-inline') 1x, url('./ui/curseurs/defaut@2x.svg?no-inline') 2x) 6 3, auto;
+    --curseur-clic: image-set(url('./ui/curseurs/clic.svg?no-inline') 1x, url('./ui/curseurs/clic@2x.svg?no-inline') 2x) 11 3, pointer;
+    --curseur-zoom-avant: image-set(url('./ui/curseurs/zoom-avant.svg?no-inline') 1x, url('./ui/curseurs/zoom-avant@2x.svg?no-inline') 2x) 11 9, zoom-in;
+    --curseur-zoom-arriere: image-set(url('./ui/curseurs/zoom-arriere.svg?no-inline') 1x, url('./ui/curseurs/zoom-arriere@2x.svg?no-inline') 2x) 11 9, zoom-out;
+    --curseur-deplacer: image-set(url('./ui/curseurs/deplacer.svg?no-inline') 1x, url('./ui/curseurs/deplacer@2x.svg?no-inline') 2x) 13 11, move;
+  }
 }
 
 * { box-sizing: border-box; }
+/* Flèche partout ; la main sur tout ce qui se clique (les règles ci-dessous) ; texte dans les champs */
+html { cursor: var(--curseur); }
+a[href], button:not(:disabled), [role='tab'], label, select, summary { cursor: var(--curseur-clic); }
+input[type='text'], input[type='search'], input:not([type]), textarea { cursor: text; }
 html, body, #root { margin: 0; height: 100%; overflow: hidden; background: var(--fond); }
 /* Pas de carré bleu au toucher sur Android (Chrome mobile) ; le focus au clavier reste visible (:focus-visible) */
 html { -webkit-tap-highlight-color: transparent; }
@@ -37,7 +62,7 @@ button { font: inherit; color: inherit; }
 
 /* Bouton rond (son, menu, fermeture des popups) : « BurgerMenu » de la maquette */
 .bouton-rond {
-  appearance: none; border: 0; cursor: pointer;
+  appearance: none; border: 0; cursor: var(--curseur-clic);
   display: grid; place-items: center; flex: none;
   width: var(--haut); height: var(--haut); border-radius: var(--rayon);
   background: var(--verre); -webkit-backdrop-filter: var(--flou); backdrop-filter: var(--flou);
@@ -48,7 +73,7 @@ button { font: inherit; color: inherit; }
 
 /* Bouton pilule (retour, précédente, suivante, partager) */
 .pilule {
-  appearance: none; border: 0; cursor: pointer; text-decoration: none; white-space: nowrap;
+  appearance: none; border: 0; cursor: var(--curseur-clic); text-decoration: none; white-space: nowrap;
   display: inline-flex; align-items: center; gap: 10px;
   height: var(--haut); padding: 0 24px 0 22px; border-radius: var(--rayon);
   background: var(--verre); -webkit-backdrop-filter: var(--flou); backdrop-filter: var(--flou);
@@ -69,7 +94,7 @@ button { font: inherit; color: inherit; }
   background: var(--verre); -webkit-backdrop-filter: var(--flou); backdrop-filter: var(--flou);
 }
 .onglets__onglet {
-  appearance: none; border: 0; cursor: pointer; background: transparent;
+  appearance: none; border: 0; cursor: var(--curseur-clic); background: transparent;
   height: 40px; padding: 0 16px; border-radius: 20px; font-size: 14px;
   transition: background-color 0.25s ease;
 }
@@ -110,8 +135,7 @@ button { font: inherit; color: inherit; }
 /* En absolu, pas en fixe : pas de contexte d'empilement, le header et le titre passent au-dessus
    de l'image des transitions (z-index 5), comme dans les salles */
 .accueil { position: absolute; inset: 0; background: var(--fond); }
-.accueil__toile { position: fixed; inset: 0; touch-action: none; cursor: grab; }
-.accueil__toile:active { cursor: grabbing; }
+.accueil__toile { position: fixed; inset: 0; touch-action: none; cursor: var(--curseur-deplacer); }
 /* Flèches précédente / suivante (bloc Figma « SliderControls ») */
 .accueil__fleches {
   position: fixed; z-index: 20; left: 50%; bottom: var(--marge); transform: translateX(-50%);
@@ -149,14 +173,14 @@ button { font: inherit; color: inherit; }
 .accueil__cta:hover { background: #ececec; }
 /* Salle fermée à la visite (oeuvres.ts, 02/11) : « Découvrir » reste, désactivé (verre, texte estompé) */
 .accueil__cta--fermee, .accueil__cta--fermee:hover {
-  background: var(--verre); color: rgba(255, 255, 255, 0.5); cursor: default;
+  background: var(--verre); color: rgba(255, 255, 255, 0.5); cursor: var(--curseur);
   -webkit-backdrop-filter: var(--flou); backdrop-filter: var(--flou);
 }
 
 /* Vue Grille (gallery/Grille.js, maquette Figma 58:207) : les cartes 3D se rangent en grille, leurs
    titres et étiquettes (HTML) se posent dessous ; flèches et bouton « Découvrir » de la spirale retirés */
 .accueil--grille .accueil__cta { pointer-events: none; }
-.accueil--grille .accueil__toile, .accueil--grille .accueil__toile:active { cursor: default; }
+.accueil--grille .accueil__toile, .accueil--grille .accueil__toile:active { cursor: var(--curseur); }
 .grille { position: fixed; inset: 0; z-index: 10; pointer-events: none; overflow: hidden; visibility: hidden; }
 .grille--active { visibility: visible; }
 .accueil--transition .grille { opacity: 0; transition: opacity 0.3s ease; }
@@ -167,7 +191,7 @@ button { font: inherit; color: inherit; }
   padding: 0 24px; text-align: center;
   color: #fff; text-decoration: none; pointer-events: auto; will-change: transform, opacity;
 }
-.grille__legende--fermee { cursor: default; }
+.grille__legende--fermee { cursor: var(--curseur); }
 .grille__titre {
   margin: 0; font-family: var(--titre); font-weight: 400; font-size: 24px; line-height: 26px;
   letter-spacing: 0.05em; text-transform: uppercase;
@@ -194,7 +218,7 @@ button { font: inherit; color: inherit; }
 .masque--champ { flex: 0 1 auto; }
 .recherche__champ, .recherche__filtre {
   display: flex; align-items: center; flex: none; height: var(--haut); padding: 0 12px 0 24px;
-  border-radius: var(--rayon); border: 0; cursor: pointer;
+  border-radius: var(--rayon); border: 0; cursor: var(--curseur-clic);
   background: var(--verre); -webkit-backdrop-filter: var(--flou); backdrop-filter: var(--flou);
   font-size: 14px; line-height: 1; white-space: nowrap;
   transition: background-color 0.2s ease;
@@ -282,7 +306,7 @@ button { font: inherit; color: inherit; }
 /* Cartouches Maladie et Manifeste (photo, libellé, titre), qui ouvrent les popups */
 .salle-accueil__cartouches { display: flex; gap: 12px; } /* 6 px sur la maquette, 12 à la demande de Ludovic */
 .cartouche {
-  appearance: none; border: 0; cursor: pointer; text-align: left;
+  appearance: none; border: 0; cursor: var(--curseur-clic); text-align: left;
   position: relative; isolation: isolate; overflow: hidden; flex: none;
   width: 192px; height: 192px; padding: 24px; border-radius: 12px; background: #000;
   display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start;
@@ -370,7 +394,7 @@ button { font: inherit; color: inherit; }
    (zone de prise de 24 px). Visible seulement quand le contenu défile. */
 .popup__barre {
   position: absolute; top: var(--marge-p); bottom: var(--marge-p); right: 24px; width: 24px;
-  cursor: pointer; touch-action: none; opacity: 0; visibility: hidden;
+  cursor: var(--curseur-clic); touch-action: none; opacity: 0; visibility: hidden;
   transition: opacity 0.4s ease, visibility 0s 0.4s;
 }
 .popup--defile .popup__barre { opacity: 1; visibility: visible; transition: opacity 0.6s ease 0.8s, visibility 0s; }
@@ -431,7 +455,7 @@ button { font: inherit; color: inherit; }
 .pied { position: fixed; z-index: 10; left: 50%; bottom: var(--marge); }
 .fleche {
   --ouverture: 0.55s cubic-bezier(.2,.7,.2,1);
-  appearance: none; border: 0; padding: 0; cursor: pointer;
+  appearance: none; border: 0; padding: 0; cursor: var(--curseur-clic);
   position: absolute; bottom: 0; isolation: isolate; overflow: hidden;
   width: var(--haut); height: var(--haut); border-radius: var(--rayon);
   background: var(--verre); -webkit-backdrop-filter: var(--flou); backdrop-filter: var(--flou);
@@ -484,7 +508,7 @@ button { font: inherit; color: inherit; }
   .fleche--suivante:not(.fleche--fermee):is(:hover, :focus-visible) .fleche__texte { margin-right: 12px; }
   .fleche--precedente:not(.fleche--fermee):is(:hover, :focus-visible) .fleche__texte { margin-left: 12px; }
 }
-.fleche:disabled { cursor: default; }
+.fleche:disabled { cursor: var(--curseur); }
 /* Salle fermée à la visite (oeuvres.ts, 02/11) : la flèche reste, estompée, et ne s'ouvre plus */
 .fleche--fermee { opacity: 0.35; }
 /* Pendant le passage par le couloir, le premier écran part élément par élément (useApparition,
@@ -592,13 +616,13 @@ button { font: inherit; color: inherit; }
   /* Poignée : trait de 40 × 4 px à 12 px du haut, dans une zone de toucher plus large */
   .salle-accueil__poignee {
     display: block; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
-    width: 120px; height: 32px; padding: 0; border: 0; background: transparent; cursor: pointer;
+    width: 120px; height: 32px; padding: 0; border: 0; background: transparent; cursor: var(--curseur-clic);
   }
   .salle-accueil__poignee::before {
     content: ''; position: absolute; top: 12px; left: 40px; width: 40px; height: 4px;
     border-radius: 4px; background: rgba(255, 255, 255, 0.2);
   }
-  .salle-accueil__titre { font-size: 30px; line-height: 30px; cursor: pointer; text-wrap: balance; }
+  .salle-accueil__titre { font-size: 30px; line-height: 30px; cursor: var(--curseur-clic); text-wrap: balance; }
 
   /* Replié : le panneau entier glisse vers le bas et ne laisse voir que son en-tête (poignée, titre)
      et 56 px dessous, occupés par les boutons du bas (--h-replie, mesurée par useFeuille) ; ses blocs
@@ -747,12 +771,12 @@ html.vue-libre .salle-ui > :not(.salle-ui__vignette) { display: none; }
 .vue-libre__ligne span { flex: 1; display: flex; flex-direction: column; }
 .vue-libre__ligne small { color: rgba(255, 255, 255, .55); }
 .vue-libre button {
-  font: inherit; color: #fff; padding: 6px 12px; border-radius: 999px; cursor: pointer;
+  font: inherit; color: #fff; padding: 6px 12px; border-radius: 999px; cursor: var(--curseur-clic);
   border: 1px solid rgba(255, 255, 255, .3); background: rgba(255, 255, 255, .08);
 }
 .vue-libre button.vue-libre__principal { background: #d93e34; border-color: #d93e34; }
-.vue-libre__case { display: flex; gap: 8px; align-items: center; margin: 10px 0; cursor: pointer; }
-.vue-libre__flou { display: flex; gap: 4px; align-items: center; cursor: pointer; color: rgba(255, 255, 255, .8); }
+.vue-libre__case { display: flex; gap: 8px; align-items: center; margin: 10px 0; cursor: var(--curseur-clic); }
+.vue-libre__flou { display: flex; gap: 4px; align-items: center; cursor: var(--curseur-clic); color: rgba(255, 255, 255, .8); }
 .vue-libre__reglages { display: flex; flex-direction: column; gap: 4px; padding: 0 0 8px 12px; }
 .vue-libre__reglages label { display: grid; grid-template-columns: 1fr 120px 36px; gap: 8px; align-items: center; color: rgba(255, 255, 255, .8); }
 .vue-libre__reglages output { text-align: right; font-variant-numeric: tabular-nums; }

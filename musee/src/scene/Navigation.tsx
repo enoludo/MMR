@@ -568,7 +568,7 @@ export function Navigation({
       prise.distance += Math.abs(dx)
       if (!prise.glisse && prise.distance >= SEUIL_GLISSER) {
         prise.glisse = true
-        canvas.style.cursor = 'grabbing'
+        canvas.style.cursor = 'var(--curseur-deplacer)'
       }
       const s = n.current
       if (s.mode !== 'cercle' && s.mode !== 'etape') return
@@ -579,7 +579,7 @@ export function Navigation({
       if (prise.glisse) {
         ignorerClic = true
         setTimeout(() => (ignorerClic = false)) // le clic, s'il vient, suit aussitôt le relâchement
-        canvas.style.cursor = ''
+        canvas.style.cursor = curseur(e.clientX, e.clientY)
       }
       prise = null
     }
@@ -619,7 +619,10 @@ export function Navigation({
     }
     const relacher = (e: PointerEvent) => {
       if (store.get().libre) return void (appui = null)
-      if (appui && Math.hypot(e.clientX - appui.x, e.clientY - appui.y) < SEUIL_GLISSER && !prise?.glisse) cliquer(e.clientX, e.clientY)
+      if (appui && Math.hypot(e.clientX - appui.x, e.clientY - appui.y) < SEUIL_GLISSER && !prise?.glisse) {
+        cliquer(e.clientX, e.clientY)
+        if (e.pointerType === 'mouse') canvas.style.cursor = curseur(e.clientX, e.clientY) // la loupe s'inverse aussitôt
+      }
       appui = null
     }
     let dernierSurvol = 0
@@ -627,9 +630,15 @@ export function Navigation({
       if (e.pointerType !== 'mouse' || e.timeStamp - dernierSurvol < 80) return
       dernierSurvol = e.timeStamp
       if (prise?.glisse) return
-      const mode = n.current.mode
-      canvas.style.cursor =
-        mode === 'cercle' && surLOeuvre(e.clientX, e.clientY) ? 'pointer' : mode === 'cercle' || mode === 'etape' ? 'grab' : ''
+      canvas.style.cursor = curseur(e.clientX, e.clientY)
+    }
+    // Curseurs de la maquette (style.css, --curseur-…) : sur l'œuvre, la loupe + si un clic rapproche
+    // (cercle réduit), la loupe − si l'on y est déjà ; ailleurs, les flèches de déplacement (glisser
+    // pour tourner autour de l'œuvre)
+    const curseur = (x: number, y: number) => {
+      const s = n.current
+      if (s.mode === 'cercle' && surLOeuvre(x, y)) return s.anneau === 'pres' ? 'var(--curseur-zoom-arriere)' : 'var(--curseur-zoom-avant)'
+      return s.mode === 'cercle' || s.mode === 'etape' ? 'var(--curseur-deplacer)' : ''
     }
 
     const clavier = (e: KeyboardEvent) => {
