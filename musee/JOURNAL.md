@@ -11,6 +11,11 @@ Une entrée par session, la plus récente en haut. Le détail technique est dans
 
 ---
 
+## 06/11/2026 (soir) — Claude Code (passation : reprise du pavillon)
+
+- Réponses à Ludovic, sans changement du site : ce que regroupe « effets actifs » (courbe de couleurs, halo, SMAA, grain, profondeur de champ, suréchantillonnage ; le reflet, la poussière, le faisceau, les ombres en direct et le grain de la pierre n'en font pas partie) ; le halo est un effet d'image (lueur autour des zones les plus claires), pas la lumière des fentes, qui est précalculée et ne coûte rien. Mesurer le coût de chaque effet pour une échelle des renoncements plus fine : mis de côté par Ludovic.
+- **Passation** (demande de Ludovic, qui reprend le pavillon de « Souffle d'éclats » avec un GLB de l'œuvre préparé par son collègue, puis les lumières et la salle) : `PASSATION.md` réécrit (état de la branche `salle-pavillon`, fusion de la branche principale à faire d'abord, intégration du GLB pas à pas, leviers de la lumière). GLB du collègue arrivé pendant la passation (`musee/poumons.glb`, 20,6 Mo) : examiné seulement (3ds Max, en mm, 3,86 × 4,02 m, deux maillages texturés en 4096 px, transparents), rien d'intégré.
+
 ## 06/11/2026 — Claude Code (réglages de Ludovic)
 
 - **[à voir] Réglages de Ludovic reportés** (copiés à la touche M, enregistrés dans `src/salles/reglages.json`). Huntington : lumière de la sculpture (soleil 0,9 → 0,38, ambiance 1,63 → 1,82), occlusion, lueur du socle beaucoup plus discrète (ruban 6 → 1,8), faisceau (0,006 → 0,056), poussière (plus fine et plus brillante), salle (exposition 5 → 6, lumière 1,3 → 0,5, voile 0,07), reflet au sol plus fort et plus long, couloir (fentes plus basses et moins lumineuses), halo 0,35 et grain 0,08. Le géant : lumière de la sculpture (0,77 / 0,68), faisceau 0,014, poussière plus brillante, grain, **reflet au sol à 1** (0,16 avant), seuil du halo 1,35, couloir (soleil 0,81, **une seule fente** au lieu de six). Nouveau réglage « glisser » à 1,5 dans les deux salles.

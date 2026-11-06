@@ -1,7 +1,7 @@
 # CLAUDE.md — Musée des Maladies Rares (MMR), site 3D
 
 Contexte de travail pour Claude Code. À lire en entier au début de chaque session.
-Dernière mise à jour : 05/11/2026 en fin de soirée, passation vers un autre compte Claude (lire aussi `PASSATION.md`).
+Dernière mise à jour : 06/11/2026 au soir, passation pour la reprise du pavillon de « Souffle d'éclats » (lire aussi `PASSATION.md`).
 
 ## Interlocuteur et façon de travailler
 
@@ -101,7 +101,8 @@ Depuis Claude Code, lancer les scripts avec le Blender de l'application : `/Appl
 
 - **Anticrénelage (05/11) :** ×4 choisi par Ludovic (06/11, avec ses réglages des deux salles dans `reglages.json`) ; coût sur M1 : 30 → 22 / 16 / 10 images/s à ×1 / ×2 / ×4 / ×6, compensé par une résolution plus basse (test de la machine). Captures des deux salles à refaire avec les nouveaux réglages.
 - **Ombres précalculées (05/11), à voir avec Ludovic :** Seuil et Huntington recalculés à 2048 échantillons, lignes dans les ombres corrigées (`masque.py`). Captures des deux salles refaites (05/11). Aussi faits le 05/11, à voir : pause de 5 s et reprise douce de la spirale, cliquer-glisser dans les salles, carré bleu au toucher sur Android (non essayé sur un vrai téléphone).
-- **Pavillon de « Souffle d'éclats » (05/11), mis de côté (décision de Ludovic) :** tout le travail est sur la branche locale `salle-pavillon` (commit `f7f6606`), sur ce Mac seulement. Ne pas l'envoyer sur GitHub, la fusionner ni la mettre en ligne sans demande explicite de Ludovic. Détail et reprise : `PASSATION.md`.
+- **Pavillon de « Souffle d'éclats » (05/11), repris à partir du 06/11 (demande de Ludovic) :** tout le travail est sur la branche locale `salle-pavillon` (commit `f7f6606`), sur ce Mac seulement, 19 enregistrements en retard sur la branche principale (à fusionner d'abord dans la branche du pavillon). Ne pas l'envoyer sur GitHub, la fusionner dans la branche principale ni la mettre en ligne sans demande explicite de Ludovic. Prochaines étapes de Ludovic : remplacer l'œuvre par le GLB préparé par son collègue, puis travailler les lumières et quelques ajustements de la salle. Détail et reprise : `PASSATION.md`.
+- **Échelle des renoncements plus fine (06/11), mise de côté par Ludovic :** mesurer le coût de chaque effet (faisceau, halo, SMAA, grain, courbe, reflet, poussière, ombres en direct) avant de redécouper l'échelle.
 - **Vidéo au survol des vignettes de la grille (03/11), système à généraliser (demande de Ludovic), à voir avec lui :** Seuil et Huntington ; de l'image de la carte à la vue Maladie, à la durée du trajet réel de la visite, retour à l'envers deux fois plus vite à la sortie de la souris, et au clic pendant que la grille se range en spirale (le zoom l'attend ; `revenirEnSpirale`, `carteVivante.video`) (`<id>-survol.mp4` et `<id>-survol-retour.mp4`, `videosSurvol` dans `oeuvres.ts` ; `SpiralGallery.survoler`, `finSurvol` ; enregistrées par `__visite.capturerSurvol(id)` ou le bouton « Vidéo du survol » de la vue libre, outils/capture.ts ; à refaire si la salle, la lumière, la vue d'entrée ou la vue Maladie changent). Grille seulement pour l'instant (pas sur la spirale).
 - **Ombres précalculées réglables (06/11), à voir avec Ludovic :** « toutes les ombres » et « ombre de la statue » (touche M « Salle · <salle> ») ; valeurs à enregistrer par Ludovic. Panneau des arbitrages de la résolution (touche M), à voir avec lui.
 - **Test invisible des performances (06/11), à voir avec Ludovic :** résolution de départ et plancher selon la machine, sécurité des 30 images/s (`performances.ts`, `resolution.ts`). Mesure bruitée sur une machine chargée ; non essayé ailleurs que sur le M1 (à essayer sur un PC modeste et un téléphone).
