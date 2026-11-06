@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { Leva } from 'leva'
 import { CopieReglages } from './ui/CopieReglages'
+import { Fps } from './ui/Fps'
 import '@fontsource-variable/google-sans-flex/wght.css'
 import { Accueil } from './accueil/Accueil'
 import { APropos } from './pages/APropos'
@@ -12,7 +13,10 @@ import { Intro } from './ui/Intro'
 import { prevoir } from './chargement'
 import { salleOuverte } from './oeuvres'
 import { store, useEtat } from './store'
-import { moteurSalles } from './scene/moteurSalles'
+import { moteurLibre, moteurSalles } from './scene/moteurSalles'
+import { departMachine, testerMachine } from './performances'
+import { arbitrages } from './resolution'
+import { Arbitrages } from './ui/Arbitrages'
 import './style.css'
 
 // La salle 3D (React Three Fiber) n'est chargée qu'en entrant dans une œuvre
@@ -29,7 +33,15 @@ if (salleDemandee && !salleOuverte(decodeURIComponent(salleDemandee))) window.hi
 if (window.location.pathname.startsWith('/oeuvre/')) prevoir('salle', 6)
 // Le moteur de rendu des salles est créé pendant l'écran d'accueil, où son arrêt (≈ 0,13 s) ne se
 // voit pas, plutôt qu'à l'entrée dans la première salle (scene/moteurSalles.ts)
-setTimeout(moteurSalles, 300)
+// Puis test invisible de la carte graphique (performances.ts) : il donne la résolution de départ des salles
+setTimeout(() => {
+  const moteur = moteurSalles()
+  testerMachine(moteur)?.then(() => {
+    // Agrandi ou réduit maintenant, pendant l'écran d'accueil, plutôt qu'à l'entrée dans la salle
+    const ratio = departMachine().ratio
+    if (arbitrages.actifs && moteurLibre() && moteur.getPixelRatio() !== ratio) moteur.setPixelRatio(ratio)
+  })
+}, 300)
 
 function App() {
   const dev = useEtat((e) => e.dev)
@@ -103,8 +115,16 @@ function App() {
 
   return (
     <>
-      <Leva hidden={!dev} collapsed={false} titleBar={{ title: 'Réglages (M)' }} />
+      <Leva
+        hidden={!dev}
+        collapsed={false}
+        titleBar={{ title: 'Réglages (M)' }}
+        // Panneau élargi (05/11, demande de Ludovic : intitulés coupés) : 280 px de large par défaut
+        theme={{ sizes: { rootWidth: '580px', controlWidth: '200px' } }}
+      />
       {dev && <CopieReglages />}
+      {dev && <Fps />}
+      {dev && <Arbitrages />}
       {(pathname === '/' || zoomVersSalle || retourVersSpirale) && <Accueil />}
       <Suspense fallback={null}>
         {idSalle && <PageOeuvre key={visite.n} id={idSalle} />}

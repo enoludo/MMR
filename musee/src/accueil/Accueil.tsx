@@ -103,6 +103,14 @@ export function Accueil() {
     ...boutonCopier('Titres de la spirale'),
     delaiEntree: { value: reglagesTitres.delaiEntree, min: 0, max: 0.6, step: 0.01, label: 'entrée du titre suivant (s après le départ)' },
   }).delaiEntree
+  // Touche M : pause et reprise de la rotation automatique après un geste (gallery/VirtualScroll.js)
+  const rotation = useControls('Rotation de la spirale', {
+    ...boutonCopier('Rotation de la spirale'),
+    pause: { value: CONFIG.idleDelayMs / 1000, min: 0, max: 15, step: 0.1, label: 'pause après un geste (s)' },
+    reprise: { value: CONFIG.autoRotateRampMs / 1000, min: 0, max: 8, step: 0.1, label: 'durée de la reprise (s)' },
+  })
+  CONFIG.idleDelayMs = rotation.pause * 1000
+  CONFIG.autoRotateRampMs = rotation.reprise * 1000
   // Touche M : la grille (gallery/Grille.js)
   Object.assign(
     reglagesGrille,
@@ -247,7 +255,7 @@ export function Accueil() {
       const ancre = galerie.pickDragAnchor(e.clientX, e.clientY)
       const i = ancre && galerie.grille.cartes?.get(ancre.slot)
       const id = i !== undefined && i !== null ? cartesSpirale[i].id : null
-      toile.current!.style.cursor = id && salleOuverte(id) ? 'pointer' : ''
+      toile.current!.style.cursor = id && salleOuverte(id) ? 'var(--curseur-clic)' : ''
       if (id !== (survol?.id ?? null)) survol = id ? { id, depuis: performance.now() } : null
       // Vidéo de la vignette survolée à la souris (essai du 03/11 : seule « Le seuil » en a une)
       const video = vueGrille && e.pointerType === 'mouse' && !e.buttons && !store.get().transition && id && salleOuverte(id)

@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { UniformsReflet } from './pierre'
+import { surEchantillonnage } from './Effets'
 
 /** Calque réservé à ce qui se reflète au sol (la sculpture et ses lumières). */
 export const CALQUE_REFLET = 1
@@ -162,7 +163,8 @@ export function PasseReflet({
     const w = Math.max(1, Math.round(taille.x / 2))
     const h = Math.max(1, Math.round(taille.y / 2))
     if (cible.width !== w || cible.height !== h) cible.setSize(w, h)
-    uSol.uResolution.value.copy(taille)
+    // Taille de la scène dessinée (plus grande avec le suréchantillonnage : le reflet est lu au pixel)
+    uSol.uResolution.value.copy(taille).multiplyScalar(surEchantillonnage.echelle)
     uSol.uTexelReflet.value.set(1 / w, 1 / h)
 
     // Caméra symétrique (même projection : un point reflété tombe au même pixel)

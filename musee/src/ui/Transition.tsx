@@ -5,7 +5,7 @@ import { useControls } from 'leva'
 import { lienOeuvre, oeuvres } from '../oeuvres'
 import { store, useEtat, type Cadre, type Transition as EtatTransition } from '../store'
 import { captureSalle, carteVivante } from '../transition'
-import { avancee, champEntree, entree, partVisible, reglagesTransition, temps } from '../entree'
+import { avancee, champEntree, decentrage, entree, partVisible, reglagesTransition, temps } from '../entree'
 import type { SalleConfig } from '../salles/types'
 import { boutonCopier, dossierSalle } from '../reglages'
 import { obtenirToile, prechargerImages, reglagesCapture } from './ToileTransition'
@@ -261,6 +261,10 @@ export function Transition() {
         // La vignette sombre de la salle (absente des captures et de la photo) s'installe à mesure
         // que la carte gagne l'écran, et s'en va pendant qu'elle s'y réduit : ni saut, ni voile sur la carte
         vignette: t.sens === 'entree' ? lisse(0.3, 1, a.zoom) : 1 - lisse(0, 0.7, a.zoom),
+        // Mobile : la salle est remontée au-dessus du panneau du bas (Decentrage) ; l'image l'est
+        // d'autant quand elle occupe l'écran, pas dans la carte de la spirale
+        decalage: ((2 * decentrage.y) / plein.hauteur) * (t.sens === 'entree' ? a.zoom : 1 - a.zoom),
+        decalagePhoto: (2 * decentrage.y) / plein.hauteur,
         // De même, l'image prend l'éclairage de la carte de la spirale (plus sombre) quand elle est
         // à sa place, et le perd en gagnant l'écran : pas de voile qui saute au clic ni au fondu
         eclairage: gsap.utils.interpolate(
@@ -310,8 +314,8 @@ export function ReglagesTransitionSalle({ config }: { config: SalleConfig }) {
     finSalle: { value: rt.finSalle, min: 0.5, max: 5, step: 0.05, label: 'entrée : fin dans la salle (s)' },
     zoomSortie: { value: rt.zoomSortie, min: 0.3, max: 4, step: 0.05, label: 'retour : réduction (s)' },
     fonduSortie: { value: rt.fonduSortie, min: 0.1, max: 2, step: 0.05, label: 'retour : fondu sur la carte (s)' },
-    recul: { value: rt.recul, min: 0, max: 6, step: 0.05, label: 'recul de la vue d’entrée (m, refaire la capture)' },
-    champEnPlus: { value: rt.champEnPlus, min: 0, max: 30, step: 0.5, label: 'champ en plus à l’entrée (°, refaire la capture)' },
+    recul: { value: rt.recul, min: 0, max: 6, step: 0.05, label: 'recul à l’entrée (m, recapturer)' },
+    champEnPlus: { value: rt.champEnPlus, min: 0, max: 30, step: 0.5, label: 'champ en plus à l’entrée (°, recapturer)' },
     regard: { value: rt.regard, min: 0, max: 1, step: 0.01, label: 'regard de la vue initiale (0 bas → 1 haut)' },
     zoomCarte: { value: rt.zoomCarte, min: 1, max: 3, step: 0.05, label: 'agrandissement dans la carte (au rechargement)' },
   })

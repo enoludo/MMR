@@ -22,10 +22,37 @@
   /* Google Sans de la maquette = Google Sans Flex, sa version libre (OFL) */
   --texte: 'Google Sans Flex Variable', 'Google Sans', system-ui, sans-serif;
   color-scheme: dark;
+  /*
+   * Curseurs de la maquette (« CursorComponent » 538:1465, 06/11) : flèche, main (tout ce qui se clique),
+   * loupe + et loupe − (clic sur l'œuvre pour s'approcher ou s'éloigner, Navigation.tsx), flèches de
+   * déplacement (glisser pour tourner autour de l'œuvre, et la spirale). Halo noir à 50 % et tracé
+   * blanc ombré, assemblés dans src/ui/curseurs/ ; version double pour les écrans Retina.
+   */
+  --curseur: url('./ui/curseurs/defaut.svg?no-inline') 6 3, auto;
+  --curseur-clic: url('./ui/curseurs/clic.svg?no-inline') 11 3, pointer;
+  --curseur-zoom-avant: url('./ui/curseurs/zoom-avant.svg?no-inline') 11 9, zoom-in;
+  --curseur-zoom-arriere: url('./ui/curseurs/zoom-arriere.svg?no-inline') 11 9, zoom-out;
+  --curseur-deplacer: url('./ui/curseurs/deplacer.svg?no-inline') 13 11, move;
+}
+/* Écrans Retina : version double, là où le navigateur accepte image-set (background-image testé) */
+@supports (background-image: image-set(linear-gradient(#000, #000) 1x)) {
+  :root {
+    --curseur: image-set(url('./ui/curseurs/defaut.svg?no-inline') 1x, url('./ui/curseurs/defaut@2x.svg?no-inline') 2x) 6 3, auto;
+    --curseur-clic: image-set(url('./ui/curseurs/clic.svg?no-inline') 1x, url('./ui/curseurs/clic@2x.svg?no-inline') 2x) 11 3, pointer;
+    --curseur-zoom-avant: image-set(url('./ui/curseurs/zoom-avant.svg?no-inline') 1x, url('./ui/curseurs/zoom-avant@2x.svg?no-inline') 2x) 11 9, zoom-in;
+    --curseur-zoom-arriere: image-set(url('./ui/curseurs/zoom-arriere.svg?no-inline') 1x, url('./ui/curseurs/zoom-arriere@2x.svg?no-inline') 2x) 11 9, zoom-out;
+    --curseur-deplacer: image-set(url('./ui/curseurs/deplacer.svg?no-inline') 1x, url('./ui/curseurs/deplacer@2x.svg?no-inline') 2x) 13 11, move;
+  }
 }
 
 * { box-sizing: border-box; }
+/* Flèche partout ; la main sur tout ce qui se clique (les règles ci-dessous) ; texte dans les champs */
+html { cursor: var(--curseur); }
+a[href], button:not(:disabled), [role='tab'], label, select, summary { cursor: var(--curseur-clic); }
+input[type='text'], input[type='search'], input:not([type]), textarea { cursor: text; }
 html, body, #root { margin: 0; height: 100%; overflow: hidden; background: var(--fond); }
+/* Pas de carré bleu au toucher sur Android (Chrome mobile) ; le focus au clavier reste visible (:focus-visible) */
+html { -webkit-tap-highlight-color: transparent; }
 body { color: var(--encre); font-family: var(--texte); -webkit-font-smoothing: antialiased; }
 a { color: inherit; }
 button { font: inherit; color: inherit; }
@@ -35,7 +62,7 @@ button { font: inherit; color: inherit; }
 
 /* Bouton rond (son, menu, fermeture des popups) : « BurgerMenu » de la maquette */
 .bouton-rond {
-  appearance: none; border: 0; cursor: pointer;
+  appearance: none; border: 0; cursor: var(--curseur-clic);
   display: grid; place-items: center; flex: none;
   width: var(--haut); height: var(--haut); border-radius: var(--rayon);
   background: var(--verre); -webkit-backdrop-filter: var(--flou); backdrop-filter: var(--flou);
@@ -46,7 +73,7 @@ button { font: inherit; color: inherit; }
 
 /* Bouton pilule (retour, précédente, suivante, partager) */
 .pilule {
-  appearance: none; border: 0; cursor: pointer; text-decoration: none; white-space: nowrap;
+  appearance: none; border: 0; cursor: var(--curseur-clic); text-decoration: none; white-space: nowrap;
   display: inline-flex; align-items: center; gap: 10px;
   height: var(--haut); padding: 0 24px 0 22px; border-radius: var(--rayon);
   background: var(--verre); -webkit-backdrop-filter: var(--flou); backdrop-filter: var(--flou);
@@ -67,7 +94,7 @@ button { font: inherit; color: inherit; }
   background: var(--verre); -webkit-backdrop-filter: var(--flou); backdrop-filter: var(--flou);
 }
 .onglets__onglet {
-  appearance: none; border: 0; cursor: pointer; background: transparent;
+  appearance: none; border: 0; cursor: var(--curseur-clic); background: transparent;
   height: 40px; padding: 0 16px; border-radius: 20px; font-size: 14px;
   transition: background-color 0.25s ease;
 }
@@ -108,8 +135,7 @@ button { font: inherit; color: inherit; }
 /* En absolu, pas en fixe : pas de contexte d'empilement, le header et le titre passent au-dessus
    de l'image des transitions (z-index 5), comme dans les salles */
 .accueil { position: absolute; inset: 0; background: var(--fond); }
-.accueil__toile { position: fixed; inset: 0; touch-action: none; cursor: grab; }
-.accueil__toile:active { cursor: grabbing; }
+.accueil__toile { position: fixed; inset: 0; touch-action: none; cursor: var(--curseur-deplacer); }
 /* Flèches précédente / suivante (bloc Figma « SliderControls ») */
 .accueil__fleches {
   position: fixed; z-index: 20; left: 50%; bottom: var(--marge); transform: translateX(-50%);
@@ -147,14 +173,14 @@ button { font: inherit; color: inherit; }
 .accueil__cta:hover { background: #ececec; }
 /* Salle fermée à la visite (oeuvres.ts, 02/11) : « Découvrir » reste, désactivé (verre, texte estompé) */
 .accueil__cta--fermee, .accueil__cta--fermee:hover {
-  background: var(--verre); color: rgba(255, 255, 255, 0.5); cursor: default;
+  background: var(--verre); color: rgba(255, 255, 255, 0.5); cursor: var(--curseur);
   -webkit-backdrop-filter: var(--flou); backdrop-filter: var(--flou);
 }
 
 /* Vue Grille (gallery/Grille.js, maquette Figma 58:207) : les cartes 3D se rangent en grille, leurs
    titres et étiquettes (HTML) se posent dessous ; flèches et bouton « Découvrir » de la spirale retirés */
 .accueil--grille .accueil__cta { pointer-events: none; }
-.accueil--grille .accueil__toile, .accueil--grille .accueil__toile:active { cursor: default; }
+.accueil--grille .accueil__toile, .accueil--grille .accueil__toile:active { cursor: var(--curseur); }
 .grille { position: fixed; inset: 0; z-index: 10; pointer-events: none; overflow: hidden; visibility: hidden; }
 .grille--active { visibility: visible; }
 .accueil--transition .grille { opacity: 0; transition: opacity 0.3s ease; }
@@ -165,7 +191,7 @@ button { font: inherit; color: inherit; }
   padding: 0 24px; text-align: center;
   color: #fff; text-decoration: none; pointer-events: auto; will-change: transform, opacity;
 }
-.grille__legende--fermee { cursor: default; }
+.grille__legende--fermee { cursor: var(--curseur); }
 .grille__titre {
   margin: 0; font-family: var(--titre); font-weight: 400; font-size: 24px; line-height: 26px;
   letter-spacing: 0.05em; text-transform: uppercase;
@@ -192,7 +218,7 @@ button { font: inherit; color: inherit; }
 .masque--champ { flex: 0 1 auto; }
 .recherche__champ, .recherche__filtre {
   display: flex; align-items: center; flex: none; height: var(--haut); padding: 0 12px 0 24px;
-  border-radius: var(--rayon); border: 0; cursor: pointer;
+  border-radius: var(--rayon); border: 0; cursor: var(--curseur-clic);
   background: var(--verre); -webkit-backdrop-filter: var(--flou); backdrop-filter: var(--flou);
   font-size: 14px; line-height: 1; white-space: nowrap;
   transition: background-color 0.2s ease;
@@ -270,6 +296,8 @@ button { font: inherit; color: inherit; }
 }
 
 .salle-accueil__haut { display: flex; flex-direction: column; gap: 48px; }
+/* En-tête du panneau mobile (poignée et titre) : sur ordinateur, le titre seul, dans la colonne */
+.salle-accueil__tete { display: contents; }
 .salle-accueil__titre {
   margin: 0; font-family: var(--titre); font-weight: 400; text-transform: uppercase;
   font-size: clamp(40px, 3.57vw, 60px); line-height: 1;
@@ -278,7 +306,7 @@ button { font: inherit; color: inherit; }
 /* Cartouches Maladie et Manifeste (photo, libellé, titre), qui ouvrent les popups */
 .salle-accueil__cartouches { display: flex; gap: 12px; } /* 6 px sur la maquette, 12 à la demande de Ludovic */
 .cartouche {
-  appearance: none; border: 0; cursor: pointer; text-align: left;
+  appearance: none; border: 0; cursor: var(--curseur-clic); text-align: left;
   position: relative; isolation: isolate; overflow: hidden; flex: none;
   width: 192px; height: 192px; padding: 24px; border-radius: 12px; background: #000;
   display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start;
@@ -310,7 +338,7 @@ button { font: inherit; color: inherit; }
 .salle-accueil__bas { display: flex; flex-direction: column; align-items: flex-start; gap: 48px; }
 .soutien { display: flex; flex-direction: column; gap: 12px; }
 .soutien__libelle { margin: 0; font-weight: 300; font-size: 14px; line-height: 18px; }
-.soutien__logo { display: block; width: 162px; height: 24px; }
+.soutien__logo { display: block; width: var(--largeur-logo, 162px); height: auto; } /* largeur propre à chaque logo (oeuvres.ts) */
 .soutien__nom { margin: 0; font-weight: 700; font-size: 20px; letter-spacing: 0.02em; text-transform: uppercase; line-height: 24px; }
 .pilule--partage { gap: 8px; padding: 0 32px 0 24px; background: var(--verre-leger); }
 .pilule--partage:hover { background: var(--verre); }
@@ -324,6 +352,7 @@ button { font: inherit; color: inherit; }
  * contenu est plus haut, il défile dans la marge intérieure (barre fine dans la marge de droite,
  * dans l'axe de la croix, et fondu du texte au bord qui cache encore du contenu).
  */
+@property --feuille { syntax: '<number>'; inherits: true; initial-value: 0; }
 @property --fondu-haut { syntax: '<length>'; inherits: false; initial-value: 0px; }
 @property --fondu-bas { syntax: '<length>'; inherits: false; initial-value: 0px; }
 .popup {
@@ -365,7 +394,7 @@ button { font: inherit; color: inherit; }
    (zone de prise de 24 px). Visible seulement quand le contenu défile. */
 .popup__barre {
   position: absolute; top: var(--marge-p); bottom: var(--marge-p); right: 24px; width: 24px;
-  cursor: pointer; touch-action: none; opacity: 0; visibility: hidden;
+  cursor: var(--curseur-clic); touch-action: none; opacity: 0; visibility: hidden;
   transition: opacity 0.4s ease, visibility 0s 0.4s;
 }
 .popup--defile .popup__barre { opacity: 1; visibility: visible; transition: opacity 0.6s ease 0.8s, visibility 0s; }
@@ -426,7 +455,7 @@ button { font: inherit; color: inherit; }
 .pied { position: fixed; z-index: 10; left: 50%; bottom: var(--marge); }
 .fleche {
   --ouverture: 0.55s cubic-bezier(.2,.7,.2,1);
-  appearance: none; border: 0; padding: 0; cursor: pointer;
+  appearance: none; border: 0; padding: 0; cursor: var(--curseur-clic);
   position: absolute; bottom: 0; isolation: isolate; overflow: hidden;
   width: var(--haut); height: var(--haut); border-radius: var(--rayon);
   background: var(--verre); -webkit-backdrop-filter: var(--flou); backdrop-filter: var(--flou);
@@ -479,7 +508,7 @@ button { font: inherit; color: inherit; }
   .fleche--suivante:not(.fleche--fermee):is(:hover, :focus-visible) .fleche__texte { margin-right: 12px; }
   .fleche--precedente:not(.fleche--fermee):is(:hover, :focus-visible) .fleche__texte { margin-left: 12px; }
 }
-.fleche:disabled { cursor: default; }
+.fleche:disabled { cursor: var(--curseur); }
 /* Salle fermée à la visite (oeuvres.ts, 02/11) : la flèche reste, estompée, et ne s'ouvre plus */
 .fleche--fermee { opacity: 0.35; }
 /* Pendant le passage par le couloir, le premier écran part élément par élément (useApparition,
@@ -520,47 +549,192 @@ button { font: inherit; color: inherit; }
 @keyframes apparition { from { opacity: 0; transform: translateY(16px); } }
 
 /* --- Mobile ------------------------------------------------------------ */
+/* Éléments propres au mobile, masqués sur ordinateur */
+.salle-ui__degrade, .salle-accueil__poignee, .pied__retour { display: none; }
+
+/*
+ * Mobile : maquette 520:1179 (iPhone 16 ; 393 × 852, puis 375 × 667 depuis la passe du 05/11 au soir) :
+ * header à 12 px du haut, 18 de la gauche et 12 de la droite (logo de 48 px, comme la maquette :
+ * demande de Ludovic, après un essai à 36 ; boutons de 48) ; voile noir en haut et en bas ; premier écran en panneau du bas, replié sur le
+ * titre (écran 1), déplié par la poignée, le titre ou un glisser vers le haut (écran 2) ; en bas,
+ * œuvre précédente, retour à la collection, œuvre suivante ; popups en panneau du bas (écran 3).
+ */
 @media (max-width: 760px) {
-  :root { --marge: 12px; --haut: 40px; }
-  .entete__logo { height: 24px; margin-top: 8px; }
-  .entete__centre .pilule__texte { display: none; }
-  .entete__centre .pilule { padding: 0 1px; }
-  .onglets__onglet { height: 32px; padding: 0 12px; font-size: 13px; }
-  .bouton-rond { border-radius: 20px; }
-
-  /* Premier écran et popup : en bas, au-dessus des boutons précédente / suivante */
-  .salle-accueil, .popup {
-    left: 12px; right: 12px; width: auto; top: auto; bottom: calc(12px + var(--haut) + 12px);
-    max-height: 52%; border-radius: var(--rayon);
+  /* Enchaînement des panneaux du bas (premier écran ↔ popups, 05/11, demande de Ludovic) : le sortant
+     descend en accélérant, l'entrant monte dans la foulée, avant que le sortant ait fini, avec la
+     courbe des feuilles d'iOS ; sans fondu, le contenu solidaire de son panneau. Pendant ce temps, la
+     caméra rejoint sa vue (Navigation). */
+  :root {
+    --marge: 16px;
+    --sortie-feuille: 0.4s cubic-bezier(.4, 0, 1, 1);
+    --entree-feuille: 0.6s cubic-bezier(.32, .72, 0, 1) 0.28s;
   }
+  .onglets__onglet { height: 40px; padding: 0 12px; font-size: 13px; }
+  /* Logo MMR de 48 px de haut, comme la maquette (36 essayé le 05/11 puis abandonné) ; accueil
+     (spirale, grille) et salles ont le même header, pas de saut à l'entrée (05/11) ; les onglets Spirale / Grille restent au centre du header s'ils
+     tiennent entre le logo et les boutons, sinon ils passent juste dessous (fin du bloc mobile) */
+  .entete { top: 12px; left: 18px; right: 12px; }
+  /* Onglets centrés sur l'écran, pas sur le header (marges inégales : 3 px de décalage) */
+  .entete__centre { left: calc(50% - 3px); }
+  .menu { top: calc(12px + var(--haut) + 8px); right: 12px; }
+  /* Dans une salle, le titre du header laisse la place au bouton retour du bas */
+  .salle-ui .entete__centre { display: none; }
+
+  /* Par-dessus la 3D, le seul voile de la maquette : noir en haut et en bas (pas de vignette radiale) ;
+     recopié dans l'image des transitions (degrade, ui/ToileTransition.ts) */
+  .salle-ui__vignette { display: none; }
+  .salle-ui__degrade {
+    display: block; position: fixed; inset: 0; z-index: 1; pointer-events: none;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 20%, rgba(0, 0, 0, 0) 80%, #000 100%);
+  }
+
+  /* Panneau du bas, opaque, de la couleur de fond de la spirale pour cette œuvre (--fond-salle,
+     InterfaceSalle.tsx ; #2f2922 de la maquette en attendant) : 40 px en haut, 24 sur les côtés, en bas 80 replié et 92 déplié
+     (place des boutons) ; coins de 32 */
   .salle-accueil {
-    --p: 24px; --p-gauche: 24px;
-    justify-content: flex-start; gap: 16px; transform: none;
-    background: var(--verre-sombre); -webkit-backdrop-filter: var(--flou); backdrop-filter: var(--flou);
+    --p: 0px; --p-gauche: 0px;
+    left: 0; right: 0; bottom: 0; top: auto; width: auto; transform: none;
+    max-height: calc(100% - var(--marge) - var(--haut) - 16px);
+    /* Hauteur réellement visible (barres de Safari comprises : iPhone SE 2, 05/11) */
+    max-height: calc(100dvh - var(--marge) - var(--haut) - 16px);
+    padding: 0 24px 92px; gap: 0; align-items: center; text-align: center;
+    border-radius: 32px 32px 0 0; pointer-events: auto; overscroll-behavior: contain; touch-action: none;
+    background: var(--fond-salle, #2f2922); -webkit-backdrop-filter: none; backdrop-filter: none;
   }
-  .salle-accueil--cache { transform: translateY(24px); }
-  .popup { --marge-p: 24px; max-height: 60%; transform: translateY(24px); }
-  .popup__barre { right: 0; }
-  .popup--ouvert { transform: none; }
-  .salle-accueil__haut { gap: 16px; }
-  .salle-accueil__titre { font-size: 28px; }
-  .cartouche { flex: 1; width: auto; height: 112px; padding: 16px; }
-  .cartouche__libelle { font-size: 13px; line-height: 18px; }
-  .cartouche__titre { font-size: 18px; line-height: 20px; }
-  .salle-accueil__bas { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
-  .soutien { gap: 4px; }
-  .soutien__libelle { font-size: 13px; line-height: 18px; }
-  .soutien__logo { width: 108px; height: 16px; }
-  .popup__entete { gap: 12px; padding-bottom: 16px; }
-  .popup__titre { font-size: 32px; line-height: 32px; }
-  .popup__texte p { font-size: 15px; line-height: 22px; }
-  .popup__chiffres { column-gap: 24px; margin-top: 8px; }
-  .popup__chiffre { gap: 4px; justify-content: flex-end; }
-  .popup__chiffre dt { line-height: 18px; }
-  .popup__chiffre dd { font-size: 24px; }
-  .popup__lien { margin-top: 8px; }
+  /* Popup ouvert, passage vers l'œuvre précédente / suivante, transition avec la spirale ou la grille
+     (et écran d'accueil) : le panneau descend entier hors de l'écran, avec son contenu, sans fondu ; il
+     remonte à la fermeture du popup, à l'arrivée par le couloir ou à l'entrée dans la salle */
+  .salle-accueil--cache, .salle-ui--passage .salle-accueil, .salle-ui--transition .salle-accueil { transform: translateY(100%); opacity: 1; }
+  /* En-tête collant (poignée et titre) : reste en haut quand le panneau déplié défile ; même fond
+     que le panneau, le contenu passe dessous. 40 px au-dessus du titre, 24 dessous (écart des blocs) */
+  .salle-accueil__haut { display: contents; }
+  .salle-accueil__tete {
+    display: block; position: sticky; top: 0; z-index: 1; align-self: stretch;
+    margin: 0 -24px; padding: 40px 24px 24px; touch-action: none;
+    background: var(--fond-salle, #2f2922); transition: background-color 1.2s ease;
+  }
+  /* Poignée : trait de 40 × 4 px à 12 px du haut, dans une zone de toucher plus large */
+  .salle-accueil__poignee {
+    display: block; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 120px; height: 32px; padding: 0; border: 0; background: transparent; cursor: var(--curseur-clic);
+  }
+  .salle-accueil__poignee::before {
+    content: ''; position: absolute; top: 12px; left: 40px; width: 40px; height: 4px;
+    border-radius: 4px; background: rgba(255, 255, 255, 0.2);
+  }
+  .salle-accueil__titre { font-size: 30px; line-height: 30px; cursor: var(--curseur-clic); text-wrap: balance; }
 
+  /* Replié : le panneau entier glisse vers le bas et ne laisse voir que son en-tête (poignée, titre)
+     et 56 px dessous, occupés par les boutons du bas (--h-replie, mesurée par useFeuille) ; ses blocs
+     ne sont pas masqués, seulement estompés. --feuille (0 → 1) suit le doigt pendant un glisser
+     (useFeuille, InterfaceSalle.tsx), sinon elle glisse vers 0 ou 1 avec la courbe des feuilles d'iOS */
+  .salle-accueil {
+    --feuille: 0;
+    translate: 0 calc((1 - var(--feuille)) * (100% - var(--h-replie, 180px)));
+    overflow: hidden;
+    /* Retour (popup fermé, arrivée d'un passage, entrée dans la salle) : il remonte dans la foulée */
+    transition: opacity 0.45s ease, visibility 0.45s, transform var(--entree-feuille), --feuille 0.5s cubic-bezier(.32,.72,0,1), background-color 1.2s ease;
+  }
+  .salle-accueil--cache, .salle-ui--passage .salle-accueil, .salle-ui--transition .salle-accueil {
+    visibility: hidden;
+    transition: visibility 0s 0.4s, transform var(--sortie-feuille), --feuille var(--sortie-feuille), background-color 1.2s ease;
+  }
+  /* Déplié : le contenu défile s'il dépasse (écrans peu hauts, barres du navigateur), sous l'en-tête
+     collant ; un glisser vers le bas depuis le haut du contenu, ou sur l'en-tête, replie le panneau */
+  .salle-accueil--deplie { --feuille: 1; overflow: hidden auto; touch-action: pan-y; }
+  /* Les blocs gardent leur hauteur : sinon ils se tassent (coupés) au lieu de faire défiler le panneau */
+  .salle-accueil > *, .salle-accueil__haut > * { flex-shrink: 0; }
+  .salle-accueil--glisse { transition: none; }
+  .salle-accueil__cartouches, .salle-accueil__bas {
+    width: 100%;
+    opacity: clamp(0, calc(var(--feuille) * 1.6 - 0.3), 1);
+  }
+  .salle-accueil__bas { margin-top: 24px; }
+  /* Replié et immobile : hors du parcours au clavier */
+  .salle-accueil:not(.salle-accueil--deplie):not(.salle-accueil--glisse) :is(.salle-accueil__cartouches, .salle-accueil__bas) {
+    visibility: hidden; transition: visibility 0s 0.5s;
+  }
 
+  /* Cartouches côte à côte au format 172,5 × 108, 6 px d'écart, 12 px de marge en haut et en bas */
+  .salle-accueil__cartouches { gap: 6px; align-items: flex-start; } /* hauteur des cartouches par leur format, pas par la rangée (repliée à 0) */
+  .cartouche { flex: 1 1 0; min-width: 0; width: auto; height: auto; aspect-ratio: 172.5 / 108; padding: 12px 24px; }
+  /* Pas de flou progressif : dans le panneau (lui-même flouté), il recouvrait toute la photo ;
+     photo nette sous le dégradé, comme sur la maquette */
+  .cartouche::before { display: none; }
+  /* Libellé et titre centrés (maquette mise à jour) */
+  .cartouche { align-items: center; text-align: center; }
+  .cartouche__texte { align-items: center; max-width: none; width: 100%; }
+  .cartouche__libelle { font-size: 12px; line-height: 21px; }
+  .cartouche__titre { font-size: 16px; line-height: 20px; }
+
+  /* Soutien et partage, centrés, 24 px entre eux */
+  .salle-accueil__bas { flex-direction: column; align-items: center; gap: 24px; }
+  .salle-accueil__bas > * { flex-shrink: 0; } /* gardent leur hauteur pendant le repli (mesure de useFeuille) */
+  .soutien { align-items: center; gap: 6px; padding-bottom: 12px; }
+  .soutien__libelle { font-size: 12px; line-height: 18px; }
+  .soutien__logo { width: calc(var(--largeur-logo, 162px) * 135 / 162); } /* Recordati : 135 px, comme la maquette */
+
+  /* En bas : précédente, retour, suivante (48 px, 8 px d'écart), à 16 px du bord */
+  .pied {
+    z-index: 11; left: 0; right: 0; bottom: 0; padding: 16px;
+    display: flex; justify-content: center; gap: 8px;
+  }
+  .fleche { position: relative; width: var(--haut); height: var(--haut); justify-content: center; align-items: center; }
+  .fleche--precedente, .fleche--suivante { left: auto; right: auto; }
+  .fleche__libelle, .fleche--suivante .fleche__libelle, .fleche--precedente .fleche__libelle { width: var(--haut); transform: none; }
+  .fleche__texte { display: none; }
+  .pied__retour { display: grid; color: inherit; }
+  /* Popup ouvert (écran 3), passage, transition avec la spirale : les boutons descendent avec le
+     premier écran et remontent avec lui */
+  .pied { transition: opacity 0.45s ease, visibility 0.45s, transform var(--entree-feuille); }
+  .salle-ui--popup .pied, .salle-ui--passage .pied, .salle-ui--transition .pied {
+    transform: translateY(100%); opacity: 1; visibility: hidden;
+    transition: visibility 0s 0.4s, transform var(--sortie-feuille);
+  }
+
+  /* Popup en panneau du bas, opaque et de la même couleur que le premier écran : 40 px en haut, 24 ailleurs, coins de 32 */
+  .popup {
+    --marge-p: 24px;
+    left: 0; right: 0; bottom: 0; top: auto; width: auto;
+    max-height: calc(100% - var(--marge) - var(--haut) - 16px);
+    /* Hauteur réellement visible (barres de Safari comprises : iPhone SE 2, 05/11) */
+    max-height: calc(100dvh - var(--marge) - var(--haut) - 16px);
+    padding: 40px 24px 24px; border-radius: 32px 32px 0 0;
+    background: var(--fond-salle, #2f2922); -webkit-backdrop-filter: none; backdrop-filter: none;
+    /* Monte depuis le bas de l'écran dans la foulée du premier écran qui descend, et redescend avant
+       qu'il remonte ; sans fondu, le contenu suit (pas de cascade sur mobile, Popup.tsx). Un glisser
+       vers le bas depuis le haut le ferme aussi, comme la croix */
+    opacity: 1; transform: translateY(100%);
+    transition: visibility 0s 0.4s, transform var(--sortie-feuille), background-color 1.2s ease;
+  }
+  .popup--ouvert {
+    opacity: 1; transform: none;
+    transition: visibility 0s, transform var(--entree-feuille), background-color 1.2s ease;
+  }
+  /* En-tête collant (surtitre, titre et son filet) : le texte défile dessous ; pas de fondu en haut */
+  .popup__entete {
+    position: sticky; top: 0; z-index: 1;
+    background: var(--fond-salle, #2f2922); transition: background-color 1.2s ease;
+  }
+  .popup__defilement--haut { --fondu-haut: 0px; }
+  /* Croix de 12 px à 24 px du coin */
+  .popup__fermer { top: 6px; right: 6px; }
+  .popup__barre { right: 0; top: 40px; }
+  /* Surtitre, titre et chiffres centrés ; le texte courant reste aligné à gauche */
+  .popup__entete { padding-right: 0; align-items: center; text-align: center; }
+  .popup__chiffre { align-items: center; text-align: center; }
+  .popup__surtitre { font-size: 14px; line-height: 25px; }
+  .popup__titre { font-size: 30px; line-height: 30px; }
+  .popup__texte p { font-size: 14px; line-height: 21px; }
+  .popup__chiffre dt { font-size: 12px; }
+  .popup__chiffre dd { font-size: 20px; }
+  .popup__lien { align-self: stretch; justify-content: center; margin-top: 0; }
+}
+/* Onglets de 127 px centrés sur l'écran, logo de 122 à 18 px du bord, boutons de 104 à 12 px, 8 px
+   d'écart au moins : au centre du header à partir de 423 px de large (le logo limite). En dessous, 8 px
+   sous le header ; la grille descend d'autant (ONGLETS_DESSOUS, Grille.js) */
+@media (max-width: 422px) {
+  .accueil .entete__centre { top: calc(var(--haut) + 8px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -597,12 +771,12 @@ html.vue-libre .salle-ui > :not(.salle-ui__vignette) { display: none; }
 .vue-libre__ligne span { flex: 1; display: flex; flex-direction: column; }
 .vue-libre__ligne small { color: rgba(255, 255, 255, .55); }
 .vue-libre button {
-  font: inherit; color: #fff; padding: 6px 12px; border-radius: 999px; cursor: pointer;
+  font: inherit; color: #fff; padding: 6px 12px; border-radius: 999px; cursor: var(--curseur-clic);
   border: 1px solid rgba(255, 255, 255, .3); background: rgba(255, 255, 255, .08);
 }
 .vue-libre button.vue-libre__principal { background: #d93e34; border-color: #d93e34; }
-.vue-libre__case { display: flex; gap: 8px; align-items: center; margin: 10px 0; cursor: pointer; }
-.vue-libre__flou { display: flex; gap: 4px; align-items: center; cursor: pointer; color: rgba(255, 255, 255, .8); }
+.vue-libre__case { display: flex; gap: 8px; align-items: center; margin: 10px 0; cursor: var(--curseur-clic); }
+.vue-libre__flou { display: flex; gap: 4px; align-items: center; cursor: var(--curseur-clic); color: rgba(255, 255, 255, .8); }
 .vue-libre__reglages { display: flex; flex-direction: column; gap: 4px; padding: 0 0 8px 12px; }
 .vue-libre__reglages label { display: grid; grid-template-columns: 1fr 120px 36px; gap: 8px; align-items: center; color: rgba(255, 255, 255, .8); }
 .vue-libre__reglages output { text-align: right; font-variant-numeric: tabular-nums; }
@@ -612,3 +786,52 @@ html.vue-libre .salle-ui > :not(.salle-ui__vignette) { display: none; }
   border-radius: 24px; border: 1px dashed rgba(255, 255, 255, .5); background: rgba(255, 255, 255, .06);
   display: grid; place-items: center; color: rgba(255, 255, 255, .6); pointer-events: none;
 }
+
+/* Compteur d'images par seconde (touche M, ui/Fps.tsx) */
+.fps {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  z-index: 2000;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  font: 12px/1.2 ui-monospace, Menlo, monospace;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.fps:empty { display: none; }
+.fps[data-niveau='bon'] { color: #7ee08a; }
+.fps[data-niveau='moyen'] { color: #f2c94c; }
+.fps[data-niveau='faible'] { color: #ff7a6b; }
+
+/* Arbitrages de la résolution (touche M, ui/Arbitrages.tsx), au-dessus du compteur d'images */
+.arbitrages {
+  position: fixed;
+  left: 12px;
+  bottom: 44px;
+  z-index: 2000;
+  max-width: min(640px, calc(100vw - 24px));
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font: 11px/1.45 ui-monospace, Menlo, monospace;
+}
+.arbitrages__texte {
+  white-space: pre-wrap;
+  max-height: 40vh;
+  overflow: auto;
+}
+.arbitrages__interrupteur {
+  margin-bottom: 8px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 6px;
+  font: inherit;
+  color: #000;
+  background: #7ee08a;
+  cursor: var(--curseur-clic);
+}
+.arbitrages__interrupteur[data-actif='false'] { background: #ff7a6b; }

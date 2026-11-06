@@ -33,6 +33,14 @@ for p in (me.polygons if not TRIANGLES else []):
     m[max(y0, 0):min(y1, res), max(x0, 0):min(x1, res)] = 1  # lightmap_pack : îlots rectangulaires
     k = int(np.clip(min(x1 - x0, y1 - y0) // 6, 1, 4))
     coeur[max(y0 + k, 0):min(y1 - k, res), max(x0 + k, 0):min(x1 - k, res)] = 1
+if not TRIANGLES:
+    # Le cœur est aussi la couverture entière rétrécie de 4 pixels : seuls les vrais bords d'îlot sont
+    # reconstruits, pas les jonctions entre faces voisines d'un même îlot (dalles du sol). Reconstruites,
+    # elles faisaient des rayures en travers des dégradés d'ombre (vues par Ludovic le 05/11)
+    interieur = m.copy()
+    for _ in range(4):
+        interieur = interieur * np.roll(interieur, 1, 0) * np.roll(interieur, -1, 0) * np.roll(interieur, 1, 1) * np.roll(interieur, -1, 1)
+    coeur = np.maximum(coeur, interieur)
 ilot = np.zeros((res, res), np.float32)
 if TRIANGLES:
     # Îlots : faces reliées par une arête dont les deux côtés ont les mêmes UV

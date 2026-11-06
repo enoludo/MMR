@@ -398,6 +398,17 @@ if O["socle"]:
 
 # --- Précalcul : lumière reçue (sans la couleur des matières) ---------------
 scn.render.engine = "CYCLES"; scn.cycles.device = "CPU"
+# Carte graphique du Mac (Metal) avec le processeur, si elle est là (comme rotonde.py) : sur le seul
+# processeur, les échantillons du 05/11 (ombres plus fines) demandaient plusieurs heures
+try:
+    pr = bpy.context.preferences.addons["cycles"].preferences
+    pr.compute_device_type = "METAL"; pr.get_devices()
+    for d in pr.devices:
+        d.use = True
+    if any(d.type == "METAL" for d in pr.devices):
+        scn.cycles.device = "GPU"
+except Exception as e:
+    print("GPU indisponible :", e)
 scn.cycles.samples = SAMPLES; scn.cycles.max_bounces = 5; scn.cycles.sample_clamp_indirect = 3.0
 scn.render.bake.margin = 8
 for obj, taille, fichier, ech in ((room, RES, "lightmap.exr", SAMPLES), (mobilier, RES, "lightmap-mobilier.exr", SAMPLES_MOB)):

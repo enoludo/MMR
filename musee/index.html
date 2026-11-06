@@ -10,7 +10,7 @@
       dans la page, pour s'afficher dès la première image, avant le chargement du JavaScript
     -->
     <style>
-      html, body { margin: 0; background: #181410; }
+      html, body { margin: 0; background: #181410; -webkit-tap-highlight-color: transparent; }
       .intro {
         --d: 0s; --s: 0s; /* délais d'apparition et de sortie de chaque élément (Intro.tsx) */
         position: fixed; inset: 0; z-index: 60; display: grid; place-items: center;
@@ -35,13 +35,13 @@
       .intro__havas { display: block; width: 177px; height: auto; }
       .intro__boutons { display: flex; flex-direction: column; align-items: center; gap: 12px; }
       .intro__entrer {
-        appearance: none; border: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 10px;
+        appearance: none; border: 0; cursor: var(--curseur-clic, pointer); display: inline-flex; align-items: center; gap: 10px;
         height: 48px; padding: 0 28px 0 24px; border-radius: 24px; background: #fff; color: #000;
         font: inherit; font-size: 14px; font-weight: 500; transition: background-color 0.25s ease;
       }
       .intro__entrer:hover { background: #ececec; }
       .intro__sans {
-        appearance: none; border: 0; cursor: pointer; background: none; color: #fff; font: inherit;
+        appearance: none; border: 0; cursor: var(--curseur-clic, pointer); background: none; color: #fff; font: inherit;
         font-size: 13px; padding: 8px 12px; opacity: 0.7; text-decoration: underline; text-underline-offset: 4px;
         text-decoration-color: rgba(255, 255, 255, 0.4); transition: opacity 0.25s ease;
       }

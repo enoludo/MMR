@@ -49,7 +49,7 @@ export function Experience() {
   const rendu = useControls('Rendu', {
     ...boutonCopier('Rendu'),
     focale: { value: 55, min: 30, max: 90, step: 1, label: 'champ de vision (°)' },
-    plancher: { value: qualite.plancher, min: 1, max: 2, step: 0.25, label: 'résolution minimale' },
+    plancher: { value: qualite.plancher, min: 0, max: 2, step: 0.05, label: 'résolution minimale' },
     passage: { value: qualite.passage, min: 0.4, max: 1, step: 0.05, label: 'résolution pendant les passages (×)' },
   })
   qualite.plancher = rendu.plancher
@@ -61,8 +61,9 @@ export function Experience() {
   useEffect(() => (moteur ? prendreMoteur() : undefined), [moteur])
   // Avec le moteur gardé, on repart de sa résolution : son canvas garde sa taille (la changer fige la page)
   const resolution = useMemo(() => {
-    const r = new ResolutionAdaptative(() => {})
-    if (moteur) r.ratio = Math.min(resolutionMax(), Math.max(qualite.plancher, moteur.getPixelRatio()))
+    // Résolution de départ donnée par le test de la machine (performances.ts), plancher appliqué à la première image
+    const r = new ResolutionAdaptative(() => {}, true, 'salle')
+    if (moteur) r.ratio = Math.min(resolutionMax(), moteur.getPixelRatio())
     return r
   }, [moteur])
   const toile = useRef<HTMLCanvasElement>(null)
@@ -335,7 +336,7 @@ function Preparation({ cle }: { cle: number }) {
         const m = (o as THREE.Mesh).material
         for (const matiere of Array.isArray(m) ? m : m ? [m] : []) {
           Object.values(matiere).forEach(ajouter)
-          const u = (matiere as THREE.ShaderMaterial).uniforms ?? matiere.userData.shader?.uniforms
+          const u = (matiere as THREE.ShaderMaterial).uniforms ?? (matiere.userData.shader?.uniforms ?? matiere.userData.pierre)
           if (u) Object.values(u).forEach((x) => ajouter((x as THREE.IUniform).value))
         }
       })
@@ -386,7 +387,7 @@ function PreparationPassage({ cle, children }: { cle: number; children: ReactNod
         const m = (o as THREE.Mesh).material
         for (const matiere of Array.isArray(m) ? m : m ? [m] : []) {
           Object.values(matiere).forEach(ajouter)
-          const u = (matiere as THREE.ShaderMaterial).uniforms ?? matiere.userData.shader?.uniforms
+          const u = (matiere as THREE.ShaderMaterial).uniforms ?? (matiere.userData.shader?.uniforms ?? matiere.userData.pierre)
           if (u) Object.values(u).forEach((x) => ajouter((x as THREE.IUniform).value))
         }
       })

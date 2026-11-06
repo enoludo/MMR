@@ -12,7 +12,8 @@
       "vitesseAuto": 0.15,
       "duree": 2.8,
       "dureePassage": 8,
-      "rotationPassage": 90
+      "rotationPassage": 90,
+      "glisser": 1.5
     },
     "Transitions": {
       "zoomEntree": 1.4,
@@ -28,79 +29,79 @@
     },
     "Effets": {
       "courbe": "aces",
-      "halo": 0.24,
+      "halo": 0.35,
       "seuilHalo": 1,
-      "grain": 0.15
+      "grain": 0.08
     },
     "Sculpture": {
       "orientation": 0,
       "teinte": "#ddd8d2",
-      "rugosite": 0.45999999999999996,
+      "rugosite": 0.46,
       "relief": 1.9,
-      "occlusion": 0.14,
-      "occlusionDirecte": 0.55
+      "occlusion": 0.19,
+      "occlusionDirecte": 0.39
     },
     "Lumière sculpture": {
-      "soleil": 0.9000000000000001,
-      "ambiance": 1.63
+      "soleil": 0.38,
+      "ambiance": 1.82
     },
     "Lueur du socle": {
-      "ruban": 6,
-      "halo": 0.3,
-      "etendue": 0.1
+      "ruban": 1.8,
+      "halo": 0.06,
+      "etendue": 0.02
     },
     "Faisceau": {
-      "intensite": 0.005999999999999999
+      "intensite": 0.056
     },
     "Poussière": {
-      "densite": 1,
-      "taille": 3.35,
+      "densite": 0.87,
+      "taille": 2.4,
       "vitesse": 1.05,
-      "brillance": 0.45
+      "brillance": 1.95
     },
     "Salle": {
-      "exposition": 5,
-      "lumiere": 1.3,
+      "exposition": 6,
+      "lumiere": 0.5,
       "grain": 0,
-      "voile": 0,
-      "nuances": 0.13
+      "voile": 0.07,
+      "nuances": 0.19
     },
     "Couleurs": {
-      "soleil": "#fffaee",
-      "ambianceCiel": "#deecff",
-      "ambianceSol": "#f2edda",
-      "ambianceCouloir": "#d6e2ee",
-      "lueur": "#ffffff",
-      "matiereMur": "#d2dee8",
-      "matiereSol": "#6f7d8b",
-      "matierePlafond": "#a4b5c4",
-      "matiereSolCentre": "#6f7d8b",
-      "matiereBanc": "#9bacba",
-      "matiereFente": "#ffffff"
+      "soleil": "#f8f1e5",
+      "ambianceCiel": "#ede7dd",
+      "ambianceSol": "#e9e3d6",
+      "ambianceCouloir": "#e7e1d7",
+      "lueur": "#faf4eb",
+      "matiereMur": "#cdd4e6",
+      "matiereSol": "#767780",
+      "matierePlafond": "#aeb4c2",
+      "matiereSolCentre": "#79777b",
+      "matiereBanc": "#a6a4ab",
+      "matiereFente": "#faf5ee"
     },
     "Reflet au sol": {
-      "force": 0.16,
-      "flou": 10,
-      "longueur": 1.4
+      "force": 0.26,
+      "flou": 9.5,
+      "longueur": 2.1
     },
     "Couloir": {
-      "soleil": 1.2,
+      "soleil": 1.34,
       "hauteurSoleil": 32,
       "azimut": 60,
       "douceur": 0.08,
       "zenithal": 1.2,
-      "ambiance": 0.0015,
+      "ambiance": 0.0065,
       "rebond": 0.012,
-      "portes": 0.012,
+      "portes": 0.1,
       "fonduPorte": 2.5,
       "raccord": 4,
-      "rayons": 0.14,
+      "rayons": 0.07,
       "dehors": 1,
-      "fente": 1,
+      "fente": 0.05,
       "nombre": 6,
       "pas": 2,
       "epaisseur": 0.5,
-      "hauteurFente": 14,
+      "hauteurFente": 10.5,
       "debutAmbiance": 2,
       "finAmbiance": 12
     }
@@ -115,22 +116,22 @@
       "occlusionDirecte": 0.35
     },
     "Lumière sculpture": {
-      "soleil": 0.55,
-      "ambiance": 0.65
+      "soleil": 0.77,
+      "ambiance": 0.68
     },
     "Faisceau": {
-      "intensite": 0.009
+      "intensite": 0.014
     },
     "Poussière": {
       "densite": 1,
       "taille": 3.35,
       "vitesse": 1.05,
-      "brillance": 0.45
+      "brillance": 1
     },
     "Salle": {
       "exposition": 3.4,
       "lumiere": 1,
-      "grain": 0.025,
+      "grain": 0.06,
       "voile": 0.0175,
       "nuances": 0.035
     },
@@ -146,12 +147,12 @@
       "matiereBanc": "#b1aca5"
     },
     "Reflet au sol": {
-      "force": 0.16,
-      "flou": 10,
-      "longueur": 1.4
+      "force": 1,
+      "flou": 13.5,
+      "longueur": 2.25
     },
     "Couloir": {
-      "soleil": 1.2,
+      "soleil": 0.81,
       "hauteurSoleil": 32,
       "azimut": 60,
       "douceur": 0.08,
@@ -162,9 +163,9 @@
       "fonduPorte": 2.5,
       "raccord": 4,
       "rayons": 0.14,
-      "dehors": 1,
-      "fente": 1,
-      "nombre": 6,
+      "dehors": 0.95,
+      "fente": 0.26,
+      "nombre": 1,
       "pas": 2,
       "epaisseur": 0.5,
       "hauteurFente": 14,
@@ -183,7 +184,8 @@
       "vitesseAuto": 0.15,
       "duree": 2.8,
       "dureePassage": 8,
-      "rotationPassage": 90
+      "rotationPassage": 90,
+      "glisser": 1.5
     },
     "Transitions": {
       "zoomEntree": 1.4,
@@ -200,8 +202,8 @@
     "Effets": {
       "courbe": "aces",
       "halo": 0.35,
-      "seuilHalo": 1,
-      "grain": 0.04
+      "seuilHalo": 1.35,
+      "grain": 0.095
     }
   }
 }

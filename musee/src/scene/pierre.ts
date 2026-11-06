@@ -17,7 +17,7 @@ import * as THREE from 'three'
 export type ReglagesPierre = { grain: number; voile: number; nuances: number }
 
 /** K de l'encodage logarithmique de la lightmap (voir blender/lightmap.py) */
-export type EncodageLightmap = { k: number }
+export type EncodageLightmap = { k: number; echelle: number }
 
 /**
  * Reflet de la sculpture sur un sol horizontal (voir Reflet.tsx) : une image de la
@@ -47,6 +47,30 @@ export type UniformsSalle = {
   /** Demi-largeur et hauteur de chaque ouverture */
   uPorteTaille: { value: THREE.Vector2[] }
   uNbPortes: { value: number }
+}
+
+/**
+ * Ombres précalculées (06/11, demande de Ludovic ; touche M « Salle · <salle> ») :
+ * - « toutes les ombres » (`uOmbres`) : courbe sur la lumière précalculée, sous `uPivot` (lumière
+ *   la plus vive de l'architecture, l'échelle de sa lightmap) : x → pivot × (x / pivot)^uOmbres.
+ *   1 = le précalcul tel quel, moins = ombres plus claires, plus = plus profondes. Même courbe
+ *   au raccord des couloirs (Couloir.tsx), en lumière absolue (décodée × échelle) : pas de marche
+ *   entre deux lightmaps ni au seuil ;
+ * - « ombre de la statue » (`uStatue`) : 1 = l'ombre précalculée, 0 = aucune. Le mobilier (sol du
+ *   centre, socle) a été recalculé sans la statue (blender/sans-statue.py) ; le rapport avec / sans
+ *   statue est une image en niveaux de gris (blender/ombre-statue.py), divisée de la lumière.
+ * Un jeu par salle, partagé par ses matières et ses couloirs (`uniformsOmbres`).
+ */
+export type UniformsOmbres = {
+  uOmbres: { value: number }
+  uPivot: { value: number }
+  uStatue: { value: number }
+}
+const ombresParSalle = new Map<string, UniformsOmbres>()
+export function uniformsOmbres(idSalle: string): UniformsOmbres {
+  let u = ombresParSalle.get(idSalle)
+  if (!u) ombresParSalle.set(idSalle, (u = { uOmbres: { value: 1 }, uPivot: { value: 1 }, uStatue: { value: 1 } }))
+  return u
 }
 
 /** Nombre de portes au plus par salle */
@@ -94,9 +118,14 @@ export function appliquerPierre(
   r: ReglagesPierre,
   enc: EncodageLightmap,
   salle: UniformsSalle,
-  reflet?: UniformsReflet,
+  reflet: UniformsReflet | undefined,
+  ombres: UniformsOmbres,
+  rapportStatue?: THREE.Texture,
 ) {
   const uniforms = {
+    ...ombres,
+    uEchelleLm: { value: enc.echelle },
+    tRapportStatue: { value: rapportStatue ?? null },
     uK: { value: enc.k },
     uGrain: { value: r.grain },
     uVoile: { value: r.voile },
@@ -119,19 +148,20 @@ export function appliquerPierre(
         vNormPierre = normalize(mat3(uVersSalle) * mat3(modelMatrix) * normal);`,
       )
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\n${GLSL_PIERRE}\n${GLSL_PORTE}`)
+      .replace('#include <common>', `#include <common>\n${GLSL_PIERRE}\n${GLSL_PORTE}\n${GLSL_LUMIERE}`)
       .replace(
         '#include <map_fragment>',
         '#include <map_fragment>\nif (auDelaDesPortes(vPosSalle)) discard;\ndiffuseColor.rgb *= pierre(vPosSalle, vNormPierre);',
       )
       // lightmap encodée en logarithmique : on la décode
-      .replace('lightMapTexel.rgb * lightMapIntensity', 'decodeLightmap(lightMapTexel.rgb) * lightMapIntensity')
+      .replace('lightMapTexel.rgb * lightMapIntensity', 'lumierePrecalculee(lightMapTexel.rgb, vLightMapUv) * lightMapIntensity')
     if (reflet)
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <common>', `#include <common>\n${GLSL_REFLET}`)
         .replace('#include <tonemapping_fragment>', `${GLSL_REFLET_APPLIQUE}\n#include <tonemapping_fragment>`)
   }
-  m.customProgramCacheKey = () => (reflet ? 'pierre-v7-reflet' : 'pierre-v7')
+  if (rapportStatue) m.defines = { ...m.defines, RAPPORT_STATUE: '' }
+  m.customProgramCacheKey = () => `pierre-v8${reflet ? '-reflet' : ''}${rapportStatue ? '-statue' : ''}`
   m.needsUpdate = true
 }
 
@@ -142,6 +172,21 @@ export function reglerPierre(m: THREE.MeshBasicMaterial, r: ReglagesPierre) {
   u.uVoile.value = r.voile
   u.uNuances.value = r.nuances
 }
+
+/** Lumière précalculée d'une matière de la salle : ombre de la statue, puis courbe des ombres */
+const GLSL_LUMIERE = /* glsl */ `
+uniform float uEchelleLm;
+uniform float uStatue;
+uniform sampler2D tRapportStatue;
+vec3 lumierePrecalculee(vec3 texel, vec2 uv) {
+  vec3 x = decodeLightmap(texel) * uEchelleLm;
+#ifdef RAPPORT_STATUE
+  float r = max(texture2D(tRapportStatue, uv).r, 0.02);
+  x *= mix(1.0 / r, 1.0, uStatue);
+#endif
+  return courbeOmbres(x) / uEchelleLm;
+}
+`
 
 const GLSL_PORTE = /* glsl */ `
 #define MAX_PORTES ${MAX_PORTES}
@@ -177,8 +222,18 @@ uniform float uNuances;
 uniform float uK;
 uniform highp sampler3D uBruit;
 
+uniform float uOmbres;
+uniform float uPivot;
+
 vec3 decodeLightmap(vec3 v) {
   return (exp(v * log(1.0 + uK)) - 1.0) / uK;
+}
+
+// Ombres plus claires (uOmbres < 1) ou plus profondes (> 1) sous le pivot, teinte gardée
+// (lumière absolue : décodée × échelle de la lightmap ; voir UniformsOmbres)
+vec3 courbeOmbres(vec3 x) {
+  float l = max((x.r + x.g + x.b) / 3.0, 1e-6);
+  return l < uPivot ? x * (uPivot * pow(l / uPivot, uOmbres) / l) : x;
 }
 
 // Bruit de valeur 3D lissé (continu) : une lecture de la texture de bruit (voir textureBruit).

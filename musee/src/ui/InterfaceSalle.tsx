@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type TouchEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useProgress } from '@react-three/drei'
 import { nouvelleCle, store, useEtat, type Sens } from '../store'
@@ -10,6 +10,7 @@ import { sortir } from '../transition'
 import { cliquer } from '../musique'
 import { avancer } from '../chargement'
 import { useApparition } from './apparition'
+import { couleurSpirale } from '../couleurSalle'
 
 
 /** Affiche le premier écran ou un popup, et envoie la caméra vers le point de vue associé (voir Oeuvre.vues). */
@@ -55,6 +56,11 @@ export function InterfaceSalle({ oeuvre }: { oeuvre: Oeuvre }) {
   }
   const premierEcran = useRef<HTMLElement>(null)
   const titre = useRef<HTMLHeadingElement>(null)
+  // Mobile : à l'ouverture d'un popup, pendant un passage vers l'œuvre précédente / suivante et au
+  // retour vers la spirale ou la grille, le panneau descend d'un bloc avec son contenu, qui reste en
+  // place (pas de cascade) ; il remonte de même à la fermeture, à l'arrivée par le couloir (titre de
+  // la nouvelle œuvre) et à l'entrée depuis la spirale, la grille ou l'écran d'accueil (style.css)
+  const mobile = window.matchMedia('(max-width: 760px)').matches
   useApparition({
     conteneur: premierEcran,
     titre,
@@ -62,14 +68,26 @@ export function InterfaceSalle({ oeuvre }: { oeuvre: Oeuvre }) {
     autres: '.cartouche, .salle-accueil__bas > *',
     // Vers l'œuvre précédente / suivante ou à l'ouverture d'un popup : il part dès le clic,
     // élément par élément ; il revient à l'arrivée dans la salle suivante ou à la fermeture
-    visible: !enTransition && !enPassage && !ouvert,
-    cascade: enPassage || ouvert,
+    visible: mobile || (!enTransition && !enPassage && !ouvert),
+    cascade: !mobile && (enPassage || ouvert),
     // À la fermeture d'un popup, on attend que son contenu soit parti
-    delai: popupFerme.current ? 0.35 : 0,
+    delai: popupFerme.current && !mobile ? 0.35 : 0,
   })
   useEffect(() => {
     popupFerme.current = false // une seule fois, à la fermeture
   })
+
+  // Mobile (maquette 520:1179) : premier écran en panneau du bas, replié sur le titre ; on le déplie
+  // en touchant la poignée ou le titre, ou en le faisant glisser : il suit le doigt, comme une feuille
+  // d'iOS, puis se cale ouvert ou fermé selon sa position et la vitesse du geste
+  const [deplie, setDeplie] = useState(false)
+  const surMobile = () => window.matchMedia('(max-width: 760px)').matches
+  if (ouvert && deplie) setDeplie(false)
+  const feuille = useFeuille(premierEcran, deplie, setDeplie, surMobile, oeuvre.id)
+  // Replié (poignée, titre, glisser) : le contenu, s'il avait défilé, revient en haut
+  useEffect(() => {
+    if (!deplie) premierEcran.current?.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [deplie])
 
   // Le popup garde son contenu pendant qu'il disparaît
   const [contenu, setContenu] = useState<'maladie' | 'manifeste'>('maladie')
@@ -81,9 +99,21 @@ export function InterfaceSalle({ oeuvre }: { oeuvre: Oeuvre }) {
   const precedente = oeuvres[(i - 1 + oeuvres.length) % oeuvres.length]
   const suivante = oeuvres[(i + 1) % oeuvres.length]
 
+  // Mobile : fond des panneaux du bas (premier écran, popups) = fond de la spirale pour cette œuvre
+  // (demande de Ludovic, 05/11), en variable CSS --fond-salle ; #2f2922 de la maquette en attendant
+  const [fond, setFond] = useState('')
+  useEffect(() => {
+    let actuel = true
+    couleurSpirale(oeuvre).then((c) => actuel && setFond(c))
+    return () => {
+      actuel = false
+    }
+  }, [oeuvre])
+
   // Nouvelle œuvre : on repart du premier écran et du tour libre
   useEffect(() => {
     store.set({ onglet: 'info', demande: 'cercle' })
+    setDeplie(false)
   }, [oeuvre.id])
 
   useEffect(() => {
@@ -98,8 +128,12 @@ export function InterfaceSalle({ oeuvre }: { oeuvre: Oeuvre }) {
   }, [])
 
   return (
-    <div className={`salle-ui ${enPassage ? 'salle-ui--passage' : ''} ${enTransition ? 'salle-ui--transition' : ''}`}>
+    <div className={`salle-ui ${enPassage ? 'salle-ui--passage' : ''} ${enTransition ? 'salle-ui--transition' : ''} ${ouvert ? 'salle-ui--popup' : ''}`}
+      style={fond ? ({ '--fond-salle': fond } as CSSProperties) : undefined}
+    >
       <div className="salle-ui__vignette" aria-hidden />
+      {/* Mobile : voile noir en haut et en bas de l'écran (maquette 520:1179) */}
+      <div className="salle-ui__degrade" aria-hidden />
       <Chargement />
 
       <EnTete
@@ -122,13 +156,27 @@ export function InterfaceSalle({ oeuvre }: { oeuvre: Oeuvre }) {
       {/* Premier écran : on ouvre les popups depuis ses cartouches Maladie et Manifeste */}
       <section
         ref={premierEcran}
-        className={`salle-accueil ${ouvert ? 'salle-accueil--cache' : ''}`}
+        className={`salle-accueil ${ouvert ? 'salle-accueil--cache' : ''} ${deplie ? 'salle-accueil--deplie' : ''}`}
         inert={ouvert || enTransition || enPassage}
         aria-label={oeuvre.titre}
+        onTouchStart={feuille.debut}
+        onTouchMove={feuille.mouvement}
+        onTouchEnd={feuille.fin}
+        onTouchCancel={feuille.fin}
       >
         <div className="salle-accueil__haut">
-          {/* Écrit et découpé en lettres par useApparition */}
-          <h1 className="salle-accueil__titre" ref={titre} />
+          {/* Mobile : poignée et titre, en-tête collant du panneau (sur ordinateur, le titre seul) */}
+          <div className="salle-accueil__tete">
+            <button
+              type="button"
+              className="salle-accueil__poignee"
+              aria-expanded={deplie}
+              aria-label={deplie ? 'Replier la présentation' : 'Déplier la présentation'}
+              onClick={() => setDeplie(!deplie)}
+            />
+            {/* Écrit et découpé en lettres par useApparition */}
+            <h1 className="salle-accueil__titre" ref={titre} onClick={() => surMobile() && setDeplie(!deplie)} />
+          </div>
           <div className="salle-accueil__cartouches">
             <Cartouche
               oeuvre={oeuvre}
@@ -152,10 +200,101 @@ export function InterfaceSalle({ oeuvre }: { oeuvre: Oeuvre }) {
 
       <nav className="pied" aria-label="Navigation dans la collection">
         <Fleche oeuvre={precedente} sens="precedente" desactivee={enPassage} />
+        {/* Mobile : retour à la collection entre les flèches (maquette 520:1179), à la place du titre du header */}
+        <Link
+          to="/"
+          className="bouton-rond pied__retour"
+          aria-label={`${oeuvre.titre} : retour à la collection`}
+          onClick={(e) => {
+            cliquer()
+            if (sortir()) e.preventDefault()
+          }}
+        >
+          <IconeCroix />
+        </Link>
         <Fleche oeuvre={suivante} sens="suivante" desactivee={enPassage} />
       </nav>
     </div>
   )
+}
+
+/**
+ * Mobile : le panneau du bas suit le doigt (feuille d'iOS). Son ouverture (0 replié, 1 déplié) est la
+ * variable CSS --feuille : le panneau entier glisse vers le bas d'autant (translate, style.css, section
+ * Mobile), sans masquer ses blocs ; replié, il ne laisse voir que son en-tête (poignée et titre) et
+ * 56 px sous lui (--h-replie). Pendant le geste elle suit le doigt au pixel près, puis elle rejoint
+ * 0 ou 1 en transition. Un geste rapide l'emporte sur la position.
+ */
+const SOUS_LE_TITRE = 56 // replié : de l'en-tête (et ses 24 px sous le titre) au bas de l'écran, 80 px sous le titre
+function useFeuille(
+  section: React.RefObject<HTMLElement | null>,
+  deplie: boolean,
+  setDeplie: (d: boolean) => void,
+  surMobile: () => boolean,
+  cle: string,
+) {
+  const geste = useRef<{ y0: number; o0: number; o: number; course: number; y: number; t: number; vitesse: number; actif: boolean; tete: boolean } | null>(null)
+  /** Course du panneau entre replié et déplié (px) ; pose --h-replie, la hauteur visible repliée */
+  const mesurer = () => {
+    const el = section.current
+    if (!el) return 1
+    const tete = el.querySelector<HTMLElement>('.salle-accueil__tete')
+    const replie = (tete?.offsetHeight ?? 124) + SOUS_LE_TITRE
+    el.style.setProperty('--h-replie', `${replie}px`)
+    return Math.max(1, el.offsetHeight - replie)
+  }
+  useLayoutEffect(() => {
+    mesurer()
+    window.addEventListener('resize', mesurer)
+    return () => window.removeEventListener('resize', mesurer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cle])
+  const debut = (e: TouchEvent) => {
+    if (!surMobile()) return
+    const y = e.touches[0].clientY
+    const o = deplie ? 1 : 0
+    // Pris par l'en-tête (poignée, titre) : le panneau suit toujours le doigt, même défilé
+    const tete = e.target instanceof Element && !!e.target.closest('.salle-accueil__tete')
+    geste.current = { y0: y, o0: o, o, course: mesurer(), y, t: e.timeStamp, vitesse: 0, actif: false, tete }
+  }
+  const mouvement = (e: TouchEvent) => {
+    const g = geste.current
+    const el = section.current
+    if (!g || !el) return
+    const y = e.touches[0].clientY
+    const dy = y - g.y0
+    if (!g.actif) {
+      if (Math.abs(dy) < 6) return
+      // Déplié et plus haut que l'écran (iPhone SE dans Safari, par exemple) : le contenu défile
+      // (touch-action: pan-y, style.css) ; on ne replie qu'en tirant vers le bas depuis le haut du
+      // contenu, comme une feuille d'iOS
+      const defile = el.scrollHeight > el.clientHeight + 1
+      if (deplie && defile && !g.tete && (dy < 0 || el.scrollTop > 0)) return void (geste.current = null)
+      g.actif = true
+      el.classList.add('salle-accueil--glisse')
+    }
+    g.o = Math.min(1, Math.max(0, g.o0 - dy / g.course))
+    el.style.setProperty('--feuille', String(g.o))
+    // Vitesse (px/ms, vers le bas positive), amortie
+    const dt = Math.max(1, e.timeStamp - g.t)
+    g.vitesse = 0.7 * ((y - g.y) / dt) + 0.3 * g.vitesse
+    g.y = y
+    g.t = e.timeStamp
+  }
+  const fin = () => {
+    const g = geste.current
+    const el = section.current
+    geste.current = null
+    if (!g?.actif || !el) return
+    const ouvrir = g.vitesse < -0.35 ? true : g.vitesse > 0.35 ? false : g.o > 0.5
+    // La transition reprend là où le doigt a laissé le panneau
+    el.classList.remove('salle-accueil--glisse')
+    void el.offsetHeight
+    el.style.setProperty('--feuille', ouvrir ? '1' : '0')
+    setDeplie(ouvrir)
+    setTimeout(() => el.style.removeProperty('--feuille'), 0)
+  }
+  return { debut, mouvement, fin }
 }
 
 /**
@@ -206,7 +345,12 @@ function Soutien({ oeuvre }: { oeuvre: Oeuvre }) {
     <div className="soutien">
       <p className="soutien__libelle">Avec le soutien de</p>
       {partenaire?.logo ? (
-        <img className="soutien__logo" src={partenaire.logo} alt={partenaire.nom} />
+        <img
+          className="soutien__logo"
+          src={partenaire.logo}
+          alt={partenaire.nom}
+          style={partenaire.largeur ? ({ '--largeur-logo': `${partenaire.largeur}px` } as CSSProperties) : undefined}
+        />
       ) : (
         <p className="soutien__nom">{partenaire?.nom ?? mecene!.nom}</p>
       )}

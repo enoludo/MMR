@@ -57,8 +57,12 @@ export interface Oeuvre {
   /** Photos des cartouches Maladie et Manifeste du premier écran (à défaut, l'image de la carte) */
   cartouches?: Partial<Record<'maladie' | 'manifeste', string>>
   mecene?: { nom: string; lien?: string }
-  /** Partenaire : logo sous « Avec le soutien de » (à défaut, le nom du mécène) */
-  partenaire?: { nom: string; logo?: string }
+  /**
+   * Partenaire : logo sous « Avec le soutien de » (à défaut, le nom du mécène) ; `largeur` : celle du
+   * logo sur ordinateur (px, sa largeur dans la maquette ; 162 par défaut, Recordati), réduite d'autant
+   * sur mobile
+   */
+  partenaire?: { nom: string; logo?: string; largeur?: number }
   maladieTexte: TexteMaladie
   /** Titre du manifeste, sous « Manifeste » dans sa cartouche */
   manifesteTitre?: string
@@ -130,8 +134,8 @@ export const oeuvres: Oeuvre[] = [
     vues: VUES_PROVISOIRES,
   },
   {
-    id: 'la-maladie-de-huntington',
-    titre: 'La maladie de Huntington',
+    id: 'la-maladie-de-huntington', // adresse et noms des fichiers gardés (captures, musique, vidéos)
+    titre: 'La Chorée de Huntington', // titre reçu par Ludovic le 06/11 (« La maladie de Huntington » avant)
     maladie: 'Maladie de Huntington',
     // Capture de sa salle (vue d'entrée, outils/capture.ts) ; l'ancien visuel : /assets/images/la-maladie-de-huntington.webp
     image: versionne('/assets/captures/la-maladie-de-huntington.webp'),
@@ -141,6 +145,9 @@ export const oeuvres: Oeuvre[] = [
     vueEntree: '/assets/captures/la-maladie-de-huntington',
     cartouches: capturesCartouches('la-maladie-de-huntington'),
     survol: videosSurvol('la-maladie-de-huntington'),
+    // Logo de la maquette 538:1536 (06/11), à sa taille de la maquette ; en blanc, comme Recordati (choix
+    // de Ludovic, 06/11 ; en couleurs : fondation-groupama.svg)
+    partenaire: { nom: 'Fondation Groupama', logo: versionne('/assets/logos/fondation-groupama-blanc.svg'), largeur: 152 },
     // Proposé par Claude le 03/11, accepté par Ludovic avec un bouton sans lien (le site est une démo) ;
     // prévalence et « 0 » traitement curatif à faire vérifier
     maladieTexte: {
@@ -156,7 +163,11 @@ export const oeuvres: Oeuvre[] = [
       ],
       lien: null, // démo : bouton sans lien
     },
-    manifeste: A_VENIR,
+    // Manifeste reçu par Ludovic le 06/11 ; titre en un mot proposé par Claude, comme « Métamorphose »
+    manifesteTitre: 'Fragmentation',
+    manifeste: [
+      'Notre œuvre, « La Chorée de Huntington », représente la dégradation progressive des fonctions cognitives et motrices, tout en mettant en avant l’individualité et l’humanité de chaque patient à travers une sculpture complète en mouvement.',
+    ],
     // Rotonde (31/10, essais) ; pour revenir à la salle carrée bleutée : salleProvisoireBleue (provisoire/config.ts)
     salle: salleRotonde,
     vues: VUES_PROVISOIRES,
