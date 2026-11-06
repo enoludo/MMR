@@ -338,7 +338,7 @@ button { font: inherit; color: inherit; }
 .salle-accueil__bas { display: flex; flex-direction: column; align-items: flex-start; gap: 48px; }
 .soutien { display: flex; flex-direction: column; gap: 12px; }
 .soutien__libelle { margin: 0; font-weight: 300; font-size: 14px; line-height: 18px; }
-.soutien__logo { display: block; width: 162px; height: 24px; }
+.soutien__logo { display: block; width: var(--largeur-logo, 162px); height: auto; } /* largeur propre à chaque logo (oeuvres.ts) */
 .soutien__nom { margin: 0; font-weight: 700; font-size: 20px; letter-spacing: 0.02em; text-transform: uppercase; line-height: 24px; }
 .pilule--partage { gap: 8px; padding: 0 32px 0 24px; background: var(--verre-leger); }
 .pilule--partage:hover { background: var(--verre); }
@@ -672,7 +672,7 @@ button { font: inherit; color: inherit; }
   .salle-accueil__bas > * { flex-shrink: 0; } /* gardent leur hauteur pendant le repli (mesure de useFeuille) */
   .soutien { align-items: center; gap: 6px; padding-bottom: 12px; }
   .soutien__libelle { font-size: 12px; line-height: 18px; }
-  .soutien__logo { width: 135px; height: 20px; }
+  .soutien__logo { width: calc(var(--largeur-logo, 162px) * 135 / 162); } /* Recordati : 135 px, comme la maquette */
 
   /* En bas : précédente, retour, suivante (48 px, 8 px d'écart), à 16 px du bord */
   .pied {

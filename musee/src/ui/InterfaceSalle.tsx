@@ -345,7 +345,12 @@ function Soutien({ oeuvre }: { oeuvre: Oeuvre }) {
     <div className="soutien">
       <p className="soutien__libelle">Avec le soutien de</p>
       {partenaire?.logo ? (
-        <img className="soutien__logo" src={partenaire.logo} alt={partenaire.nom} />
+        <img
+          className="soutien__logo"
+          src={partenaire.logo}
+          alt={partenaire.nom}
+          style={partenaire.largeur ? ({ '--largeur-logo': `${partenaire.largeur}px` } as CSSProperties) : undefined}
+        />
       ) : (
         <p className="soutien__nom">{partenaire?.nom ?? mecene!.nom}</p>
       )}
