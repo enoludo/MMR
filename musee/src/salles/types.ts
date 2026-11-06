@@ -83,7 +83,11 @@ export interface SalleConfig {
   /** Géométrie de la salle (GLB, UV = lightmap) */
   modele: string
   /** Lumières précalculées dans Blender (voir blender/lightmap.py), par atlas */
-  lightmaps: Record<string, { image: string; echelle: number; k: number }>
+  /**
+   * Lightmaps (encodage : blender/lightmap.py). `ombreStatue` : rapport de la lumière avec / sans la
+   * statue (blender/ombre-statue.py), pour le réglage « ombre de la statue » (pierre.ts)
+   */
+  lightmaps: Record<string, { image: string; echelle: number; k: number; ombreStatue?: string }>
   /**
    * Matières (noms des matériaux Blender) : couleur, et atlas de lightmap utilisé. Le grain est procédural.
    * Une matière `lumineuse` (paroi lumineuse des fentes de la rotonde) n'a pas de lightmap : sa couleur

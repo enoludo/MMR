@@ -4,7 +4,7 @@ import { useLightmap } from './lightmaps'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import type { Porte, SalleConfig } from '../salles/types'
-import { GLSL_PIERRE, textureBruit } from './pierre'
+import { GLSL_PIERRE, textureBruit, uniformsOmbres } from './pierre'
 import { LONGUEUR_COULOIR, matricePlacement, placementCouloir } from './passage'
 import { GLSL_SORTIE, uSortie } from './Effets'
 import { useReglagesSalle } from '../reglages'
@@ -160,6 +160,8 @@ export function Couloir({
       uFonduAmbiance: { value: new THREE.Vector2(2, 12) },
       uPlacement: { value: matricePlacement(placementCouloir(porte)) },
       uLightmapSalle: { value: lightmap },
+      // Courbe des ombres de la salle (touche M « Salle », pierre.ts), suivie au raccord
+      ...uniformsOmbres(config.id),
       uEchelleSalle: { value: atlas.echelle },
       uRaccordSol: { value: raccords.sol ?? new THREE.Vector4() },
       uRaccordPlafond: { value: raccords.plafond ?? new THREE.Vector4() },
@@ -551,7 +553,7 @@ vec3 eclairageCouloir(vec3 p, vec3 n) {
   if (actif > 0.5) {
     vec4 r = sol ? uRaccordSol : (plafond ? uRaccordPlafond : uRaccordMur);
     float t = mur ? p.y / uHauteur : (p.x + uDemiLargeur) / (2.0 * uDemiLargeur);
-    vec3 salle = decodeLightmap(texture2D(uLightmapSalle, mix(r.xy, r.zw, clamp(t, 0.0, 1.0))).rgb) * uEchelleSalle;
+    vec3 salle = courbeOmbres(decodeLightmap(texture2D(uLightmapSalle, mix(r.xy, r.zw, clamp(t, 0.0, 1.0))).rgb) * uEchelleSalle);
     float fondu = smoothstep(0.0, uFonduRaccord, -p.z);
     diffus = mix(salle, diffus, fondu);
     // La lumière précalculée de la salle contient déjà la lueur de la fente zénithale : celle du

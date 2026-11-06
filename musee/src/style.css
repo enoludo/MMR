@@ -805,3 +805,33 @@ html.vue-libre .salle-ui > :not(.salle-ui__vignette) { display: none; }
 .fps[data-niveau='bon'] { color: #7ee08a; }
 .fps[data-niveau='moyen'] { color: #f2c94c; }
 .fps[data-niveau='faible'] { color: #ff7a6b; }
+
+/* Arbitrages de la résolution (touche M, ui/Arbitrages.tsx), au-dessus du compteur d'images */
+.arbitrages {
+  position: fixed;
+  left: 12px;
+  bottom: 44px;
+  z-index: 2000;
+  max-width: min(640px, calc(100vw - 24px));
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font: 11px/1.45 ui-monospace, Menlo, monospace;
+}
+.arbitrages__texte {
+  white-space: pre-wrap;
+  max-height: 40vh;
+  overflow: auto;
+}
+.arbitrages__interrupteur {
+  margin-bottom: 8px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 6px;
+  font: inherit;
+  color: #000;
+  background: #7ee08a;
+  cursor: var(--curseur-clic);
+}
+.arbitrages__interrupteur[data-actif='false'] { background: #ff7a6b; }

@@ -4,6 +4,8 @@ import { useControls } from 'leva'
 import * as THREE from 'three'
 import type { SalleConfig } from '../salles/types'
 import { boutonCopier, dossierSalle, valeursEnregistrees } from '../reglages'
+import { charge, ECHANTILLONS_DEFAUT } from '../performances'
+import { echantillonsMax, sansFlou, sansHalos } from '../renoncements'
 import { configActuelle, configArriveeLue, poidsArrivee } from './passage'
 import { FLOU_DEFAUT, flouDeLaVue, vueEnCours } from '../salles/pointsDeVue'
 import {
@@ -287,7 +289,7 @@ export function Effets() {
       options: { aucun: -1, basse: SMAAPreset.LOW, moyenne: SMAAPreset.MEDIUM, haute: SMAAPreset.HIGH, ultra: SMAAPreset.ULTRA },
       label: 'SMAA',
     },
-    echantillons: { value: 1, options: { '×1': 1, '×2': 2, '×4': 4, '×6': 6 }, label: 'échantillons' },
+    echantillons: { value: ECHANTILLONS_DEFAUT, options: { '×1': 1, '×2': 2, '×4': 4, '×6': 6 }, label: 'échantillons' },
   })
   const avecSmaa = e.smaa >= 0
 
@@ -299,12 +301,13 @@ export function Effets() {
     // (on passe de l'une à l'autre selon la distance, sans recompiler)
     const halo = () => new BloomEffect({ mipmapBlur: true, luminanceThreshold: 1, luminanceSmoothing: 0.3, intensity: 0.35, radius: 0.7, levels: 6, resolutionScale: 0.5 })
     const bloom = [halo(), halo()]
-    const courbe = [new Courbe(), new Courbe()]
+    // Trois jeux : avec profondeur de champ, sans, et sans halo (renoncements.ts)
+    const courbe = [new Courbe(), new Courbe(), new Courbe()]
     // Anticrénelage et grain : un jeu par passe (de loin, ils rejoignent la passe du halo et de la courbe)
-    const smaa = [new SMAAEffect({ preset: SMAAPreset.LOW }), new SMAAEffect({ preset: SMAAPreset.LOW })]
+    const smaa = [0, 1, 2].map(() => new SMAAEffect({ preset: SMAAPreset.LOW }))
     const nouveauGrain = () => new NoiseEffect({ blendFunction: BlendFunction.OVERLAY, premultiply: false })
-    const grain = [nouveauGrain(), nouveauGrain()]
-    const passes = { avecFlou: [] as EffectPass[], sansFlou: [] as EffectPass[] }
+    const grain = [nouveauGrain(), nouveauGrain(), nouveauGrain()]
+    const passes = { avecFlou: [] as EffectPass[], sansFlou: [] as EffectPass[], sansHalo: [] as EffectPass[] }
     return { composer, dof, bloom, courbe, smaa, grain, passes, rendu: new PasseScene(scene, camera) }
   }, [gl, scene, camera])
 
@@ -320,9 +323,11 @@ export function Effets() {
     composer.addPass(outils.rendu)
     passes.avecFlou = [new EffectPass(camera, dof, bloom[0], courbe[0]), new EffectPass(camera, ...aa(0), grain[0])]
     passes.sansFlou = [new EffectPass(camera, bloom[1], courbe[1], ...aa(1), grain[1])]
-    for (const p of [...passes.avecFlou, ...passes.sansFlou]) composer.addPass(p)
+    passes.sansHalo = [new EffectPass(camera, courbe[2], ...aa(2), grain[2])]
+    for (const p of [...passes.avecFlou, ...passes.sansFlou, ...passes.sansHalo]) composer.addPass(p)
     // Le composeur n'envoie à l'écran que la dernière passe : ici, la dernière de chaque jeu
     passes.avecFlou[1].renderToScreen = true
+    passes.sansFlou[0].renderToScreen = true
   }, [outils, camera, avecSmaa])
 
   // Qualité du SMAA (basse jusqu'au 05/11) : plus haute, il suit mieux les bords fins et en biais
@@ -330,10 +335,11 @@ export function Effets() {
     if (avecSmaa) for (const a of outils.smaa) a.applyPreset(e.smaa as SMAAPreset)
   }, [outils, avecSmaa, e.smaa])
 
-  // Suréchantillonnage (05/11) : 1, 2, 4 ou 6 échantillons par pixel
+  // Suréchantillonnage (05/11) : 1, 2, 4 ou 6 échantillons par pixel, réduit par les renoncements
+  // (renoncements.ts, appliqué à chaque image) ; le test de la machine part du réglage voulu (performances.ts)
   useEffect(() => {
-    outils.rendu.echantillons = e.actifs ? e.echantillons : 1
-  }, [outils, e.actifs, e.echantillons])
+    charge.echantillons = e.actifs ? e.echantillons : 1
+  }, [e.actifs, e.echantillons])
 
   // La courbe de couleurs passe dans les effets : la scène est dessinée sans (sinon, deux fois)
   useEffect(() => {
@@ -394,6 +400,7 @@ export function Effets() {
     uSortie.uLineaire.value = e.actifs ? 1 : 0
     // Exposition appliquée par la courbe (three : ACES la divise par 0,6)
     uSortie.uExpoSortie.value = gl.toneMappingExposure * melange(1 / 0.6, 1, agx)
+    outils.rendu.echantillons = e.actifs ? Math.min(e.echantillons, echantillonsMax()) : 1
     if (!e.actifs) return void gl.render(scene, camera)
     const { dof, bloom, courbe: courbes, grain, passes } = outils
     for (const b of bloom) {
@@ -405,7 +412,7 @@ export function Effets() {
     const nom = vueEnCours.nom
     const reglage = ca && nom ? flouDeLaVue(ca, nom) : null
     if (reglage?.actif) flouVue.reglage = reglage
-    const voulu = reglage?.actif ? 1 : 0
+    const voulu = reglage?.actif && !sansFlou() ? 1 : 0
     flouVue.valeur = rendu.capture ? voulu : flouVue.valeur + (voulu - flouVue.valeur) * (1 - Math.exp(-3 * delta))
     const force = flouVue.valeur < 0.01 ? 0 : flouVue.valeur
     const f = flouVue.reglage
@@ -414,7 +421,8 @@ export function Effets() {
     dof.cocMaterial.focusRange = f.nettete
     dof.bokehScale = f.flou * force
     for (const p of passes.avecFlou) p.enabled = force > 0
-    for (const p of passes.sansFlou) p.enabled = force <= 0
+    for (const p of passes.sansFlou) p.enabled = force <= 0 && !sansHalos()
+    for (const p of passes.sansHalo) p.enabled = force <= 0 && sansHalos()
     for (const g of grain) g.blendMode.opacity.value = rendu.capture ? 0 : melange(ra.grain, rb.grain, w)
     outils.composer.render(delta)
   }, 1) // après tout le reste (navigation, reflet), à la place du rendu automatique

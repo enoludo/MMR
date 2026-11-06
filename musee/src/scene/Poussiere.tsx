@@ -5,8 +5,14 @@ import type { SalleConfig } from '../salles/types'
 import { GLSL_LAMES, uniformsLames } from './lames'
 import { dessinsDirects, GLSL_SORTIE, uSortie } from './Effets'
 import { useReglagesSalle } from '../reglages'
+import { sansPoussiere } from '../renoncements'
 
-const MAX = 16000 // grains réservés (8000 avant le 29/10) ; le réglage « densité » n’en affiche qu’une partie
+/** Grains à la densité 1 (8000 avant le 29/10) */
+const PAR_DENSITE = 16000
+/** Densité maximale du réglage (1 jusqu'au 06/11, 3 depuis, demande de Ludovic) */
+const DENSITE_MAX = 3
+/** Grains réservés ; le réglage « densité » n’en affiche qu’une partie */
+const MAX = PAR_DENSITE * DENSITE_MAX
 
 /**
  * Poussière qui flotte dans le faisceau du puits de lumière.
@@ -19,7 +25,7 @@ const MAX = 16000 // grains réservés (8000 avant le 29/10) ; le réglage « de
  */
 export function Poussiere({ config }: { config: SalleConfig }) {
   const p = useReglagesSalle(config, 'Poussière', {
-    densite: { value: 1, min: 0, max: 1, step: 0.01, label: 'densité' },
+    densite: { value: 1, min: 0, max: DENSITE_MAX, step: 0.01, label: 'densité' },
     taille: { value: 3.35, min: 0.3, max: 16, step: 0.05 },
     vitesse: { value: 1.05, min: 0, max: 12, step: 0.05 },
     brillance: { value: 0.45, min: 0, max: 4, step: 0.05 },
@@ -134,13 +140,15 @@ export function Poussiere({ config }: { config: SalleConfig }) {
   // Moins de grains sur les petits écrans (téléphones)
   const facteurEcran = size.width < 768 ? 0.5 : 1
   useEffect(() => {
-    geometrie.setDrawRange(0, Math.round(MAX * p.densite * facteurEcran))
     uniforms.uTaille.value = p.taille
     uniforms.uVitesse.value = p.vitesse
     uniforms.uBrillance.value = p.brillance
-  }, [geometrie, uniforms, p, facteurEcran])
+  }, [uniforms, p])
 
+  const grains = Math.round(PAR_DENSITE * Math.min(p.densite, DENSITE_MAX) * facteurEcran)
   useFrame((_, dt) => {
+    // Coupée quand la machine peine (renoncements.ts)
+    geometrie.setDrawRange(0, sansPoussiere() ? 0 : grains)
     uniforms.uTemps.value += Math.min(dt, 0.1)
     const cam = camera as THREE.PerspectiveCamera
     uniforms.uEchelle.value = (size.height * viewport.dpr * 0.5) / Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2)

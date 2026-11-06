@@ -5,9 +5,10 @@ import * as THREE from 'three'
 import type { SalleConfig } from '../salles/types'
 import { AMBIANCE_CHAUDE, PARTIE_COULEURS, appliquerCouleurs, schemaCouleurs } from '../salles/couleurs'
 import { reglagesSalle, useReglagesSalle } from '../reglages'
+import { sansReflets } from '../renoncements'
 import { Faisceau, tableFaisceau } from './Faisceau'
 import { Poussiere } from './Poussiere'
-import { MAX_PORTES, appliquerPierre, creerUniformsSalle, reglerPierre } from './pierre'
+import { MAX_PORTES, appliquerPierre, creerUniformsSalle, reglerPierre, uniformsOmbres } from './pierre'
 import { configActuelle, configArriveeLue, groupesSalles, poidsArrivee, salleActuelle, salleArrivee } from './passage'
 import { prechargerLightmaps, useLightmaps } from './lightmaps'
 import { CALQUE_REFLET, PasseReflet, creerUniformsReflet, preparerSculpture, type UniformsSculpture } from './Reflet'
@@ -23,6 +24,9 @@ const REGLAGES_SALLE = {
   grain: { value: 0.025, min: 0, max: 0.3, step: 0.005, label: 'grain fin' },
   voile: { value: 0.0175, min: 0, max: 0.3, step: 0.005, label: 'voile' },
   nuances: { value: 0.035, min: 0, max: 0.4, step: 0.005, label: 'nuances' },
+  // Ombres précalculées (06/11, demande de Ludovic ; voir UniformsOmbres, pierre.ts)
+  ombres: { value: 1, min: 0.2, max: 2, step: 0.01, label: 'toutes les ombres' },
+  ombreStatue: { value: 1, min: 0, max: 1, step: 0.01, label: 'ombre de la statue' },
 }
 
 /** Touche M, « Lumière sculpture · <salle> » : soleil et ambiance de l'œuvre (Eclairage) */
@@ -54,6 +58,10 @@ export function Salle({ config }: { config: SalleConfig }) {
   const racine = useRef<THREE.Group>(null)
   const nomsLightmaps = Object.keys(config.lightmaps)
   const textures = useLightmaps(nomsLightmaps.map((n) => config.lightmaps[n].image))
+  // Rapports avec / sans la statue (même chargement que les lightmaps : octets lus tels quels)
+  const nomsRapports = nomsLightmaps.filter((n) => config.lightmaps[n].ombreStatue)
+  const rapports = useLightmaps(nomsRapports.map((n) => config.lightmaps[n].ombreStatue!))
+  const uOmbres = uniformsOmbres(config.id)
 
   const r = useReglagesSalle(config, 'Salle', REGLAGES_SALLE)
   // Couleurs de la salle (soleil, ambiance, lueur, matières), écrites dans sa config
@@ -83,10 +91,13 @@ export function Salle({ config }: { config: SalleConfig }) {
     longueur: { value: 1.4, min: 0.2, max: 6, step: 0.05, label: 'atténuation (m)' },
   })
   useEffect(() => {
-    // Pas de reflet pour une œuvre sur socle : le socle en cache le pied
-    uReflet.uForceReflet.value = config.sculpture.reflet === false ? 0 : reflet.force
     uReflet.uFlouReflet.value = reflet.flou
-  }, [uReflet, reflet.force, reflet.flou, config.sculpture.reflet])
+  }, [uReflet, reflet.flou])
+  // Pas de reflet pour une œuvre sur socle (le socle en cache le pied), ni quand la machine peine
+  // (renoncements.ts) : à force nulle, la passe du reflet n'est plus dessinée (Reflet.tsx)
+  useFrame(() => {
+    uReflet.uForceReflet.value = config.sculpture.reflet === false || sansReflets() ? 0 : reflet.force
+  })
 
   const materiaux = useMemo(() => {
     const parNom: Record<string, THREE.Texture> = {}
@@ -107,14 +118,16 @@ export function Salle({ config }: { config: SalleConfig }) {
       appliquerPierre(
         m[nom],
         { grain: 0, voile: 0, nuances: 0 },
-        { k: config.lightmaps[lightmap].k },
+        config.lightmaps[lightmap],
         uSalle,
         SOLS.includes(nom) ? uReflet : undefined,
+        uOmbres,
+        nomsRapports.includes(lightmap) ? rapports[nomsRapports.indexOf(lightmap)] : undefined,
       )
     }
     return m
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [textures, config, uSalle])
+  }, [textures, rapports, config, uSalle])
 
   useEffect(() => {
     for (const m of Object.values(materiaux)) {
@@ -123,7 +136,11 @@ export function Salle({ config }: { config: SalleConfig }) {
       m.lightMapIntensity = m.userData.lightmap.echelle * Math.PI * r.lumiere
       reglerPierre(m, r)
     }
-  }, [materiaux, r])
+    uOmbres.uOmbres.value = r.ombres
+    uOmbres.uStatue.value = r.ombreStatue
+    // Pivot : la lumière la plus vive de l'architecture (échelle de sa lightmap)
+    uOmbres.uPivot.value = (config.lightmaps.salle ?? Object.values(config.lightmaps)[0]).echelle
+  }, [materiaux, r, uOmbres, config.lightmaps])
   useEffect(() => {
     for (const [nom, m] of Object.entries(materiaux)) {
       const { couleur, lumineuse } = config.matieres[nom]
@@ -515,5 +532,5 @@ export function prechargerSalle(config: SalleConfig) {
   useGLTF.preload(config.modele)
   useGLTF.preload(config.sculpture.modele)
   tableFaisceau(config.soleil)
-  prechargerLightmaps(Object.keys(config.lightmaps).map((n) => config.lightmaps[n].image))
+  prechargerLightmaps(Object.values(config.lightmaps).flatMap((l) => (l.ombreStatue ? [l.image, l.ombreStatue] : [l.image])))
 }

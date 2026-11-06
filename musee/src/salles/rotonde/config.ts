@@ -25,7 +25,11 @@ export const salleRotonde: SalleConfig = {
   modele: versionne('/models/rotonde-salle.glb'),
   lightmaps: {
     salle: { image: versionne('/models/rotonde-salle-lightmap.ktx2'), ...lightmapRotonde },
-    mobilier: { image: versionne('/models/rotonde-salle-lightmap-mobilier.ktx2'), ...lightmapMobilierRotonde },
+    mobilier: {
+      image: versionne('/models/rotonde-salle-lightmap-mobilier.ktx2'),
+      ...lightmapMobilierRotonde,
+      ombreStatue: versionne('/models/rotonde-ombre-statue.png'), // blender/ombre-statue.sh rotonde
+    },
   },
   // Ambiance « calcaire doré » (choix de Ludovic du 05/11 ; gris bleu de la vignette avant) : la lumière
   // précalculée avec les albédos beiges de rotonde.py est déjà chaude (rebonds) ; la pierre du site, presque

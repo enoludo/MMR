@@ -27,7 +27,11 @@ export const salleProvisoire: SalleConfig = {
   modele: versionne('/models/salle.glb'),
   lightmaps: {
     salle: { image: versionne('/models/salle-lightmap.ktx2'), ...lightmapSalle },
-    mobilier: { image: versionne('/models/salle-lightmap-mobilier.ktx2'), ...lightmapMobilier },
+    mobilier: {
+      image: versionne('/models/salle-lightmap-mobilier.ktx2'),
+      ...lightmapMobilier,
+      ombreStatue: versionne('/models/ombre-statue.png'), // blender/ombre-statue.sh seuil
+    },
   },
   // Couleur de chaque matière = albédo utilisé dans Blender (même rendu des rebonds)
   matieres: {
