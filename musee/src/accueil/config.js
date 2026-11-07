@@ -162,11 +162,11 @@ export const CONFIG = {
  * entre les cartes : le pas (`pitch`) est multiplié par `ECART_MOBILE` (touche M « Spirale
  * (mobile) », en direct). Molette, glisser et rotation automatique sont dans la même unité que le
  * pas : multipliés d'autant, les cartes passent au même rythme. Accueil.tsx recale la spirale (même
- * carte au centre) et reconstruit ses cases quand le pas change. 1,15 : avec des cartes 4/3, on
- * retrouve l'écart du 16/9 et l'on voit encore le haut et le bas des cartes du tour voisin (à 1,5,
- * elles sortaient de l'écran en 375 × 667).
+ * carte au centre) et reconstruit ses cases quand le pas change. 1,9 : réglage de Ludovic (07/11,
+ * cartes 4/3) ; 1,15 proposé avant (écart du 16/9). Au-delà de 1,5 environ, les cartes du tour voisin
+ * sortent de l'écran en 375 × 667 : une carte seule à la fois.
  */
-export const ECART_MOBILE = 1.15;
+export const ECART_MOBILE = 1.9;
 export const PAS_DE_BASE = {
   pitch: CONFIG.pitch,
   wheelSensitivity: CONFIG.wheelSensitivity,
