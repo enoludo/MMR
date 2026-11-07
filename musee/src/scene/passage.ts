@@ -18,6 +18,12 @@ export const LONGUEUR_COULOIR = 14
 /** Groupes 3D des salles chargées, par clé de visite (voir store.SalleVisitee) */
 export const groupesSalles = new Map<number, THREE.Group>()
 
+/**
+ * Salles prêtes à être vues, par clé de visite : la salle d'arrivée d'un passage reste cachée le temps
+ * de sa préparation (PreparationPassage, Experience.tsx) ; le bout du couloir garde sa lueur jusque-là.
+ */
+export const sallesPretes = new Set<number>()
+
 /** Angle horizontal d'une direction (même convention que la navigation : 0 = +z) */
 const cap = (d: THREE.Vector3 | Vec3) => (Array.isArray(d) ? Math.atan2(d[0], d[2]) : Math.atan2(d.x, d.z))
 

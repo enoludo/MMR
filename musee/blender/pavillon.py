@@ -55,9 +55,9 @@ INT, EXT, PLAT, CONGE = 15.5, 18.971, 16.0, 1.0
 OUV = 4 * math.sqrt(2)
 # Plafond de l'espace central doublé le 06/11 (6 → 12 m, demande de Ludovic)
 H_INT, TOIT = 12.0, 1.0
-# Hauteur des deux ouvertures de l'espace central (07/11, demande de Ludovic : 4 m ; avant, toute la hauteur) :
-# un linteau les ferme au-dessus
-H_OUV = 4.0
+# Hauteur des deux ouvertures de l'espace central (07/11, demande de Ludovic : 4 m, puis 12 m le même jour, soit
+# toute la hauteur) : sous H_INT, un linteau les ferme au-dessus
+H_OUV = 12.0
 # Plus de socle depuis le 05/11 (demande de Ludovic) : l'œuvre flotte à la même hauteur (pied du modèle à OEUVRE_Z)
 OEUVRE_Z = 0.8
 # Puits de lumière au-dessus de l'œuvre (06/11, demande de Ludovic, d'après references/souffle) : cylindre de
@@ -78,6 +78,32 @@ LAVAGE_FORCE, LAVAGE_COULEUR, LAVAGE_RETRAIT = 40.0 * ECHELLE, "#6f8fdc", 0.25
 LAVAGE_COULEUR2, LAVAGE_PERIODE, LAVAGE_MELANGE, LAVAGE_PAS = "#e3c9a1", 4.0, 0.0, 0.5
 BANC_R, BANC_P, BANC_H = 6.47, 0.76, 0.45
 BANCS = [(-45 - 22.5, -45 + 22.5), (135 - 22.5, 135 + 22.5)]
+# Repères d'échelle (07/11, essai demandé par Ludovic : faire comprendre la taille de l'œuvre) :
+# - bancs droits de musée à la place des bancs en arc : assise de chêne sur deux pieds d'acier noir, aux mêmes angles,
+#   le long du cercle (BANCS_DROITS = False : retour aux bancs en arc) ;
+# - mise à distance : anneau bas d'acier noir autour de l'œuvre (ANNEAU_R, un peu plus large que le puits) ;
+# - cartel sur pupitre (plaque claire inclinée sur un pied d'acier), devant l'œuvre, décalé de l'axe de la vue
+#   d'arrivée. Les joints du sol sont dessinés par le site (« Joints du sol », touche M).
+BANCS_DROITS = True
+# Bancs retirés le 07/11 (demande de Ludovic) ; True pour les remettre
+BANCS_ACTIFS = False
+BANC_L, BANC_PROF, BANC_ASSISE, BANC_EP = 2.4, 0.5, 0.45, 0.06
+ANNEAU_R, ANNEAU_L, ANNEAU_H = 2.6, 0.06, 0.03
+# Cartel dans l'axe des deux ouvertures (07/11, demande de Ludovic ; 200° avant), du côté sud-ouest, celui de la vue
+# d'arrivée, lisible en venant de l'ouverture
+CARTEL_ANGLE, CARTEL_R, CARTEL_H, CARTEL_INCL = 225.0, 3.1, 1.0, 25.0
+CARTEL_L, CARTEL_P = 0.42, 0.30
+# Luminaires à hauteur humaine (07/11, demande de Ludovic, à la place des rubans au pied des murs) :
+# - anneau d'acier noir suspendu (ANNEAU_HAUT de rayon, à ANNEAU_HAUT_Z, tenu au plafond par 4 tiges fines), qui porte
+#   PROJ_N petits projecteurs (cylindres de 20 cm, lentille lumineuse) tournés vers l'œuvre ; dans le précalcul, un spot
+#   devant chaque lentille (PROJ_FORCE, PROJ_CONE, PROJ_COULEUR) ;
+# - bornes de 40 cm (acier noir, bande lumineuse chaude en haut, BORNE_FORCE), de part et d'autre du chemin qui
+#   mène des deux ouvertures à l'œuvre.
+ANNEAU_HAUT, ANNEAU_HAUT_Z, ANNEAU_SECTION = 3.6, 6.0, 0.05
+PROJ_N, PROJ_L, PROJ_R = 8, 0.2, 0.045
+PROJ_FORCE, PROJ_CONE, PROJ_COULEUR = 250.0 * ECHELLE, 22.0, "#fff0dc"
+BORNE_COTE, BORNE_H, BORNE_FORCE, BORNE_COULEUR = 0.12, 0.40, 250.0, "#ffd7a3"
+BORNES_R, BORNES_ECART = (9.0, 12.0), 1.8   # distances au centre le long du chemin, écart de part et d'autre
 # L'œuvre (souffle.py), au-dessus du sol, face avant vers la vue d'arrivée (sud-ouest) comme dans le site ; sa lueur
 OEUVRE_ROTATION = -45.0
 # (rouge faible : à 5, les milliers de vaisseaux teintaient toute la salle en magenta ; sur l'image, la pénombre
@@ -101,6 +127,12 @@ if ECLAIRAGE:
     LAVAGE_COULEUR2 = r_.get("couleur2", LAVAGE_COULEUR2)
     LAVAGE_PERIODE, LAVAGE_MELANGE = r_.get("periode", LAVAGE_PERIODE), r_.get("melange", LAVAGE_MELANGE)
     OEUVRE_BLEU_FORCE, OEUVRE_ROUGE_FORCE = l_["bleu"] * ECHELLE, l_["rouge"] * ECHELLE
+if "projecteurs" in ECLAIRAGE:
+    p_ = ECLAIRAGE["projecteurs"]
+    PROJ_FORCE, PROJ_COULEUR, PROJ_CONE = (p_["force"] if p_["actif"] else 0) * ECHELLE, p_["couleur"], p_["cone"]
+if "bornes" in ECLAIRAGE:
+    b_ = ECLAIRAGE["bornes"]
+    BORNE_FORCE, BORNE_COULEUR = b_["force"] if b_["actif"] else 0, b_["couleur"]
 GRILLE = 1.5
 DEHORS_R, CIEL_H = 100.0, 60.0          # sous la limite de vue de la caméra du site (150 m)
 ECRAN = 32.0                            # écran du ciel autour de la salle (voir plus bas)
@@ -132,14 +164,15 @@ def mat(name, color, rough=0.9):
 # sombres, intérieur du puits clair (il s'illumine comme l'oculus de la première référence) ; mêmes couleurs dans
 # la config du site (src/salles/pavillon/config.ts)
 COULEURS_CENTRE = {"SolCentre": "#4b5059", "MurCentre": "#7c8694", "PlafondCentre": "#3b3f47", "Banc": "#8e959f",
-                   "Puits": "#a3a9b1"}
+                   "Puits": "#a3a9b1", "Cartel": "#d6d2ca"}
 COULEURS_CENTRE.update(ECLAIRAGE.get("couleurs", {}))
 MATS = [mat("Mur", lineaire("#c1bcb4")), mat("Sol", lineaire("#a09b96"), 0.6), mat("Plafond", lineaire("#bab6b1")),
         mat("SolCentre", lineaire(COULEURS_CENTRE["SolCentre"]), 0.61), mat("Banc", lineaire(COULEURS_CENTRE["Banc"])),
         mat("MurCentre", lineaire(COULEURS_CENTRE["MurCentre"]), 0.91),
         mat("PlafondCentre", lineaire(COULEURS_CENTRE["PlafondCentre"]), 0.91),
-        mat("Puits", lineaire(COULEURS_CENTRE["Puits"]), 0.92)]
-MUR, SOL, PLAF, SOL_C, BANC, MUR_C, PLAF_C, PUITS = range(8)
+        mat("Puits", lineaire(COULEURS_CENTRE["Puits"]), 0.92),
+        mat("Cartel", lineaire(COULEURS_CENTRE["Cartel"]), 0.93)]
+MUR, SOL, PLAF, SOL_C, BANC, MUR_C, PLAF_C, PUITS, CARTEL = range(9)
 ACIER = mat("Acier", lineaire("#161616"), 0.45)
 ACIER.node_tree.nodes["Principled BSDF"].inputs["Metallic"].default_value = 0.7
 DEHORS = mat("Dehors", lineaire("#d9d2c6"), 0.95)
@@ -277,12 +310,13 @@ _d = OUV / 2 / math.sqrt(2)
 _m = INT / 2
 _k = (EXT - INT) / 2
 _l = 0.05 / math.sqrt(2)
-for q in (0, 2):
+for q in ((0, 2) if H_OUV < H_INT - 1e-3 else ()):
     A_ = (_m + _d + _l, _m - _d - _l)
     B_ = (_m - _d - _l, _m + _d + _l)
     pleins.append(prisme(f"Linteau{q}", tourner([A_, (A_[0] + _k, A_[1] + _k), (B_[0] + _k, B_[1] + _k), B_], q),
                          H_OUV, H_INT + 0.5))
-pleins += [prisme("Banc", arc(a0, a1, BANC_R + BANC_P, 3) + arc(a1, a0, BANC_R, 3), -1, BANC_H) for a0, a1 in BANCS]
+if BANCS_ACTIFS and not BANCS_DROITS:
+    pleins += [prisme("Banc", arc(a0, a1, BANC_R + BANC_P, 3) + arc(a1, a0, BANC_R, 3), -1, BANC_H) for a0, a1 in BANCS]
 # Paroi du puits, du toit de l'espace central au plafond de la grande salle (et au-delà, dans la pierre)
 R_PUITS = PUITS_D / 2
 paroi = prisme("PuitsParoi", cercle(R_PUITS + PUITS_E, 128), H_INT + TOIT - 0.1, H + 0.5)
@@ -367,7 +401,7 @@ def matiere(f):
     # Dedans du puits : sa paroi (tournée vers l'axe), du trou dans le toit jusqu'en haut, et son fond
     if PUITS_ACTIF and math.hypot(c.x, c.y) < R_PUITS + 0.02 and c.z > H_INT - 1e-3:
         return PUITS
-    if math.hypot(c.x, c.y) < BANC_R + BANC_P + 0.1 and 1e-3 < c.z < BANC_H + 1e-3:
+    if BANCS_ACTIFS and math.hypot(c.x, c.y) < BANC_R + BANC_P + 0.1 and 1e-3 < c.z < BANC_H + 1e-3:
         return BANC
     # Tableaux des deux ouvertures (côtés et dessous du linteau) : comme les murs de l'espace central (07/11)
     if (c.x * c.y > 0 and INT - 0.01 < abs(c.x + c.y) < EXT + 0.01 and abs(c.y - c.x) / math.sqrt(2) < OUV / 2 + 0.01
@@ -397,6 +431,53 @@ for f in bm.faces:
     m = matiere(f)
     ajouter(groupes["Mobilier"] if m in (SOL_C, BANC, MUR_C, PLAF_C, PUITS) else groupes["Salle"], f, m)
 bm.free()
+
+
+def piece(b, sommets, faces, mi=None):
+    """Pièce faite de sommets et de faces (indices), dans un bmesh ; matière mi si donnée."""
+    vs = [b.verts.new(v) for v in sommets]
+    for f_ in faces:
+        nf = b.faces.new([vs[i] for i in f_])
+        if mi is not None:
+            nf.material_index = mi
+
+
+def boite(b, centre, axe_x, axe_y, axe_z, mi=None):
+    """Pavé : centre, et ses trois demi-axes (vecteurs) ; faces tournées vers l'extérieur quel que soit leur sens."""
+    c = Vector(centre)
+    if axe_x.cross(axe_y).dot(axe_z) < 0:
+        axe_z = -axe_z
+    som = [c + sx * axe_x + sy * axe_y + sz * axe_z for sz in (-1, 1) for sy in (-1, 1) for sx in (-1, 1)]
+    piece(b, som, [(0, 2, 3, 1), (4, 5, 7, 6), (0, 1, 5, 4), (2, 6, 7, 3), (0, 4, 6, 2), (1, 3, 7, 5)], mi)
+
+
+# Repères d'échelle : assises des bancs droits et plaque du cartel, dans le mobilier (lumière précalculée) ;
+# leurs pièces d'acier (pieds, pied du cartel, anneau) vont avec les huisseries
+ACIER_PIECES = []   # (centre, demi-axes x, y, z)
+if BANCS_ACTIFS and BANCS_DROITS:
+    for a0, a1 in BANCS:
+        ang = math.radians((a0 + a1) / 2)
+        rad = Vector((math.cos(ang), math.sin(ang), 0))
+        tan_ = Vector((-rad.y, rad.x, 0))
+        c = rad * (BANC_R + BANC_P / 2)
+        haut_ = Vector((0, 0, 1))
+        boite(groupes["Mobilier"], c + haut_ * (BANC_ASSISE - BANC_EP / 2), tan_ * BANC_L / 2, rad * BANC_PROF / 2,
+              haut_ * BANC_EP / 2, BANC)
+        for sens in (-1, 1):   # pieds : plaques d'acier, du dessous du sol jusque dans l'assise
+            pied = c + tan_ * sens * (BANC_L / 2 - 0.25)
+            z0, z1 = -0.01, BANC_ASSISE - BANC_EP + 0.005
+            ACIER_PIECES.append((pied + haut_ * (z0 + z1) / 2, tan_ * 0.03, rad * (BANC_PROF / 2 - 0.04), haut_ * (z1 - z0) / 2))
+ang = math.radians(CARTEL_ANGLE)
+rad = Vector((math.cos(ang), math.sin(ang), 0))
+tan_ = Vector((-rad.y, rad.x, 0))
+pied = rad * CARTEL_R
+monte = (-rad * math.cos(math.radians(CARTEL_INCL)) + Vector((0, 0, 1)) * math.sin(math.radians(CARTEL_INCL)))
+normale = tan_.cross(monte).normalized()
+if normale.z < 0:
+    normale = -normale
+boite(groupes["Mobilier"], pied + Vector((0, 0, CARTEL_H)), tan_ * CARTEL_L / 2, monte * CARTEL_P / 2, normale * 0.0125, CARTEL)
+z1 = CARTEL_H - 0.012
+ACIER_PIECES.append((pied + Vector((0, 0, (z1 - 0.01) / 2)), tan_ * 0.025, rad * 0.025, Vector((0, 0, (z1 + 0.01) / 2))))
 
 
 def finir(nom, b, materiaux, uv=True):
@@ -441,7 +522,90 @@ for q in range(4):
                 pieces.append((x0, yv - TRAVERSE_P, x1, yv + 0.03, z - MENEAU_E / 2, z + MENEAU_E / 2))
         for x0, y0, x1, y1, z0, z1 in pieces:
             prisme("", tourner(rect(x0, y0, x1, y1), q), z0, z1, b)
+# Acier des repères d'échelle : pieds des bancs, pied du cartel, anneau de mise à distance autour de l'œuvre
+for centre_, ax, ay, az in ACIER_PIECES:
+    boite(b, centre_, ax, ay, az)
+n_ = 180
+anneau = []
+for r_, z_ in ((ANNEAU_R, -0.01), (ANNEAU_R + ANNEAU_L, -0.01), (ANNEAU_R + ANNEAU_L, ANNEAU_H), (ANNEAU_R, ANNEAU_H)):
+    anneau += [(r_ * math.cos(2 * math.pi * k / n_), r_ * math.sin(2 * math.pi * k / n_), z_) for k in range(n_)]
+faces_ = []
+for k in range(n_):
+    k2 = (k + 1) % n_
+    i0, i1, i2, i3 = 0, n_, 2 * n_, 3 * n_
+    faces_ += [(i1 + k, i1 + k2, i2 + k2, i2 + k),     # côté extérieur
+               (i2 + k, i2 + k2, i3 + k2, i3 + k),     # dessus
+               (i3 + k, i3 + k2, i0 + k2, i0 + k)]     # côté intérieur
+piece(b, anneau, faces_)
+
+
+def tube(b, centre, axe, rayon, longueur, mi_avant=None, n=16):
+    """Cylindre fermé le long de axe (vecteur unitaire) ; face avant (+axe) en matière mi_avant si donnée."""
+    axe = axe.normalized()
+    u = axe.cross(Vector((0, 0, 1)) if abs(axe.z) < 0.9 else Vector((1, 0, 0))).normalized()
+    v = axe.cross(u)
+    c0, c1 = Vector(centre) - axe * longueur / 2, Vector(centre) + axe * longueur / 2
+    cercle_ = [u * math.cos(2 * math.pi * k / n) * rayon + v * math.sin(2 * math.pi * k / n) * rayon for k in range(n)]
+    arriere = [b.verts.new(c0 + p_) for p_ in cercle_]
+    avant = [b.verts.new(c1 + p_) for p_ in cercle_]
+    for k in range(n):
+        k2 = (k + 1) % n
+        b.faces.new([arriere[k], arriere[k2], avant[k2], avant[k]])
+    b.faces.new(arriere[::-1])
+    f = b.faces.new(avant)
+    if mi_avant is not None:
+        f.material_index = mi_avant
+    return c1
+
+
+# Anneau suspendu : section carrée, comme l'anneau du sol (côtés et dessus), avec son dessous
+n_ = 180
+r0_, r1_ = ANNEAU_HAUT - ANNEAU_SECTION / 2, ANNEAU_HAUT + ANNEAU_SECTION / 2
+z0_, z1_ = ANNEAU_HAUT_Z, ANNEAU_HAUT_Z + ANNEAU_SECTION
+som_ = []
+for r_, z_ in ((r0_, z0_), (r1_, z0_), (r1_, z1_), (r0_, z1_)):
+    som_ += [(r_ * math.cos(2 * math.pi * k / n_), r_ * math.sin(2 * math.pi * k / n_), z_) for k in range(n_)]
+faces_ = []
+for k in range(n_):
+    k2 = (k + 1) % n_
+    i0, i1, i2, i3 = 0, n_, 2 * n_, 3 * n_
+    faces_ += [(i0 + k, i0 + k2, i1 + k2, i1 + k), (i1 + k, i1 + k2, i2 + k2, i2 + k),
+               (i2 + k, i2 + k2, i3 + k2, i3 + k), (i3 + k, i3 + k2, i0 + k2, i0 + k)]
+piece(b, som_, faces_)
+# Tiges de suspension, de l'anneau jusque dans le plafond
+for k in range(4):
+    a_ = math.radians(45 * (2 * k + 1) + 22.5)
+    p_ = Vector((ANNEAU_HAUT * math.cos(a_), ANNEAU_HAUT * math.sin(a_), 0))
+    zb, zh = ANNEAU_HAUT_Z + ANNEAU_SECTION - 0.005, H_INT + 0.05
+    tube(b, p_ + Vector((0, 0, (zb + zh) / 2)), Vector((0, 0, 1)), 0.012, zh - zb, n=8)
+# Projecteurs sous l'anneau, tournés vers l'œuvre (lentille en matière lumineuse : indice 1 des huisseries)
+CIBLE_OEUVRE = Vector((0, 0, OEUVRE_Z + 2.0))
+PROJECTEURS = []
+for k in range(PROJ_N):
+    a_ = math.radians(360 * k / PROJ_N + 22.5)
+    attache = Vector((ANNEAU_HAUT * math.cos(a_), ANNEAU_HAUT * math.sin(a_), ANNEAU_HAUT_Z))
+    tube(b, attache - Vector((0, 0, 0.05)), Vector((0, 0, 1)), 0.01, 0.1, n=8)   # tige courte
+    centre_ = attache - Vector((0, 0, 0.12))
+    axe_ = (CIBLE_OEUVRE - centre_).normalized()
+    lentille = tube(b, centre_, axe_, PROJ_R, PROJ_L, mi_avant=1)
+    PROJECTEURS.append((lentille + axe_ * 0.02, axe_))
+# Bornes de part et d'autre du chemin des deux ouvertures (axes à 45° et 225°)
+for ang in (45.0, 225.0):
+    axe_ = Vector((math.cos(math.radians(ang)), math.sin(math.radians(ang)), 0))
+    cote = Vector((-axe_.y, axe_.x, 0))
+    for d_ in BORNES_R:
+        for sens in (-1, 1):
+            p_ = axe_ * d_ + cote * sens * BORNES_ECART
+            demi = BORNE_COTE / 2
+            boite(b, p_ + Vector((0, 0, 0.16)), Vector((demi, 0, 0)), Vector((0, demi, 0)),
+                  Vector((0, 0, 0.17)))                                      # fût, de -1 à 33 cm (dans la bande)
+            boite(b, p_ + Vector((0, 0, BORNE_H - 0.055)), Vector((demi + 0.002, 0, 0)), Vector((0, demi + 0.002, 0)),
+                  Vector((0, 0, 0.02)), 2)                                   # bande lumineuse
+            boite(b, p_ + Vector((0, 0, 0.381)), Vector((demi, 0, 0)), Vector((0, demi, 0)),
+                  Vector((0, 0, 0.019)))                                     # chapeau, de 36,2 à 40 cm
 huisseries = objet("Huisseries", b); huisseries.data.materials.append(ACIER)
+huisseries.data.materials.append(emission("Lampe", (*lineaire(PROJ_COULEUR), 1), 0.0))
+huisseries.data.materials.append(emission("Borne", (*lineaire(BORNE_COULEUR), 1), BORNE_FORCE * ECHELLE))
 
 # --- L'œuvre dans le précalcul : sa lueur seulement (le verre laisse passer la lumière et luit en bleu, les
 # vaisseaux luisent en rouge) ; elle colore le socle, le sol et les murs proches. Depuis le 05/11, plus de lumière
@@ -485,6 +649,15 @@ if PUITS_ACTIF:
     lo = bpy.data.objects.new("Puits", ld); scn.collection.objects.link(lo)
     lo.location = (0, 0, H - 0.15)
 RUBANS = []   # place des rubans, pour l'aperçu en direct du site
+
+# Projecteurs de l'anneau : un spot devant chaque lentille, tourné vers l'œuvre
+for k, (pos_, axe_) in enumerate(PROJECTEURS):
+    ld = bpy.data.lights.new(f"Projecteur{k}", "SPOT")
+    ld.energy = PROJ_FORCE; ld.color = lineaire(PROJ_COULEUR)
+    ld.spot_size = math.radians(PROJ_CONE); ld.spot_blend = 0.6; ld.shadow_soft_size = 0.04
+    lo = bpy.data.objects.new(f"Projecteur{k}", ld); scn.collection.objects.link(lo)
+    lo.location = pos_
+    lo.rotation_euler = axe_.to_track_quat("-Z", "Y").to_euler()
 
 # Lumière rasante au pied des murs de l'espace central : un ruban par pan de mur, à LAVAGE_RETRAIT du mur, tourné
 # vers le haut et un peu vers le mur ; deux pans, au nord-est et au sud-ouest, sont coupés par les ouvertures
@@ -557,7 +730,8 @@ if ESSAI:
     scn.view_settings.view_transform = "AgX"; scn.view_settings.exposure = math.log2(3.4)
     vues = {"arrivee": ((-6.01, -6.01, 1.7), (0, 0, 2.6)), "coin-est": ((-2, 2, 1.7), (INT, 0, 2.0)),
             "coin-nord": ((4, -4, 1.7), (0, INT, 2.0)), "puits": ((-3.9, -3.9, 1.7), (0, 0, 11.0)),
-            "hall": ((-17, -17, 1.7), (0, 0, 10.0)), "ouverture": ((-4.5, -8.5, 1.7), (-9.0, -9.0, 2.6))}
+            "hall": ((-17, -17, 1.7), (0, 0, 10.0)), "ouverture": ((-4.5, -8.5, 1.7), (-9.0, -9.0, 2.6)),
+            "echelle": ((-4.2, -4.2, 1.7), (0, 0, 1.6)), "anneau": ((-7.5, -7.5, 1.7), (0, 0, 4.5))}
     cd = bpy.data.cameras.new("Essai"); cd.lens = 18
     cam = bpy.data.objects.new("Essai", cd); scn.collection.objects.link(cam); scn.camera = cam
     for nom, (pos, cible) in vues.items():

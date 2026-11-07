@@ -1,5 +1,6 @@
 import type { ReglagesTransition } from '../entree'
 import type { ReglagesEffets } from '../scene/Effets'
+import type { ReglagesFlouSalle } from '../scene/FlouSalle'
 export type Vec3 = [number, number, number]
 
 /** Étape de la visite : un point de vue particulier, hors du cercle, avec un texte. */
@@ -112,6 +113,8 @@ export interface SalleConfig {
   transition?: Partial<ReglagesTransition>
   /** Effets d'image (rendu photographique) : réglages propres à la salle (sinon ceux par défaut, voir scene/Effets.tsx) */
   effets?: Partial<ReglagesEffets>
+  /** Flou de la salle autour de l'œuvre, qui reste nette (scene/FlouSalle.ts) : valeurs de départ (touche M ensuite) */
+  flouSalle?: Partial<ReglagesFlouSalle>
   /**
    * Portes de la salle : une entrée et une sortie. « Œuvre suivante » part par la sortie et
    * arrive par l'entrée de la salle suivante ; « Œuvre précédente », l'inverse.
@@ -178,6 +181,10 @@ export interface SalleConfig {
    * matières éclairées en direct.
    */
   eclairage?: { reglages: EclairageSite; lumieres: LumieresSite; atlas: string }
+  /** Joints du sol dessinés par le site sur ces matières (pavillon, 07/11 ; pierre.ts, réglables à la touche M) */
+  /** Lueur de l'œuvre sur la salle, qui suit ses variations (pavillon, 07/11 ; pierre.ts, Salle.tsx) */
+  lueurOeuvre?: { position: Vec3; couleur: string; force: number; portee: number }
+  joints?: { matieres: string[]; longueur: number; largeur: number; joint: number; force: number; angle: number; decalage?: number }
 }
 
 /** Réglages de l'éclairage figés (src/salles/pavillon/eclairage.json, lu par blender/pavillon.py) */
@@ -186,6 +193,9 @@ export interface EclairageSite {
   /** Alternance douce de couleur et couleur2 sur `periode` mètres, `melange` de 0 à 1 (07/11) */
   rubans: { actif: boolean; force: number; couleur: string; couleur2?: string; melange?: number; periode?: number }
   lueur: { bleu: number; rouge: number }
+  /** Projecteurs de l'anneau suspendu et bornes (07/11) : au calcul seulement, sans aperçu en direct */
+  projecteurs?: { actif: boolean; force: number; couleur: string; cone: number }
+  bornes?: { actif: boolean; force: number; couleur: string }
   couleurs: Record<string, string>
 }
 

@@ -11,7 +11,7 @@ import { Decentrage } from './Decentrage'
 import { VolLibre } from './VolLibre'
 import { Effets, ReglagesEffetsSalle, rendu as renduEffets } from './Effets'
 import { Couloir } from './Couloir'
-import { ORIGINE, groupesSalles, placementArrivee, portesDuPassage, type Placement } from './passage'
+import { ORIGINE, groupesSalles, placementArrivee, portesDuPassage, type Placement, sallesPretes } from './passage'
 import { store, useEtat, type SalleVisitee } from '../store'
 import type { Porte } from '../salles/types'
 import { oeuvres } from '../oeuvres'
@@ -414,6 +414,13 @@ function PreparationPassage({ cle, children }: { cle: number; children: ReactNod
       desabonner()
     }
   }, [gl, scene, camera, prete, cle])
+  useEffect(() => {
+    if (!prete) return
+    sallesPretes.add(cle)
+    return () => {
+      sallesPretes.delete(cle)
+    }
+  }, [prete, cle])
   return (
     <group ref={groupe} visible={prete}>
       {children}

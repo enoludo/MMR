@@ -45,6 +45,8 @@ export const salleRotonde: SalleConfig = {
     Fente: { couleur: '#faf5ee', lumineuse: 2.5 }, // FENTE_LUEUR dans rotonde.py
   },
   sculpture: { ...salleProvisoireBleue.sculpture, lueur: { rayon: 1.1, couleur: '#faf4eb' } },
+  // Flou de la salle autour de l'œuvre, qui reste nette (07/11, essai demandé par Ludovic ; scene/FlouSalle.ts)
+  flouSalle: { actif: true, flouPres: 22, pres: 2.5, flouLoin: 4, loin: 7, debut: 2, progression: 10, haut: 3.6 },
   ambiance: { ciel: '#ede7dd', sol: '#e9e3d6', couloir: '#e7e1d7' },
   // Vue d'arrivée à 11 m, devant les colonnes (décision du 30/10) : le recul par défaut y tient
   transition: undefined,

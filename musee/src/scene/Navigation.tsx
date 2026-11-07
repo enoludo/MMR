@@ -505,8 +505,19 @@ export function Navigation({
       groupe.rotation.set(0, 0, 0)
       groupe.updateMatrixWorld(true)
     }
+    // La salle quittée disparaît, sauf le couloir traversé : le couloir de la porte d'arrivée, qui le remplace, n'est
+    // monté qu'au rendu suivant de React ; sans lui, une image sans couloir (flash vu par Ludovic le 07/11). Il est
+    // recalé avec la salle d'arrivée (même déplacement), donc immobile à l'écran
     const depart = visitee && groupesSalles.get(visitee.cle)
-    if (depart && depart !== groupe) depart.visible = false
+    if (depart && depart !== groupe) {
+      tmp.inverse.decompose(depart.position, depart.quaternion, depart.scale)
+      const couloir = depart.getObjectsByProperty('type', 'Group').find((o) => o.userData.couloirTraverse) ?? null
+      // Tout est caché, sauf le chemin jusqu'au couloir (la salle est emballée dans des groupes intermédiaires)
+      if (!couloir) depart.visible = false
+      for (let o: THREE.Object3D | null = couloir; o && o !== depart && o.parent; o = o.parent)
+        for (const voisin of o.parent.children) if (voisin !== o) voisin.visible = false
+      depart.updateMatrixWorld(true)
+    }
     s.mode = 'cercle'
     s.anneau = 'loin'
     s.rayon = r.current.rayonLointain

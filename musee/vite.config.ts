@@ -83,6 +83,8 @@ function enregistrementCaptures(): Plugin {
             typeof r.rubans?.actif !== 'boolean' || !nombre(r.rubans.force) || !couleur(r.rubans.couleur) ||
             !couleur(r.rubans.couleur2) || !nombre(r.rubans.melange) || r.rubans.melange > 1 || !(r.rubans.periode > 0) ||
             !nombre(r.lueur?.bleu) || !nombre(r.lueur?.rouge) || typeof r.couleurs !== 'object' ||
+            typeof r.projecteurs?.actif !== 'boolean' || !nombre(r.projecteurs.force) || !couleur(r.projecteurs.couleur) ||
+            !(r.projecteurs.cone > 0) || typeof r.bornes?.actif !== 'boolean' || !nombre(r.bornes.force) || !couleur(r.bornes.couleur) ||
             !Object.entries(r.couleurs).every(([k, c]) => /^[A-Za-z]+$/.test(k) && couleur(c)))
             throw new Error('réglages refusés')
           if (calculEclairage.etat === 'calcul') throw new Error('un calcul est déjà en cours')

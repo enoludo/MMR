@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { button, useControls } from 'leva'
 import * as THREE from 'three'
 import type { EclairageSite, SalleConfig } from '../salles/types'
-import { dossierSalle } from '../reglages'
+import { dossierSalle, valeursEnregistrees } from '../reglages'
 import type { UniformsSalle } from './pierre'
 
 /**
@@ -136,10 +136,28 @@ function schema(r: EclairageSite) {
     lueurBleu: { value: r.lueur.bleu, min: 0, max: 3, step: 0.01, label: 'lueur bleue de l’œuvre (calcul)' },
     lueurRouge: { value: r.lueur.rouge, min: 0, max: 3, step: 0.01, label: 'lueur rouge de l’œuvre (calcul)' },
     // Lumière renvoyée par la salle, uniforme (le calcul en donne ≈ 0,02 hors de la flaque, 07/11)
+    projecteursActifs: { value: r.projecteurs?.actif ?? true, label: 'projecteurs de l’anneau (calcul)' },
+    projecteursForce: { value: r.projecteurs?.force ?? 250, min: 0, max: 2000, step: 5, label: 'force des projecteurs (calcul)' },
+    projecteursCouleur: { value: r.projecteurs?.couleur ?? '#fff0dc', label: 'couleur des projecteurs (calcul)' },
+    projecteursCone: { value: r.projecteurs?.cone ?? 22, min: 5, max: 90, step: 1, label: 'faisceau des projecteurs, ° (calcul)' },
+    bornesActives: { value: r.bornes?.actif ?? true, label: 'bornes (calcul)' },
+    bornesForce: { value: r.bornes?.force ?? 250, min: 0, max: 2000, step: 5, label: 'force des bornes (calcul)' },
+    bornesCouleur: { value: r.bornes?.couleur ?? '#ffd7a3', label: 'couleur des bornes (calcul)' },
     rebond: { value: 0.02, min: 0, max: 0.2, step: 0.001, label: 'lumière renvoyée (aperçu)' },
   }
 }
 type Valeurs = { [K in keyof ReturnType<typeof schema>]: ReturnType<typeof schema>[K]['value'] }
+
+/**
+ * Valeurs enregistrées par le bouton « Enregistrer les réglages de cette salle » (reglages.json, 07/11 : sinon le
+ * dossier reprenait au rechargement les valeurs du dernier calcul) ; l'aperçu en direct repart toujours éteint
+ */
+function avecEnregistres<S extends Record<string, { value: unknown }>>(s: S, sauves: Record<string, unknown>): S {
+  const r = { ...s }
+  for (const cle of Object.keys(r) as (keyof S & string)[])
+    if (cle !== 'direct' && typeof sauves[cle] === typeof r[cle].value) r[cle] = { ...r[cle], value: sauves[cle] }
+  return r
+}
 
 type Etat = { etat: 'libre' | 'calcul' | 'fini' | 'erreur'; debut?: number; fin?: number; message?: string }
 const texteEtat = (e: Etat) => {
@@ -159,10 +177,11 @@ export function EclairageDirect({ config, scene, uSalle, lumiere }: {
   const ecl = config.eclairage!
   const dossier = dossierSalle('Éclairage', config)
   const derniers = useRef<Valeurs | null>(null)
+  // Bouton « Figer » et état du calcul en tête du dossier (07/11 : en bas, Ludovic ne le trouvait pas)
   const [v, regler] = useControls(dossier, () => ({
-    ...schema(ecl.reglages),
-    'Figer (calcul ≈ 20 min)': button(() => derniers.current && figer(config, derniers.current)),
+    'FIGER : lancer le calcul (≈ 20 min)': button(() => derniers.current && figer(config, derniers.current)),
     calcul: { value: 'rien en cours', editable: false, label: 'calcul' },
+    ...avecEnregistres(schema(ecl.reglages), valeursEnregistrees(config, 'Éclairage')),
   }), [config.id]) as unknown as [Valeurs & { calcul: string }, (v: Record<string, unknown>) => void]
   useEffect(() => {
     derniers.current = v
@@ -277,6 +296,8 @@ async function figer(config: SalleConfig, v: Valeurs) {
       couleur2: v.rubansCouleur2, melange: v.rubansMelange, periode: v.rubansPeriode,
     },
     lueur: { bleu: v.lueurBleu, rouge: v.lueurRouge },
+    projecteurs: { actif: v.projecteursActifs, force: v.projecteursForce, couleur: v.projecteursCouleur, cone: v.projecteursCone },
+    bornes: { actif: v.bornesActives, force: v.bornesForce, couleur: v.bornesCouleur },
     couleurs,
   }
   if (!window.confirm('Figer ces réglages et lancer le calcul de la lumière (≈ 20 min) ?')) return

@@ -113,6 +113,67 @@ export const textureBruit = (() => {
   return t
 })()
 
+/**
+ * Joints du sol (07/11, pavillon : repère d'échelle demandé par Ludovic) : dalles de `longueur` × `largeur` m,
+ * alignées (rangs décalés de `uJointsDecalage` dalle : 0 depuis le 07/11, demande de Ludovic ; 0,5 en quinconce), joint plus sombre de `joint` m, tournées de `angle` ; adoucis à l'écran (fwidth)
+ * pour ne pas scintiller au loin. Réglés à la touche M (« Joints du sol · <salle> », Salle.tsx).
+ */
+export type UniformsJoints = {
+  uJoints: { value: THREE.Vector4 } // longueur, largeur, joint, force
+  uJointsAngle: { value: number }
+  /** Décalage d'un rang sur l'autre, en part de dalle (0 : dalles alignées, 0,5 : en quinconce) */
+  uJointsDecalage: { value: number }
+}
+export const creerUniformsJoints = (): UniformsJoints => ({
+  uJoints: { value: new THREE.Vector4(1.2, 0.6, 0.004, 0.35) },
+  uJointsAngle: { value: 0 },
+  uJointsDecalage: { value: 0 },
+})
+const GLSL_JOINTS = /* glsl */ `
+uniform vec4 uJoints;
+uniform float uJointsAngle, uJointsDecalage;
+float joints(vec3 p, vec3 n) {
+  if (n.y < 0.9) return 1.0;
+  float c = cos(uJointsAngle), s = sin(uJointsAngle);
+  vec2 q = vec2(c * p.x - s * p.z, s * p.x + c * p.z);
+  float rang = floor(q.y / uJoints.y);
+  q.x += mod(rang, 2.0) * uJointsDecalage * uJoints.x;
+  vec2 bord = (0.5 - abs(fract(q / uJoints.xy) - 0.5)) * uJoints.xy; // distance au joint le plus proche (m)
+  vec2 w = fwidth(q);
+  vec2 ligne = 1.0 - smoothstep(vec2(uJoints.z * 0.5) - w, vec2(uJoints.z * 0.5) + w, bord);
+  // Au loin, le joint devient plus fin qu'un pixel : on l'estompe au lieu de le laisser scintiller
+  float loin = clamp(uJoints.z / max(max(w.x, w.y), 1e-5), 0.0, 1.0);
+  return 1.0 - uJoints.w * max(ligne.x, ligne.y) * mix(0.35, 1.0, loin);
+}
+`
+
+/**
+ * Lueur de l'œuvre sur la salle (07/11, pavillon : demande de Ludovic) : lumière ajoutée à la lumière précalculée,
+ * qui suit les variations des bronches incandescentes (Salle.tsx, LueurOeuvre) ; décroît avec la distance au cœur
+ * de l'œuvre (`uLueurPortee`), un peu plus forte sur les faces tournées vers elle.
+ */
+export type UniformsLueur = {
+  uLueurPos: { value: THREE.Vector3 }
+  uLueurCouleur: { value: THREE.Color }
+  uLueurPortee: { value: number }
+}
+export const creerUniformsLueur = (): UniformsLueur => ({
+  uLueurPos: { value: new THREE.Vector3() },
+  uLueurCouleur: { value: new THREE.Color(0, 0, 0) },
+  uLueurPortee: { value: 3 },
+})
+const GLSL_LUEUR = /* glsl */ `
+uniform vec3 uLueurPos;
+uniform vec3 uLueurCouleur;
+uniform float uLueurPortee;
+vec3 lueurOeuvre(vec3 p, vec3 n) {
+  vec3 l = uLueurPos - p;
+  float d2 = dot(l, l);
+  float face = 0.35 + 0.65 * max(dot(n, l * inversesqrt(max(d2, 1e-4))), 0.0);
+  return uLueurCouleur * face / (1.0 + d2 / (uLueurPortee * uLueurPortee));
+}
+`
+
 export function appliquerPierre(
   m: THREE.MeshBasicMaterial,
   r: ReglagesPierre,
@@ -121,6 +182,8 @@ export function appliquerPierre(
   reflet: UniformsReflet | undefined,
   ombres: UniformsOmbres,
   rapportStatue?: THREE.Texture,
+  joints?: UniformsJoints,
+  lueur?: UniformsLueur,
 ) {
   const uniforms = {
     ...ombres,
@@ -134,7 +197,7 @@ export function appliquerPierre(
   }
   m.userData.pierre = uniforms
   m.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, uniforms, salle, reflet ?? {})
+    Object.assign(shader.uniforms, uniforms, salle, reflet ?? {}, joints ?? {}, lueur ?? {})
     shader.vertexShader = shader.vertexShader
       .replace(
         '#include <common>',
@@ -151,17 +214,26 @@ export function appliquerPierre(
       .replace('#include <common>', `#include <common>\n${GLSL_PIERRE}\n${GLSL_PORTE}\n${GLSL_LUMIERE}`)
       .replace(
         '#include <map_fragment>',
-        '#include <map_fragment>\nif (auDelaDesPortes(vPosSalle)) discard;\ndiffuseColor.rgb *= pierre(vPosSalle, vNormPierre);',
+        '#include <map_fragment>\nif (auDelaDesPortes(vPosSalle)) discard;\ndiffuseColor.rgb *= pierre(vPosSalle, vNormPierre);' +
+          (joints ? '\ndiffuseColor.rgb *= joints(vPosSalle, normalize(vNormPierre));' : ''),
       )
       // lightmap encodée en logarithmique : on la décode
       .replace('lightMapTexel.rgb * lightMapIntensity', 'lumierePrecalculee(lightMapTexel.rgb, vLightMapUv) * lightMapIntensity')
+    if (joints) shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `#include <common>\n${GLSL_JOINTS}`)
+    if (lueur)
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', `#include <common>\n${GLSL_LUEUR}`)
+        .replace(
+          'lumierePrecalculee(lightMapTexel.rgb, vLightMapUv) * lightMapIntensity',
+          '(lumierePrecalculee(lightMapTexel.rgb, vLightMapUv) * lightMapIntensity + lueurOeuvre(vPosSalle, normalize(vNormPierre)) * PI)',
+        )
     if (reflet)
       shader.fragmentShader = shader.fragmentShader
         .replace('#include <common>', `#include <common>\n${GLSL_REFLET}`)
         .replace('#include <tonemapping_fragment>', `${GLSL_REFLET_APPLIQUE}\n#include <tonemapping_fragment>`)
   }
   if (rapportStatue) m.defines = { ...m.defines, RAPPORT_STATUE: '' }
-  m.customProgramCacheKey = () => `pierre-v8${reflet ? '-reflet' : ''}${rapportStatue ? '-statue' : ''}`
+  m.customProgramCacheKey = () => `pierre-v8${reflet ? '-reflet' : ''}${rapportStatue ? '-statue' : ''}${joints ? '-joints' : ''}${lueur ? '-lueur' : ''}`
   m.needsUpdate = true
 }
 

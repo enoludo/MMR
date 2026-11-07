@@ -1,14 +1,17 @@
-import { useEffect, useMemo } from 'react'
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useGLTF } from '@react-three/drei'
+import { useFrame } from '@react-three/fiber'
 import { useLightmap } from './lightmaps'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import type { Porte, SalleConfig } from '../salles/types'
 import { GLSL_PIERRE, textureBruit, uniformsOmbres } from './pierre'
-import { LONGUEUR_COULOIR, matricePlacement, placementCouloir } from './passage'
+import { LONGUEUR_COULOIR, matricePlacement, placementArrivee, placementCouloir, sallesPretes } from './passage'
+import { store } from '../store'
 import { GLSL_SORTIE, uSortie } from './Effets'
 import { useReglagesSalle } from '../reglages'
 import { AMBIANCE_CHAUDE, PARTIE_COULEURS, schemaCouleurs } from '../salles/couleurs'
+import { couloirsEntreSalles } from '../salles/couloirs'
 
 /**
  * Couloir entre deux salles, derrière la porte (références : references/couloir).
@@ -32,8 +35,20 @@ import { AMBIANCE_CHAUDE, PARTIE_COULEURS, schemaCouleurs } from '../salles/coul
  *
  * Raccord avec la salle : le sol, le plafond et le mur qui se prolongent dans le couloir
  * (la porte est au bord de son mur) reprennent, au seuil, la lumière précalculée de la salle
- * au même endroit (sa lightmap), puis passent en quelques mètres à celle du couloir.
+ * au même endroit (sa lightmap), puis passent en quelques mètres à celle du couloir. Depuis le
+ * 07/11, de même au bout, avec la salle voisine (RaccordBout).
+ *
+ * Un même couloir, vu de ses deux salles (07/11, saut de lumière à l'arrivée signalé par Ludovic) :
+ * pendant un passage on traverse le couloir de la salle de départ ; à l'arrivée, il est remplacé par
+ * celui de la salle d'arrivée. Les deux doivent être identiques : réglages « Couloir » de la salle
+ * dont c'est la sortie (`reglagesDuCouloir`), raccords aux deux bouts, paroi ensoleillée du dehors
+ * absente si l'une des deux salles a un vrai dehors.
  */
+/** Durée du fondu de la lueur du bout, au départ d'un passage (s) */
+const FONDU_LUEUR = 0.6
+/** Lueur au seuil du couloir traversé : de 0 à 1 entre ces distances de la caméra au bout du couloir, dans la salle d'arrivée (m) */
+const LUEUR_SEUIL: [number, number] = [2, 9]
+
 /** Fente zénithale du couloir : largeur et profondeur (FENTE, FENTE_P dans blender/salle.py) */
 const FENTE_ZENITHALE: [number, number] = [0.9, 3]
 
@@ -53,7 +68,7 @@ export function Couloir({
    */
   voisine?: SalleConfig
 }) {
-  const c = useReglagesSalle(config, 'Couloir', {
+  const c = useReglagesSalle(reglagesDuCouloir(config, porte, voisine), 'Couloir', {
     soleil: { value: 1.2, min: 0, max: 4, step: 0.01 },
     hauteurSoleil: { value: 32, min: 5, max: 75, step: 1, label: 'hauteur du soleil (°)' },
     // D'où vient le soleil, depuis le nord dans le sens horaire (90 = est). Une paroi épaisse ne
@@ -169,11 +184,15 @@ export function Couloir({
       uRaccordActif: { value: new THREE.Vector3(+!!raccords.sol, +!!raccords.plafond, +!!raccords.mur) },
       uCoteMur: { value: raccords.coteMur || 1 },
       uFonduRaccord: { value: 4 },
+      // Raccord au bout, avec la salle voisine (RaccordBout ; éteint tant qu'elle n'est pas chargée)
+      ...uniformsBout(),
     }),
     [L, W, H, config.matieres, config.soleil, autre, porte, atlas, lightmap, raccords, versCouloir, zenith, zenithale],
   )
 
-  useEffect(() => {
+  // Avant la première image (useLayoutEffect) : un couloir monté à l'arrivée d'un passage (celui de la porte
+  // d'arrivée) était dessiné une fois sans soleil ni ambiance, noir (flash vu par Ludovic le 07/11)
+  useLayoutEffect(() => {
     const h = THREE.MathUtils.degToRad(c.hauteurSoleil)
     const a = THREE.MathUtils.degToRad(azimut)
     // Direction de propagation dans le repère de la salle (x = est, −z = nord), puis du couloir
@@ -311,7 +330,7 @@ export function Couloir({
           'vec3 outgoingLight = couleurCouloir(normalize(vNormLocal), ambianceVoisine(vLocal)) * pierre(vPosPierre, vNormPierre) * eclairageCouloir(vLocal, normalize(vNormLocal));',
         )
     }
-    m.customProgramCacheKey = () => 'couloir-v7'
+    m.customProgramCacheKey = () => 'couloir-v8'
     return m
   }, [uniforms])
 
@@ -396,35 +415,154 @@ export function Couloir({
     return g
   }, [W, H, L])
 
-  const dehors = useMemo(() => new THREE.MeshBasicMaterial({ color: '#fff3e2' }), [])
+  const dehors = useMemo(() => new THREE.MeshBasicMaterial({ color: '#fff3e2', transparent: true }), [])
+  const meshDehors = useRef<THREE.Mesh>(null)
   dehors.color.set('#fff3e2').multiplyScalar(c.dehors)
-  // Au bout, la porte de la salle suivante : une lueur, remplacée par la vraie salle pendant un passage
-  const lueur = useMemo(() => new THREE.MeshBasicMaterial({ color: new THREE.Color(0.05, 0.04, 0.032) }), [])
+  // Au bout, la porte de la salle suivante : une lueur, remplacée par la vraie salle pendant un passage.
+  // En fondu dans les deux sens (07/11, sauts vus par Ludovic) : au départ, elle s'efface une fois la salle
+  // d'arrivée prête (cachée le temps de sa préparation) ; à l'arrivée, le couloir traversé est remplacé par
+  // celui de la salle d'arrivée, dont la lueur cache la salle quittée : la même lueur, posée au seuil du
+  // couloir traversé, apparaît pendant qu'on s'éloigne dans la salle d'arrivée.
+  const lueur = useMemo(() => new THREE.MeshBasicMaterial({ color: new THREE.Color(0.05, 0.04, 0.032), transparent: true }), [])
+  const lueurSeuil = useMemo(
+    () => new THREE.MeshBasicMaterial({ color: new THREE.Color(0.05, 0.04, 0.032), transparent: true, opacity: 0, side: THREE.DoubleSide }),
+    [],
+  )
+  const groupe = useRef<THREE.Group>(null)
+  const meshBout = useRef<THREE.Mesh>(null)
+  const meshSeuil = useRef<THREE.Mesh>(null)
+  const fondu = useRef({ bout: 1, camera: new THREE.Vector3() })
+  useFrame(({ camera }, dt) => {
+    const g = groupe.current
+    if (!g || !meshBout.current || !meshSeuil.current) return
+    const f = fondu.current
+    const passage = store.get().passage
+    // Couloir traversé, gardé une image après l'arrivée (Navigation.arriver) : son bout donne sur la salle d'arrivée
+    const visee = traverse && (!passage || sallesPretes.has(passage.cle)) ? 0 : 1
+    f.bout = visee < f.bout ? Math.max(visee, f.bout - Math.min(dt, 0.05) / FONDU_LUEUR) : visee
+    lueur.opacity = f.bout
+    meshBout.current.visible = !ferme && f.bout > 0.001
+    // Au seuil : selon l'avancée de la caméra dans la salle d'arrivée, au-delà du bout du couloir
+    const zc = traverse ? g.worldToLocal(f.camera.copy(camera.position)).z : 0
+    lueurSeuil.opacity = traverse ? THREE.MathUtils.smoothstep(-L - zc, LUEUR_SEUIL[0], LUEUR_SEUIL[1]) : 0
+    meshSeuil.current.visible = lueurSeuil.opacity > 0.001
+    // Paroi ensoleillée derrière les fentes, selon où est la caméra (07/11) : effacée du côté d'une salle qui a un
+    // vrai dehors (pavillon : on la verrait par ses baies, et ce dehors se voit par les fentes), en fondu le long du
+    // couloir. Avant, elle était absente dès que l'une des deux salles avait un dehors : vu de l'autre salle, le
+    // dehors visible par les fentes disparaissait avec le pavillon à l'arrivée d'un passage (traits lumineux)
+    if (meshDehors.current) {
+      const zd = g.worldToLocal(f.camera.copy(camera.position)).z
+      const vu = (d?: boolean) => (d ? 0 : 1)
+      const visible = THREE.MathUtils.lerp(vu(config.dehors), vu((voisine ?? config).dehors), THREE.MathUtils.smoothstep(-zd, 0, L))
+      dehors.opacity = visible
+      meshDehors.current.visible = visible > 0.001
+    }
+  })
   // Le ciel vu par la fente zénithale (comme celui de la salle, Salle.tsx)
   const ciel = useMemo(() => new THREE.MeshBasicMaterial({ color: new THREE.Color(2.6, 2.9, 3.4), side: THREE.DoubleSide }), [])
 
   return (
-    <group position={placement.position} rotation-y={placement.rotationY} scale-x={placement.miroir ? -1 : 1}>
+    <group ref={groupe} position={placement.position} rotation-y={placement.rotationY} scale-x={placement.miroir ? -1 : 1} userData={{ couloirTraverse: traverse }}>
       <mesh geometry={geometrie} material={pierre} />
-      {/* Le dehors, vu par les fentes : une paroi ensoleillée (sans dépasser dans les salles) ; pas dans
-          une salle qui a un vrai dehors, vu par ses baies (on verrait la paroi) */}
-      {!config.dehors && (
-        <mesh material={dehors} position={[-W / 2 - c.epaisseur - 1.5, H / 2 + 2, -L / 2]} rotation-y={Math.PI / 2}>
-          <planeGeometry args={[L, H + 6]} />
-        </mesh>
-      )}
+      {/* Le dehors, vu par les fentes : une paroi ensoleillée (sans dépasser dans les salles), effacée du côté d'une
+          salle qui a un vrai dehors (voir useFrame) */}
+      <mesh ref={meshDehors} material={dehors} position={[-W / 2 - c.epaisseur - 1.5, H / 2 + 2, -L / 2]} rotation-y={Math.PI / 2}>
+        <planeGeometry args={[L, H + 6]} />
+      </mesh>
       {zenithale && (
         // Un peu au-dessus du haut de la fente et un peu plus grand qu'elle (voir Ciel, Salle.tsx)
         <mesh material={ciel} position={[W / 2 - FENTE_ZENITHALE[0] / 2, H + FENTE_ZENITHALE[1] + 0.05, (zenith.x + zenith.y) / 2]} rotation-x={Math.PI / 2}>
           <planeGeometry args={[FENTE_ZENITHALE[0] + 0.4, zenith.y - zenith.x + 0.4]} />
         </mesh>
       )}
-      <mesh material={lueur} position={[0, H / 2, -L]} visible={!traverse && !ferme}>
+      <mesh ref={meshBout} material={lueur} position={[0, H / 2, -L]} visible={!ferme}>
+        <planeGeometry args={[W, H]} />
+      </mesh>
+      <mesh ref={meshSeuil} material={lueurSeuil} position={[0, H / 2, -0.02]} visible={false}>
         <planeGeometry args={[W, H]} />
       </mesh>
       <mesh geometry={volume} material={rayons} renderOrder={5} frustumCulled={false} />
+      {voisine && !ferme && (
+        <Suspense fallback={null}>
+          <RaccordBout porte={porte} voisine={voisine} uniforms={uniforms as unknown as UniformsBout} />
+        </Suspense>
+      )}
     </group>
   )
+}
+
+/**
+ * Réglages « Couloir » d'un couloir. Entre deux salles : réglages communs (salles/couloirs.ts), pour qu'un
+ * couloir soit le même vu de ses deux salles et que tous se ressemblent. Une impasse : ceux de sa salle.
+ */
+export function reglagesDuCouloir(config: SalleConfig, porte: Porte, voisine?: SalleConfig) {
+  return voisine && !porte.couloir?.ferme ? couloirsEntreSalles : config
+}
+
+/** Porte de la salle voisine qui donne sur ce couloir */
+const porteEnFace = (porte: Porte, voisine: SalleConfig) => {
+  const id = porte.id === 'sortie' ? 'entree' : 'sortie'
+  return voisine.portes.find((p) => p.id === id) ?? voisine.portes[0]
+}
+
+const uniformsBout = () => ({
+  uLightmapBout: { value: null as THREE.Texture | null },
+  uKBout: { value: 1 },
+  uEchelleBout: { value: 1 },
+  uOmbresBout: { value: 1 },
+  uPivotBout: { value: 1 },
+  uRaccordSolBout: { value: new THREE.Vector4() },
+  uRaccordPlafondBout: { value: new THREE.Vector4() },
+  uRaccordMurBout: { value: new THREE.Vector4() },
+  uRaccordActifBout: { value: new THREE.Vector3() },
+  uCoteMurBout: { value: 1 },
+  uMiroirBout: { value: 1 },
+})
+type UniformsBout = ReturnType<typeof uniformsBout>
+
+/**
+ * Raccord du bout du couloir avec la salle voisine, comme celui du seuil : sa lumière précalculée
+ * au seuil de sa porte. Chargée à part (Suspense) : le couloir s'affiche sans l'attendre.
+ * Le couloir vu depuis la voisine a son seuil à notre bout (z' = −L − z) ; x' = ±x selon les
+ * symétries des deux couloirs (uMiroirBout).
+ */
+function RaccordBout({ porte, voisine, uniforms }: { porte: Porte; voisine: SalleConfig; uniforms: UniformsBout }) {
+  const nomAtlas = voisine.matieres.Mur?.lightmap ?? 'salle'
+  const atlas = voisine.lightmaps[nomAtlas]
+  const gltf = useGLTF(voisine.modele)
+  const lightmap = useLightmap(atlas.image)
+  const enFace = porteEnFace(porte, voisine)
+  const raccords = useMemo(() => raccordsSalle(gltf.scene, voisine, nomAtlas, enFace), [gltf.scene, voisine, nomAtlas, enFace])
+  const miroir = useMemo(() => {
+    // Point du couloir (notre repère) → notre salle → salle voisine posée au bout → repère du couloir vu d'elle
+    const versNotreSalle = matricePlacement(placementCouloir(porte))
+    const voisineDansNotre = matricePlacement(placementArrivee(porte, enFace))
+    const versLeSien = matricePlacement(placementCouloir(enFace)).invert().multiply(voisineDansNotre.clone().invert()).multiply(versNotreSalle)
+    const a = new THREE.Vector3(0, 0, -LONGUEUR_COULOIR / 2).applyMatrix4(versLeSien)
+    const b = new THREE.Vector3(1, 0, -LONGUEUR_COULOIR / 2).applyMatrix4(versLeSien)
+    return b.x - a.x < 0 ? -1 : 1
+  }, [porte, enFace])
+  useLayoutEffect(() => {
+    uniforms.uLightmapBout.value = lightmap
+    uniforms.uKBout.value = atlas.k
+    uniforms.uEchelleBout.value = atlas.echelle
+    if (raccords.sol) uniforms.uRaccordSolBout.value.copy(raccords.sol)
+    if (raccords.plafond) uniforms.uRaccordPlafondBout.value.copy(raccords.plafond)
+    if (raccords.mur) uniforms.uRaccordMurBout.value.copy(raccords.mur)
+    uniforms.uCoteMurBout.value = raccords.coteMur || 1
+    uniforms.uMiroirBout.value = miroir
+    uniforms.uRaccordActifBout.value.set(+!!raccords.sol, +!!raccords.plafond, +!!raccords.mur)
+    return () => {
+      uniforms.uRaccordActifBout.value.set(0, 0, 0)
+    }
+  }, [uniforms, voisine, lightmap, atlas, raccords, miroir])
+  // Courbe des ombres de la voisine (touche M « Salle · <voisine> »), suivie en direct
+  const ombres = uniformsOmbres(voisine.id)
+  useFrame(() => {
+    uniforms.uOmbresBout.value = ombres.uOmbres.value
+    uniforms.uPivotBout.value = ombres.uPivot.value
+  })
+  return null
 }
 
 /** Fraction de soleil reçue en un point, à travers les fentes de la paroi (x < 0). */
@@ -524,6 +662,17 @@ uniform vec3 uRaccordActif;
 uniform float uCoteMur;
 uniform float uFonduRaccord;
 uniform vec3 uZenithSoleil;
+uniform sampler2D uLightmapBout;
+uniform float uKBout;
+uniform float uEchelleBout;
+uniform float uOmbresBout;
+uniform float uPivotBout;
+uniform vec4 uRaccordSolBout;
+uniform vec4 uRaccordPlafondBout;
+uniform vec4 uRaccordMurBout;
+uniform vec3 uRaccordActifBout;
+uniform float uCoteMurBout;
+uniform float uMiroirBout;
 
 // Coins assombris (la lumière diffuse y entre moins), comme dans le précalcul de la salle
 float coin(float d) {
@@ -561,6 +710,21 @@ vec3 eclairageCouloir(vec3 p, vec3 n) {
     diffus = mix(salle, diffus, fondu);
     // La lumière précalculée de la salle contient déjà la lueur de la fente zénithale : celle du
     // couloir arrive en fondu, sinon elle s'ajoute au seuil (marche de luminosité)
+    zenith *= fondu;
+  }
+  // Au bout, la même chose avec la salle voisine, dans le repère du couloir vu d'elle (x' = ±x)
+  float xb = uMiroirBout * p.x;
+  bool murBout = !sol && !plafond && uMiroirBout * n.x * uCoteMurBout < -0.5;
+  float actifBout = sol ? uRaccordActifBout.x : (plafond ? uRaccordActifBout.y : (murBout ? uRaccordActifBout.z : 0.0));
+  if (actifBout > 0.5) {
+    vec4 r = sol ? uRaccordSolBout : (plafond ? uRaccordPlafondBout : uRaccordMurBout);
+    float t = murBout ? p.y / uHauteur : (xb + uDemiLargeur) / (2.0 * uDemiLargeur);
+    vec3 v = texture2D(uLightmapBout, mix(r.xy, r.zw, clamp(t, 0.0, 1.0))).rgb;
+    vec3 x = (exp(v * log(1.0 + uKBout)) - 1.0) / uKBout * uEchelleBout;
+    float l = max((x.r + x.g + x.b) / 3.0, 1e-6);
+    vec3 voisine = l < uPivotBout ? x * (uPivotBout * pow(l / uPivotBout, uOmbresBout) / l) : x;
+    float fondu = smoothstep(0.0, uFonduRaccord, p.z + uLongueur);
+    diffus = mix(voisine, diffus, fondu);
     zenith *= fondu;
   }
   return diffus + mix(uSoleil, uSoleil2, f) * direct + zenith;

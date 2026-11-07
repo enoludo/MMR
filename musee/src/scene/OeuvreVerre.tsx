@@ -6,6 +6,7 @@ import type { SalleConfig } from '../salles/types'
 import { useReglagesSalle } from '../reglages'
 import { CALQUE_REFLET, PasseReflet, type UniformsSculpture } from './Reflet'
 import type { UniformsReflet } from './pierre'
+import { GLSL_INCANDESCENCE, POINTS_BRONCHES, chaleurProcesseur, creerUniformsIncandescence, etatIncandescence, pointsBronches } from './incandescence'
 
 /**
  * Œuvre de verre (« Souffle d'éclats », blender/souffle.py) : poumons de verre épais (deux surfaces) et vaisseaux
@@ -131,6 +132,17 @@ export function OeuvreVerre({ config, modele, uSol, longueurReflet }: {
     [],
   )
   uSculpture.uLongueurReflet.value = longueurReflet
+  // Incandescence des bronches (07/11) : chauffe, rythme et couleurs, partagés par les bronches et le verre
+  const uChauffe = useMemo(creerUniformsIncandescence, [])
+  // Lumière des bronches jetée dans le verre : points tirés sur les bronches (repère du modèle), force et portée
+  const uLumiereVerre = useMemo(
+    () => ({
+      uPointsBronches: { value: Array.from({ length: POINTS_BRONCHES }, () => new THREE.Vector3(0, -100, 0)) },
+      uVerreLumiere: { value: 0.6 },
+      uVerrePortee: { value: 0.45 },
+    }),
+    [],
+  )
   const r = useReglagesSalle(config, 'Verre', {
     teinte: { value: '#1a3dff', label: 'bleu du verre' },
     aretes: { value: '#5fd2ff', label: 'arêtes' },
@@ -156,6 +168,20 @@ export function OeuvreVerre({ config, modele, uSol, longueurReflet }: {
     eclatFin: { value: 0.25, min: 0, max: 5, step: 0.01, label: 'éclat du lacis' },
     transparence: { value: 0.6, min: 0, max: 1, step: 0.01, label: 'transparence des vaisseaux' },
     refletsVaisseaux: { value: 1, min: 0, max: 5, step: 0.01, label: 'reflets des vaisseaux' },
+    // Incandescence des bronches, comme une résistance électrique (07/11 ; incandescence.ts)
+    chauffe: { value: 1.2, min: 0, max: 4, step: 0.01, label: 'incandescence : intensité' },
+    coeur: { value: 0.6, min: 0, max: 1, step: 0.01, label: 'incandescence : cœur des tubes plus chaud' },
+    deformation: { value: 0.03, min: 0, max: 0.2, step: 0.001, label: 'artères : déformation par le verre (m)' },
+    deformationEchelle: { value: 1.5, min: 0.2, max: 6, step: 0.05, label: 'artères : finesse de la déformation' },
+    froid: { value: '#ff1600', label: 'incandescence : couleur basse' },
+    chaud: { value: '#ff8a2a', label: 'incandescence : couleur haute' },
+    variation: { value: 0.6, min: 0, max: 1, step: 0.01, label: 'variations : amplitude' },
+    vitesse: { value: 0.6, min: 0, max: 4, step: 0.01, label: 'variations : vitesse' },
+    crises: { value: 0.6, min: 0, max: 1.5, step: 0.01, label: 'variations : crises (pics rares)' },
+    scintillement: { value: 0.15, min: 0, max: 1, step: 0.01, label: 'variations : scintillement' },
+    onde: { value: 2, min: 0, max: 10, step: 0.1, label: 'variations : propagation (m/s, 0 = ensemble)' },
+    verreLumiere: { value: 0.6, min: 0, max: 4, step: 0.01, label: 'lumière dans le verre : force' },
+    verrePortee: { value: 0.45, min: 0.05, max: 1.5, step: 0.01, label: 'lumière dans le verre : portée (m)' },
   })
 
   // 1. Absorption : multiplie ce qu'on voit au travers par la teinte du verre
@@ -277,6 +303,8 @@ export function OeuvreVerre({ config, modele, uSol, longueurReflet }: {
           uEclats: { value: 0.8 },
           uLumierePeinture: { value: 0 },
           ...uniformsCartes(),
+          ...uChauffe,
+          ...uLumiereVerre,
           uReflet: uSculpture.uReflet,
           uLongueurReflet: uSculpture.uLongueurReflet,
         },
@@ -284,7 +312,9 @@ export function OeuvreVerre({ config, modele, uSol, longueurReflet }: {
         fragmentShader: /* glsl */ `
           ${GLSL_BRUIT}
           ${GLSL_CARTES}
-          uniform float uLumierePeinture, uReflet, uLongueurReflet;
+          ${GLSL_INCANDESCENCE}
+          uniform float uLumierePeinture, uReflet, uLongueurReflet, uVerreLumiere, uVerrePortee;
+          uniform vec3 uPointsBronches[${POINTS_BRONCHES}];
           uniform vec3 uTeinte, uAretes;
           uniform float uBords, uFinesse, uMasse, uNuages, uReflets, uArriere, uModele, uEclats;
           varying vec3 vNormale;
@@ -303,6 +333,16 @@ export function OeuvreVerre({ config, modele, uSol, longueurReflet }: {
             vec3 couleur = uTeinte * masse + uAretes * arete * uBords;
             // Couleur peinte du modèle, ajoutée comme une lumière dans la masse (ses reflets peints compris)
             if (uAvecCarte > 0.5) couleur += peinture() * uLumierePeinture;
+            // Lumière des bronches incandescentes, prise dans le verre près d'elles (07/11) : elle reste dans la coque
+            if (uVerreLumiere > 0.0) {
+              float proche = 0.0;
+              for (int i = 0; i < ${POINTS_BRONCHES}; i++) {
+                vec3 e = (vLocal - uPointsBronches[i]) / uVerrePortee;
+                proche += exp(-dot(e, e));
+              }
+              float h = chaleur(vMonde.y);
+              couleur += rampe(h) * h * min(proche, 3.0) * 0.05 * uVerreLumiere * (gl_FrontFacing ? 1.0 : 0.7);
+            }
             // Reflets (Schlick) : nets, ils glissent sur les bosses
             float fresnel = 0.04 + 0.96 * pow(1.0 - c, 5.0);
             couleur += entourage(reflect(-v, n)) * fresnel * uReflets;
@@ -329,6 +369,7 @@ export function OeuvreVerre({ config, modele, uSol, longueurReflet }: {
         name: 'Vaisseaux',
         transparent: true,
         defines: { USE_UV1: '' },
+        vertexColors: true, // « dansVerre » (poumons.py) : part de la déformation
         // Verre rouge : ce qu'il y a derrière se voit au centre des tubes (prémultiplié : la couleur est déjà
         // pondérée par l'opacité, les reflets blancs s'y ajoutent)
         premultipliedAlpha: true,
@@ -341,6 +382,10 @@ export function OeuvreVerre({ config, modele, uSol, longueurReflet }: {
           uTransparence: { value: 0.6 },
           uRefletsV: { value: 1 },
           uAvecDonnees: { value: 1 },
+          ...uChauffe,
+          uCoeur: { value: 0.6 },
+          uDeformation: { value: 0.03 },
+          uDeformationEchelle: { value: 1.5 },
           uPeintureV: { value: 0 },
           ...uniformsCartes(),
           uReflet: uSculpture.uReflet,
@@ -352,8 +397,27 @@ export function OeuvreVerre({ config, modele, uSol, longueurReflet }: {
           varying vec2 vDonnees;
           varying vec2 vUv;
           varying vec3 vMonde;
+          uniform float uDeformation, uDeformationEchelle;
+          // Champ lisse (sommes de sinus) : l'ondulation du verre épais vu de biais
+          float onde(vec3 q) {
+            return sin(q.x * 1.7 + sin(q.y * 1.3)) * 0.5 + sin(q.y * 2.3 + sin(q.z * 1.9) * 1.5) * 0.3
+                 + sin(q.z * 3.1 + q.x * 0.7) * 0.2;
+          }
           void main() {
             vec4 p = modelMatrix * vec4(position, 1.0);
+            // Déformation légère (07/11) : vues au travers de la coque, les artères ondulent selon l'angle de vue,
+            // comme derrière un verre épais et irrégulier ; seulement dans la coque (couleur de sommet « dansVerre »
+            // de poumons.py : 0 dehors, 1 dedans, adoucie à la paroi), la trachée et les bronches souches restent nettes
+            vec3 vers = normalize(cameraPosition - p.xyz);
+            vec3 droite = normalize(cross(vers, vec3(0.0, 1.0, 0.0)) + vec3(1e-4));
+            vec3 haut_ = cross(droite, vers);
+            vec3 q = p.xyz * uDeformationEchelle + vers * 2.5;
+            #ifdef USE_COLOR
+              float dansVerre = color.r;
+            #else
+              float dansVerre = 0.0;
+            #endif
+            p.xyz += (droite * onde(q) + haut_ * onde(q.zxy + 7.3)) * uDeformation * dansVerre;
             vNormale = normalize(mat3(modelMatrix) * normal);
             vVue = cameraPosition - p.xyz;
             vDonnees = uv1;
@@ -364,7 +428,8 @@ export function OeuvreVerre({ config, modele, uSol, longueurReflet }: {
         fragmentShader: /* glsl */ `
           ${GLSL_CARTES}
           uniform vec3 uRouge, uRougeFin;
-          uniform float uEclat, uEclatFin, uTransparence, uRefletsV, uAvecDonnees, uPeintureV, uReflet, uLongueurReflet;
+          ${GLSL_INCANDESCENCE}
+          uniform float uEclat, uEclatFin, uTransparence, uRefletsV, uAvecDonnees, uPeintureV, uReflet, uLongueurReflet, uCoeur;
           varying vec3 vNormale;
           varying vec3 vVue;
           varying vec2 vDonnees;
@@ -382,13 +447,18 @@ export function OeuvreVerre({ config, modele, uSol, longueurReflet }: {
             float alpha = mix(0.9, mix(1.0 - uTransparence, 1.0, bord), gros);
             vec3 rougeGros = uAvecCarte > 0.5 ? mix(uRouge, peinture(), uPeintureV) : uRouge;
             vec3 corps = mix(uRougeFin * uEclatFin, rougeGros * uEclat, gros) * mix(1.0, 0.55 + 0.9 * bord, gros);
+            // Incandescence (07/11) : comme une résistance électrique, le cœur des tubes plus chaud que leurs bords ;
+            // elle varie avec la douleur (incandescence.ts)
+            float h = chaleur(vMonde.y) * mix(1.0, 0.45 + 0.85 * pow(c, 1.5), uCoeur);
+            // (× 0,18 : l'exposition de la salle s'y applique ; plus vive, la courbe de couleurs délave le rouge en saumon)
+            vec3 incandescence = rampe(h) * h * 0.18 * gros;
             // Reflets blancs : la lumière du modelé (en haut, côté sud-ouest) en un trait le long de chaque tube, et
             // les ouvertures de l'espace central (Fresnel)
             vec3 l = normalize(vec3(-0.2, 1.0, 0.2)); // du puits, au-dessus (06/11)
             float trait = pow(max(dot(n, normalize(l + v)), 0.0), 90.0);
             float fresnel = 0.04 + 0.96 * pow(1.0 - c, 5.0);
             vec3 reflet = (vec3(1.0, 0.95, 0.95) * trait * 1.4 + entourage(reflect(-v, n)) * fresnel) * uRefletsV * gros;
-            gl_FragColor = vec4(corps * alpha + reflet, alpha);
+            gl_FragColor = vec4(corps * alpha + reflet + incandescence, alpha);
             // Dans la passe de reflet : éteint avec la hauteur (prémultiplié : tout est atténué)
             if (uReflet > 0.5) gl_FragColor *= exp(-max(vMonde.y, 0.0) / uLongueurReflet);
             #include <tonemapping_fragment>
@@ -426,6 +496,19 @@ export function OeuvreVerre({ config, modele, uSol, longueurReflet }: {
   w.uEclatFin.value = r.eclatFin
   w.uTransparence.value = r.transparence
   w.uRefletsV.value = r.refletsVaisseaux
+  w.uCoeur.value = r.coeur
+  w.uDeformation.value = r.deformation
+  w.uDeformationEchelle.value = r.deformationEchelle
+  uChauffe.uChauffe.value = r.chauffe
+  uChauffe.uVariation.value = r.variation
+  uChauffe.uVitesse.value = r.vitesse
+  uChauffe.uCrises.value = r.crises
+  uChauffe.uScintillement.value = r.scintillement
+  uChauffe.uOnde.value = r.onde
+  uChauffe.uFroid.value.set(r.froid)
+  uChauffe.uChaud.value.set(r.chaud)
+  uLumiereVerre.uVerreLumiere.value = r.verreLumiere
+  uLumiereVerre.uVerrePortee.value = r.verrePortee
   w.uPeintureV.value = r.peintureVaisseaux
 
   // Copie du modèle ; le verre y est doublé : d'abord l'absorption, puis la lumière ajoutée
@@ -471,6 +554,7 @@ export function OeuvreVerre({ config, modele, uSol, longueurReflet }: {
     lire('Verre', [absorbe.uniforms, refracte.uniforms, verre.uniforms] as unknown as UniformsCartes[])
     const v = lire('Vaisseaux', [vaisseaux.uniforms] as unknown as UniformsCartes[])
     vaisseaux.uniforms.uAvecDonnees.value = v?.geometry.getAttribute('uv1') ? 1 : 0
+    if (v) pointsBronches(v).forEach((p, i) => uLumiereVerre.uPointsBronches.value[i].copy(p))
     copie.userData.echellesRelief = [absorbe, refracte, verre, vaisseaux].map((m) => m.uniforms.uEchelleRelief.value.clone())
     return copie
   }, [gltf.scene, absorbe, noir, refracte, verre, vaisseaux])
@@ -535,13 +619,15 @@ export function OeuvreVerre({ config, modele, uSol, longueurReflet }: {
 
   // Les vaisseaux n'ont qu'une face : la passe de reflet la retourne (la symétrie inverse le sens des faces)
   const retournees = useMemo(() => [vaisseaux] as unknown as THREE.MeshStandardMaterial[], [vaisseaux])
+  useFrame((_, dt) => {
+    uChauffe.uTemps.value += Math.min(dt, 0.05)
+    etatIncandescence.chaleur = chaleurProcesseur(uChauffe.uTemps.value, r)
+  })
   return (
     <>
-      <primitive
-        object={scene}
-        position={config.sculpture.position}
-        rotation-y={THREE.MathUtils.degToRad(config.sculpture.rotationY)}
-      />
+      <group position={config.sculpture.position} rotation-y={THREE.MathUtils.degToRad(config.sculpture.rotationY)}>
+        <primitive object={scene} />
+      </group>
       <PasseReflet sculpture={scene} materiaux={retournees} uSol={uSol} uSculpture={uSculpture} />
     </>
   )

@@ -10,7 +10,8 @@ import { Faisceau, tableFaisceau } from './Faisceau'
 import { Poussiere } from './Poussiere'
 import { OeuvreVerre } from './OeuvreVerre'
 import { EclairageDirect } from './EclairageDirect'
-import { MAX_PORTES, appliquerPierre, creerUniformsSalle, reglerPierre, uniformsOmbres } from './pierre'
+import { MAX_PORTES, appliquerPierre, creerUniformsJoints, creerUniformsLueur, creerUniformsSalle, reglerPierre, uniformsOmbres, type UniformsJoints, type UniformsLueur } from './pierre'
+import { etatIncandescence } from './incandescence'
 import { configActuelle, configArriveeLue, groupesSalles, poidsArrivee, salleActuelle, salleArrivee } from './passage'
 import { prechargerLightmaps, useLightmaps } from './lightmaps'
 import { CALQUE_REFLET, PasseReflet, creerUniformsReflet, preparerSculpture, type UniformsSculpture } from './Reflet'
@@ -85,6 +86,11 @@ export function Salle({ config }: { config: SalleConfig }) {
     if (racine.current) uSalle.uVersSalle.value.copy(racine.current.matrixWorld).invert()
   })
 
+  // Joints du sol (pavillon), réglés par ReglagesJoints
+  const uJoints = useMemo(creerUniformsJoints, [])
+  // Lueur de l'œuvre sur la salle (pavillon), réglée par LueurOeuvre
+  const uLueur = useMemo(creerUniformsLueur, [])
+
   // Reflet de la sculpture au sol (uniforms partagés avec la passe de reflet)
   const uReflet = useMemo(creerUniformsReflet, [])
   const reflet = useReglagesSalle(config, 'Reflet au sol', {
@@ -125,6 +131,8 @@ export function Salle({ config }: { config: SalleConfig }) {
         SOLS.includes(nom) ? uReflet : undefined,
         uOmbres,
         nomsRapports.includes(lightmap) ? rapports[nomsRapports.indexOf(lightmap)] : undefined,
+        config.joints?.matieres.includes(nom) ? uJoints : undefined,
+        config.lueurOeuvre ? uLueur : undefined,
       )
     }
     return m
@@ -163,6 +171,8 @@ export function Salle({ config }: { config: SalleConfig }) {
   return (
     <group ref={racine}>
       <primitive object={scene} />
+      {config.joints && <ReglagesJoints config={config} uJoints={uJoints} />}
+      {config.lueurOeuvre && <LueurOeuvre config={config} uLueur={uLueur} />}
       {import.meta.env.DEV && config.eclairage && (
         <EclairageDirect config={config} scene={scene} uSalle={uSalle} lumiere={r.lumiere} />
       )}
@@ -549,4 +559,41 @@ export function prechargerSalle(config: SalleConfig) {
   if (config.sculpture.modele) useGLTF.preload(config.sculpture.modele)
   if (config.faisceau !== false) tableFaisceau(config.soleil)
   prechargerLightmaps(Object.values(config.lightmaps).flatMap((l) => (l.ombreStatue ? [l.image, l.ombreStatue] : [l.image])))
+}
+
+/** Touche M, « Joints du sol · <salle> » : dimensions et force des joints dessinés sur le sol (pierre.ts) */
+function ReglagesJoints({ config, uJoints }: { config: SalleConfig; uJoints: UniformsJoints }) {
+  const j = config.joints!
+  const v = useReglagesSalle(config, 'Joints du sol', {
+    longueur: { value: j.longueur, min: 0.2, max: 4, step: 0.05, label: 'longueur des dalles (m)' },
+    largeur: { value: j.largeur, min: 0.2, max: 4, step: 0.05, label: 'largeur des dalles (m)' },
+    joint: { value: j.joint, min: 0, max: 0.03, step: 0.001, label: 'épaisseur du joint (m)' },
+    force: { value: j.force, min: 0, max: 1, step: 0.01, label: 'force du joint' },
+    angle: { value: j.angle, min: 0, max: 90, step: 1, label: 'orientation (°)' },
+    decalage: { value: j.decalage ?? 0, min: 0, max: 0.5, step: 0.01, label: 'décalage des rangs (0 : alignées)' },
+  })
+  uJoints.uJointsDecalage.value = v.decalage
+  uJoints.uJoints.value.set(v.longueur, v.largeur, v.joint, v.force)
+  uJoints.uJointsAngle.value = THREE.MathUtils.degToRad(v.angle)
+  return null
+}
+
+/**
+ * Touche M, « Lueur de l'œuvre · <salle> » : lumière de l'œuvre ajoutée sur la salle, qui suit la chaleur de ses
+ * bronches incandescentes (incandescence.ts) à chaque image
+ */
+function LueurOeuvre({ config, uLueur }: { config: SalleConfig; uLueur: UniformsLueur }) {
+  const l = config.lueurOeuvre!
+  const v = useReglagesSalle(config, 'Lueur de l’œuvre', {
+    force: { value: l.force, min: 0, max: 2, step: 0.005, label: 'force' },
+    portee: { value: l.portee, min: 0.5, max: 15, step: 0.1, label: 'portée (m)' },
+    couleur: { value: l.couleur, label: 'couleur' },
+  })
+  const couleur = useMemo(() => new THREE.Color(), [])
+  uLueur.uLueurPos.value.set(...l.position)
+  uLueur.uLueurPortee.value = v.portee
+  useFrame(() => {
+    uLueur.uLueurCouleur.value.copy(couleur.set(v.couleur)).multiplyScalar(v.force * etatIncandescence.chaleur)
+  })
+  return null
 }

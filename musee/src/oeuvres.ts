@@ -175,15 +175,33 @@ export const oeuvres: Oeuvre[] = [
   {
     id: 'souffle-d-eclats',
     titre: "Souffle d'éclats",
-    maladie: '',
+    maladie: 'Sarcoïdose',
     // Capture de sa salle (vue d'entrée, faite par Ludovic le 07/11) ; l'ancien visuel : /assets/images/souffle-declats.webp
     image: versionne('/assets/captures/souffle-d-eclats.webp'),
     vignette: versionne('/assets/images/souffle-declats.webp'),
     vueEntree: '/assets/captures/souffle-d-eclats',
     cartouches: capturesCartouches('souffle-d-eclats'),
     survol: videosSurvol('souffle-d-eclats'),
-    maladieTexte: maladieAVenir('À venir'),
-    manifeste: A_VENIR,
+    // Texte reçu par Ludovic le 07/11 (prévalence : sa source, notée ⁽¹⁾, reste à citer) ; bouton sans lien (démo)
+    maladieTexte: {
+      titre: 'Sarcoïdose',
+      paragraphes: [
+        'La sarcoïdose est une maladie rare auto-inflammatoire et multisystémique, de cause inconnue, caractérisée par la formation de granulomes dans divers organes, principalement dans les poumons.',
+      ],
+      chiffres: [
+        { libelle: 'Prévalence en France', valeur: '1/2 200 à 1/3 300' },
+        { libelle: 'Nouveaux cas par an', valeur: '3 300' },
+        { libelle: 'Atteinte des poumons', valeur: '90 %' },
+        { libelle: 'Cause', valeur: 'Inconnue' },
+      ],
+      lien: null,
+    },
+    // Manifeste reçu par Ludovic le 07/11 (phrase finale rattachée à la précédente) ; titre en un mot proposé par Claude
+    manifesteTitre: 'Oppression',
+    manifeste: [
+      'Notre œuvre, « Souffle d’éclats », est une œuvre en verre soufflé illuminée par des LED rougeâtres, où les poumons, touchés par la sarcoïdose dans 90 % des cas, deviennent un symbole central.',
+      'Les faisceaux lumineux représentent à la fois l’inconfort et la menace ressentis par les patients, accentués par les variations d’intensité des lumières, qui illustrent les nuances de la douleur et de la gravité des symptômes.',
+    ],
     // Pavillon (05/11, demande de Ludovic), poumons de verre du collègue de Ludovic (06/11)
     salle: sallePavillon,
     vues: VUES_PROVISOIRES,

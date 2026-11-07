@@ -16,15 +16,21 @@ dans sculpture-souffle/ :
 
 Puis, depuis musee/ :
   npx @gltf-transform/cli optimize blender/sculpture-souffle/poumons-raw.glb public/models/poumons.glb \
-      --compress meshopt --simplify false --join false --texture-compress webp --texture-size 2048
+      --compress meshopt --simplify false --join false --texture-compress webp --texture-size 2048 \
+      --prune-attributes false
+  (--prune-attributes false : garde la couleur de sommet « dansVerre » des bronches, qu'aucune matière ne lit)
 """
 import bpy, os
 from mathutils import Vector, Matrix
+from mathutils.bvhtree import BVHTree
 
 ICI = os.path.dirname(os.path.abspath(__file__))
 DOSSIER = os.path.join(ICI, "sculpture-souffle")
 LARGEUR, HAUTEUR = 3.4, 3.6     # encombrement des anciens poumons (souffle.py)
 LEVE = 0.35                     # bas de l'œuvre au-dessus de l'origine, comme souffle.py
+# Verre épais (07/11, demande de Ludovic) : seconde paroi des poumons, EPAISSEUR vers l'intérieur (comme souffle.py :
+# OeuvreVerre compte deux faces tournées vers la caméra par rayon, et ses arêtes de lumière se doublent)
+EPAISSEUR = 0.0   # 0,045 essayé le 07/11, refusé par Ludovic (« pas convaincu ») : paroi simple
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=os.path.join(DOSSIER, "poumons.glb"))
@@ -58,6 +64,34 @@ for o in objets:
     o.data.transform(transfo)
     o.data.update()
 
+# Seconde paroi : solidification vers l'intérieur (normales du modèle tournées vers l'extérieur)
+if EPAISSEUR > 0:
+  mod = poumons.modifiers.new("Epaisseur", "SOLIDIFY")
+  mod.thickness = EPAISSEUR
+  mod.offset = -1.0
+  mod.use_even_offset = True
+  mod.use_quality_normals = True
+  bpy.context.view_layer.objects.active = poumons
+  bpy.ops.object.modifier_apply(modifier=mod.name)
+
+# Part de chaque sommet des bronches qui est dans la coque des poumons (07/11) : le site ne déforme que celles-là
+# (vues au travers du verre ; la trachée et les bronches souches, dehors, restent nettes). Distance à la paroi la plus
+# proche, du bon côté de sa normale (tournée vers l'extérieur), adoucie sur DOUCEUR_PAROI ; couleur de sommet
+# « dansVerre » (rouge), exportée en COLOR_0.
+DOUCEUR_PAROI = 0.06
+arbre = BVHTree.FromPolygons([v.co.copy() for v in poumons.data.vertices], [list(p_.vertices) for p_ in poumons.data.polygons])
+couleurs_ = bronches.data.color_attributes.new("dansVerre", "FLOAT_COLOR", "POINT")
+dedans_n = 0
+for v in bronches.data.vertices:
+    proche, normale, _, dist = arbre.find_nearest(v.co)
+    dedans = proche is not None and (v.co - proche).dot(normale) < 0
+    t = min(max(dist / DOUCEUR_PAROI, 0.0), 1.0) if dedans else 0.0
+    val = t * t * (3 - 2 * t)
+    dedans_n += val > 0.5
+    couleurs_.data[v.index].color = (val, val, val, 1.0)
+bronches.data.color_attributes.active_color = couleurs_
+print("BRONCHES DANS LE VERRE", dedans_n, "/", len(bronches.data.vertices))
+
 poumons.name = poumons.data.name = "Verre"
 bronches.name = bronches.data.name = "Vaisseaux"
 poumons.active_material.name = "Verre"
@@ -79,4 +113,4 @@ bpy.ops.wm.save_as_mainfile(filepath=os.path.join(DOSSIER, "poumons.blend"))
 for o in bpy.context.scene.objects:
     o.select_set(o in objets)
 bpy.ops.export_scene.gltf(filepath=os.path.join(DOSSIER, "poumons-raw.glb"), export_format="GLB", use_selection=True,
-                          export_materials="EXPORT", export_apply=True)
+                          export_materials="EXPORT", export_apply=True, export_vertex_color="ACTIVE")

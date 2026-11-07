@@ -17,7 +17,7 @@ import lumieresPavillon from './lumieres.json'
  *   nord-est et au sud-ouest), sans lampe au plafond depuis le 05/11 (demande de Ludovic) : éclairé par ses
  *   ouvertures, quatre projecteurs discrets dans ses angles et la lueur de l'œuvre (comptée dans la lumière
  *   précalculée, bleu et rouge réduits le 05/11) ;
- * - l'œuvre flotte au centre, sans socle (retiré le 05/11), deux bancs en arc ;
+ * - l'œuvre flotte au centre, sans socle (retiré le 05/11) ; plus de bancs (07/11), cartel dans l'axe des ouvertures ;
  * - dehors simple et lumineux (sol clair, ciel), vu par les baies.
  * Lumière précalculée ramenée à l'exposition du site (3,4) : voir ECHELLE dans pavillon.py.
  */
@@ -42,6 +42,10 @@ export const sallePavillon: SalleConfig = {
     MurCentre: { couleur: '#7c8694', lightmap: 'mobilier' },
     PlafondCentre: { couleur: '#3b3f47', lightmap: 'mobilier' },
     Puits: { couleur: '#a3a9b1', lightmap: 'mobilier' },
+    Cartel: { couleur: '#d6d2ca', lightmap: 'mobilier' }, // plaque du cartel sur pupitre (07/11)
+    // Lentilles des projecteurs de l'anneau suspendu et bandes des bornes (07/11, pavillon.py), sans lightmap
+    Lampe: { couleur: '#fff0dc', lumineuse: 1 },
+    Borne: { couleur: '#ffd7a3', lumineuse: 1 },
     Acier: { couleur: '#1e1e1e', lumineuse: 1 }, // huisseries des baies, sans lightmap
     Dehors: { couleur: '#d9d2c6', lumineuse: 0.6 }, // sol du dehors, clair (demande de Ludovic)
     Ciel: { couleur: '#c9d6e6', lumineuse: 0.5 },
@@ -59,9 +63,15 @@ export const sallePavillon: SalleConfig = {
   faisceau: false,
   // Éclairage de l'espace central réglable en direct puis figé (touche M « Éclairage », en dev ; 07/11)
   eclairage: { reglages: eclairagePavillon, lumieres: lumieresPavillon, atlas: 'mobilier' },
+  // Joints du sol de l'espace central (repère d'échelle, 07/11) : dalles de 1,2 × 0,6 m alignées sur ses murs (45°)
+  // Lueur rouge de l'œuvre sur la salle, qui suit les variations des bronches (07/11) ; centre de l'œuvre
+  lueurOeuvre: { position: [0, 2.8, 0], couleur: '#ff2a10', force: 0.15, portee: 3 },
+  joints: { matieres: ['SolCentre'], longueur: 1.2, largeur: 0.6, joint: 0.008, force: 0.6, angle: 45 },
   // Halo : la salle est sombre (sans lampes) et l'œuvre peu exposée ; il démarre plus bas pour que les vaisseaux
   // rayonnent, comme sur l'image
   effets: { courbe: 'aces', halo: 0.35, seuilHalo: 0.3 },
+  // Flou de la salle autour de l'œuvre, qui reste nette (07/11, essai demandé par Ludovic ; scene/FlouSalle.ts)
+  flouSalle: { actif: true, flouPres: 22, pres: 2.5, flouLoin: 4, loin: 9, debut: 2.5, progression: 10, haut: 4.75 },
   dehors: true,
   // Vue d'arrivée dans l'espace central, à 8,5 m, depuis l'ouverture sud-ouest (décision du 05/11). Poumons de
   // 3,4 m de large, de 1,15 à 4,75 m du sol (trachée comprise) : cercle à 5,5 m (dans les bancs), réduit à 3,5 m
