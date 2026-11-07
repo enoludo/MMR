@@ -4,7 +4,8 @@ import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import type { SalleConfig } from '../salles/types'
 import { useReglagesSalle } from '../reglages'
-import { CALQUE_REFLET } from './Reflet'
+import { CALQUE_REFLET, PasseReflet, type UniformsSculpture } from './Reflet'
+import type { UniformsReflet } from './pierre'
 
 /**
  * Œuvre de verre (« Souffle d'éclats », blender/souffle.py) : poumons de verre épais (deux surfaces) et vaisseaux
@@ -23,6 +24,12 @@ import { CALQUE_REFLET } from './Reflet'
  *   fibres, d'anneaux sur la trachée ni d'éclats dessinés (retirés le 05/11).
  *   Le modèle donne pour chaque tube : UV = (tour, longueur en m), UV2 = (rayon, 1 pour la trachée), V retourné
  *   par l'export glTF (1 − v).
+ * Depuis le 06/11, poumons du collègue de Ludovic (blender/poumons.py) : un seul maillage pour les poumons, sans
+ * données dans les UV pour les bronches (« Vaisseaux ») : elles sont traitées comme de gros vaisseaux. Leurs textures
+ * sont lues : couleur (« peinture » : teinte du verre, lumière ajoutée, couleur des bronches) et relief (normales).
+ * Reflet au sol (07/11, demande de Ludovic) : la lumière du verre et les bronches sont dessinées dans la passe de reflet
+ * (PasseReflet, comme les statues), éteintes avec la hauteur (« Reflet au sol · <salle> », atténuation) ; la réfraction
+ * n'y est pas (elle lit l'image de la salle vue normalement).
  * Réglages : touche M, « Verre · <salle> ». Les maillages sont sur le calque de l'œuvre : un clic dessus mène au
  * cercle réduit, comme pour les autres œuvres (Navigation).
  */
@@ -35,22 +42,68 @@ const GLSL_ENTOURAGE = /* glsl */ `
     vec2 h = normalize(r.xz + 1e-5);
     return smoothstep(0.955, 0.975, dot(h, cap)) * smoothstep(-0.18, -0.05, r.y) * (1.0 - smoothstep(0.3, 0.38, r.y));
   }
+  // Puits de lumière au-dessus de l'œuvre (06/11) : disque blanc froid, vu de l'œuvre à ≈ 30° autour de la verticale
   vec3 entourage(vec3 r) {
     float baies = ouverture(r, normalize(vec2(-1.0, 1.0))) + ouverture(r, normalize(vec2(1.0, -1.0)));
-    return vec3(1.0, 0.95, 0.88) * baies * 2.2 + vec3(0.03 + 0.05 * max(r.y, 0.0));
+    float puits = smoothstep(0.84, 0.88, r.y);
+    return vec3(1.0, 0.95, 0.88) * baies * 2.2 + vec3(0.85, 0.9, 1.0) * puits * 2.5 + vec3(0.03 + 0.05 * max(r.y, 0.0));
   }`
 
 const SOMMETS = /* glsl */ `
   varying vec3 vNormale;
   varying vec3 vVue;
   varying vec3 vLocal;
+  varying vec2 vUv;
+  varying vec3 vMonde;
   void main() {
     vec4 p = modelMatrix * vec4(position, 1.0);
     vNormale = normalize(mat3(modelMatrix) * normal);
     vVue = cameraPosition - p.xyz;
     vLocal = position;
+    vUv = uv;
+    vMonde = p.xyz;
     gl_Position = projectionMatrix * viewMatrix * p;
   }`
+
+/**
+ * Textures du modèle (poumons du collègue, 06/11) : couleur peinte et relief. Relief sans tangentes, d'après les
+ * dérivées de la position et des UV à l'écran (comme three, perturbNormal2Arb).
+ */
+const GLSL_CARTES = /* glsl */ `
+  uniform sampler2D uCarte, uRelief;
+  uniform vec2 uEchelleRelief;
+  uniform float uAvecCarte, uAvecRelief;
+  varying vec2 vUv;
+  varying vec3 vMonde;
+  vec3 avecRelief(vec3 n) {
+    if (uAvecRelief < 0.5) return n;
+    vec3 q0 = dFdx(vMonde), q1 = dFdy(vMonde);
+    vec2 st0 = dFdx(vUv), st1 = dFdy(vUv);
+    vec3 q1perp = cross(q1, n), q0perp = cross(n, q0);
+    vec3 t = q1perp * st0.x + q0perp * st1.x;
+    vec3 b = q1perp * st0.y + q0perp * st1.y;
+    float det = max(dot(t, t), dot(b, b));
+    float e = det == 0.0 ? 0.0 : inversesqrt(det);
+    vec3 m = texture2D(uRelief, vUv).xyz * 2.0 - 1.0;
+    m.xy *= uEchelleRelief;
+    return normalize(t * (m.x * e) + b * (m.y * e) + n * m.z);
+  }
+  vec3 peinture() { return uAvecCarte > 0.5 ? texture2D(uCarte, vUv).rgb : vec3(1.0); }`
+
+/** Uniforms des textures du modèle, remplis à partir de ses matières (voir plus bas) */
+const uniformsCartes = () => ({
+  uCarte: { value: null as THREE.Texture | null },
+  uRelief: { value: null as THREE.Texture | null },
+  uEchelleRelief: { value: new THREE.Vector2(1, 1) },
+  uAvecCarte: { value: 0 },
+  uAvecRelief: { value: 0 },
+})
+type UniformsCartes = ReturnType<typeof uniformsCartes>
+
+/** Teinte du verre : celle du réglage, mêlée à la couleur peinte du modèle (« peinture » : 0 à 1) */
+const GLSL_TEINTE = /* glsl */ `
+  uniform float uPeinture;
+  vec3 teinteVerre(vec3 teinte) { return uAvecCarte > 0.5 ? mix(teinte, peinture(), uPeinture) : teinte; }`
 
 /** Bruit lisse en 3D (valeurs au hasard aux nœuds d'une grille, interpolées) et sa somme sur trois octaves */
 const GLSL_BRUIT = /* glsl */ `
@@ -65,8 +118,19 @@ const GLSL_BRUIT = /* glsl */ `
 
 // Valeurs basses : l'exposition de la salle (×3,4) s'applique aussi à l'œuvre ; au-delà de ≈ 1 après exposition,
 // la courbe de couleurs pâlit le rouge en saumon et le bleu en lavande
-export function OeuvreVerre({ config, modele }: { config: SalleConfig; modele: string }) {
+export function OeuvreVerre({ config, modele, uSol, longueurReflet }: {
+  config: SalleConfig
+  modele: string
+  uSol: UniformsReflet
+  longueurReflet: number
+}) {
   const gltf = useGLTF(modele)
+  // Mode « reflet » des matières, piloté par la passe de reflet (seuls uReflet et uLongueurReflet servent ici)
+  const uSculpture = useMemo<UniformsSculpture>(
+    () => ({ uOcclusion: { value: 0 }, uOcclusionDirecte: { value: 0 }, uReflet: { value: 0 }, uLongueurReflet: { value: 1.4 } }),
+    [],
+  )
+  uSculpture.uLongueurReflet.value = longueurReflet
   const r = useReglagesSalle(config, 'Verre', {
     teinte: { value: '#1a3dff', label: 'bleu du verre' },
     aretes: { value: '#5fd2ff', label: 'arêtes' },
@@ -79,10 +143,14 @@ export function OeuvreVerre({ config, modele }: { config: SalleConfig; modele: s
     eclats: { value: 0.3, min: 0, max: 4, step: 0.01, label: 'éclats sur les bosses' },
     arriere: { value: 0.35, min: 0, max: 1, step: 0.01, label: 'faces arrière' },
     absorption: { value: '#0a1890', label: 'teinte absorbée' },
+    peinture: { value: 0.5, min: 0, max: 1, step: 0.01, label: 'couleur du modèle (teinte)' },
+    lumierePeinture: { value: 0.05, min: 0, max: 1, step: 0.005, label: 'couleur du modèle (lumière)' },
+    relief: { value: 1, min: 0, max: 3, step: 0.05, label: 'relief du modèle' },
     densite: { value: 0.7, min: 0, max: 1, step: 0.01, label: 'densité du verre' },
     refraction: { value: 0.7, min: -2, max: 2, step: 0.01, label: 'réfraction (0 : sans)' },
     dispersion: { value: 0.08, min: 0, max: 0.4, step: 0.01, label: 'irisation' },
     rouge: { value: '#ff0848', label: 'gros vaisseaux' },
+    peintureVaisseaux: { value: 0.6, min: 0, max: 1, step: 0.01, label: 'couleur du modèle (bronches)' },
     rougeFin: { value: '#ff0a50', label: 'lacis fin' },
     eclat: { value: 0.45, min: 0, max: 5, step: 0.01, label: 'éclat des gros vaisseaux' },
     eclatFin: { value: 0.25, min: 0, max: 5, step: 0.01, label: 'éclat du lacis' },
@@ -102,16 +170,18 @@ export function OeuvreVerre({ config, modele }: { config: SalleConfig; modele: s
         blendEquation: THREE.AddEquation,
         blendSrc: THREE.ZeroFactor,
         blendDst: THREE.SrcColorFactor,
-        uniforms: { uTeinte: { value: new THREE.Color() }, uDensite: { value: 0.9 } },
+        uniforms: { uTeinte: { value: new THREE.Color() }, uDensite: { value: 0.9 }, uPeinture: { value: 0 }, ...uniformsCartes() },
         vertexShader: SOMMETS,
         fragmentShader: /* glsl */ `
+          ${GLSL_CARTES}
+          ${GLSL_TEINTE}
           uniform vec3 uTeinte;
           uniform float uDensite;
           varying vec3 vNormale;
           varying vec3 vVue;
           void main() {
             float c = abs(dot(normalize(vNormale), normalize(vVue)));
-            gl_FragColor = vec4(mix(vec3(1.0), uTeinte, uDensite * (0.75 + 0.25 * pow(1.0 - c, 1.2))), 1.0);
+            gl_FragColor = vec4(mix(vec3(1.0), teinteVerre(uTeinte), uDensite * (0.75 + 0.25 * pow(1.0 - c, 1.2))), 1.0);
           }`,
       }),
     [],
@@ -153,9 +223,13 @@ export function OeuvreVerre({ config, modele }: { config: SalleConfig; modele: s
           uDispersion: { value: 0.08 },
           uTeinte: { value: new THREE.Color() },
           uDensite: { value: 0.9 },
+          uPeinture: { value: 0 },
+          ...uniformsCartes(),
         },
         vertexShader: SOMMETS,
         fragmentShader: /* glsl */ `
+          ${GLSL_CARTES}
+          ${GLSL_TEINTE}
           uniform sampler2D uFond;
           uniform vec2 uTaille;
           uniform float uRefraction, uDispersion, uDensite;
@@ -163,7 +237,7 @@ export function OeuvreVerre({ config, modele }: { config: SalleConfig; modele: s
           varying vec3 vNormale;
           varying vec3 vVue;
           void main() {
-            vec3 n = normalize(vNormale);
+            vec3 n = avecRelief(normalize(vNormale));
             float c = clamp(dot(n, normalize(vVue)), 0.0, 1.0);
             // Déviation à l'écran : orientation de la surface vue de la caméra, moindre de loin
             vec3 nv = normalize((viewMatrix * vec4(n, 0.0)).xyz);
@@ -172,7 +246,7 @@ export function OeuvreVerre({ config, modele }: { config: SalleConfig; modele: s
             vec3 fond = vec3(texture2D(uFond, uv - d * (1.0 - uDispersion)).r,
                              texture2D(uFond, uv - d).g,
                              texture2D(uFond, uv - d * (1.0 + uDispersion)).b);
-            vec3 t = mix(vec3(1.0), uTeinte, uDensite * (0.75 + 0.25 * pow(1.0 - c, 1.2)));
+            vec3 t = mix(vec3(1.0), teinteVerre(uTeinte), uDensite * (0.75 + 0.25 * pow(1.0 - c, 1.2)));
             gl_FragColor = vec4(fond * t * t * 0.5, 1.0);
             #include <tonemapping_fragment>
             #include <colorspace_fragment>
@@ -201,10 +275,16 @@ export function OeuvreVerre({ config, modele }: { config: SalleConfig; modele: s
           uArriere: { value: 0.5 },
           uModele: { value: 0.35 },
           uEclats: { value: 0.8 },
+          uLumierePeinture: { value: 0 },
+          ...uniformsCartes(),
+          uReflet: uSculpture.uReflet,
+          uLongueurReflet: uSculpture.uLongueurReflet,
         },
         vertexShader: SOMMETS,
         fragmentShader: /* glsl */ `
           ${GLSL_BRUIT}
+          ${GLSL_CARTES}
+          uniform float uLumierePeinture, uReflet, uLongueurReflet;
           uniform vec3 uTeinte, uAretes;
           uniform float uBords, uFinesse, uMasse, uNuages, uReflets, uArriere, uModele, uEclats;
           varying vec3 vNormale;
@@ -212,7 +292,7 @@ export function OeuvreVerre({ config, modele }: { config: SalleConfig; modele: s
           varying vec3 vLocal;
           ${GLSL_ENTOURAGE}
           void main() {
-            vec3 n = normalize(vNormale) * (gl_FrontFacing ? 1.0 : -1.0);
+            vec3 n = avecRelief(normalize(vNormale) * (gl_FrontFacing ? 1.0 : -1.0));
             vec3 v = normalize(vVue);
             float c = clamp(dot(n, v), 0.0, 1.0);
             // Arêtes : Fresnel serré, en traits fins le long des contours (doublés par le verre épais)
@@ -221,16 +301,20 @@ export function OeuvreVerre({ config, modele }: { config: SalleConfig; modele: s
             float nu = nuages(vLocal * 1.7);
             float masse = uMasse * mix(1.0, 0.12 + 2.4 * smoothstep(0.35, 0.75, nu), uNuages);
             vec3 couleur = uTeinte * masse + uAretes * arete * uBords;
+            // Couleur peinte du modèle, ajoutée comme une lumière dans la masse (ses reflets peints compris)
+            if (uAvecCarte > 0.5) couleur += peinture() * uLumierePeinture;
             // Reflets (Schlick) : nets, ils glissent sur les bosses
             float fresnel = 0.04 + 0.96 * pow(1.0 - c, 5.0);
             couleur += entourage(reflect(-v, n)) * fresnel * uReflets;
-            // Modelé : une lumière bleue venue d'en haut, du côté de la vue d'arrivée (sud-ouest), éclaire les
+            // Modelé : une lumière bleue venue d'en haut (le puits, depuis le 06/11 ; avant, du sud-ouest), éclaire les
             // lobes et laisse les creux sombres ; ses éclats, très serrés, accrochent les bosses
-            vec3 l = normalize(vec3(-0.5, 0.85, 0.5));
+            vec3 l = normalize(vec3(-0.2, 1.0, 0.2)); // du puits, au-dessus (06/11)
             couleur += vec3(0.3, 0.55, 1.0) * pow(max(dot(n, l), 0.0), 2.0) * uModele;
             couleur += vec3(0.75, 0.9, 1.0) * pow(max(dot(n, normalize(l + v)), 0.0), 140.0) * uEclats;
             if (!gl_FrontFacing) couleur *= uArriere;
             gl_FragColor = vec4(couleur, 1.0);
+            // Dans la passe de reflet : éteint avec la hauteur (ajouté à l'image : l'alpha porte l'atténuation)
+            if (uReflet > 0.5) gl_FragColor = vec4(couleur, exp(-max(vMonde.y, 0.0) / uLongueurReflet));
             #include <tonemapping_fragment>
             #include <colorspace_fragment>
           }`,
@@ -256,57 +340,73 @@ export function OeuvreVerre({ config, modele }: { config: SalleConfig; modele: s
           uEclatFin: { value: 1.6 },
           uTransparence: { value: 0.6 },
           uRefletsV: { value: 1 },
+          uAvecDonnees: { value: 1 },
+          uPeintureV: { value: 0 },
+          ...uniformsCartes(),
+          uReflet: uSculpture.uReflet,
+          uLongueurReflet: uSculpture.uLongueurReflet,
         },
         vertexShader: /* glsl */ `
           varying vec3 vNormale;
           varying vec3 vVue;
           varying vec2 vDonnees;
+          varying vec2 vUv;
+          varying vec3 vMonde;
           void main() {
             vec4 p = modelMatrix * vec4(position, 1.0);
             vNormale = normalize(mat3(modelMatrix) * normal);
             vVue = cameraPosition - p.xyz;
             vDonnees = uv1;
+            vUv = uv;
+            vMonde = p.xyz;
             gl_Position = projectionMatrix * viewMatrix * p;
           }`,
         fragmentShader: /* glsl */ `
+          ${GLSL_CARTES}
           uniform vec3 uRouge, uRougeFin;
-          uniform float uEclat, uEclatFin, uTransparence, uRefletsV;
+          uniform float uEclat, uEclatFin, uTransparence, uRefletsV, uAvecDonnees, uPeintureV, uReflet, uLongueurReflet;
           varying vec3 vNormale;
           varying vec3 vVue;
           varying vec2 vDonnees;
           ${GLSL_ENTOURAGE}
           void main() {
-            vec3 n = normalize(vNormale);
+            vec3 n = avecRelief(normalize(vNormale));
             vec3 v = normalize(vVue);
             float c = clamp(abs(dot(n, v)), 0.0, 1.0);
             float rayon = vDonnees.x;
             // Le lacis, trop fin pour un modelé, reste d'une couleur égale et presque opaque (sinon il scintille)
-            float gros = smoothstep(0.006, 0.05, rayon);
+            // Sans données (bronches du collègue, 06/11) : tout est traité comme de gros vaisseaux
+            float gros = uAvecDonnees > 0.5 ? smoothstep(0.006, 0.05, rayon) : 1.0;
             // Tube de verre : plus transparent au centre, plus rouge et plus dense au bord (trajet plus long)
             float bord = pow(1.0 - c, 1.5);
             float alpha = mix(0.9, mix(1.0 - uTransparence, 1.0, bord), gros);
-            vec3 corps = mix(uRougeFin * uEclatFin, uRouge * uEclat, gros) * mix(1.0, 0.55 + 0.9 * bord, gros);
+            vec3 rougeGros = uAvecCarte > 0.5 ? mix(uRouge, peinture(), uPeintureV) : uRouge;
+            vec3 corps = mix(uRougeFin * uEclatFin, rougeGros * uEclat, gros) * mix(1.0, 0.55 + 0.9 * bord, gros);
             // Reflets blancs : la lumière du modelé (en haut, côté sud-ouest) en un trait le long de chaque tube, et
             // les ouvertures de l'espace central (Fresnel)
-            vec3 l = normalize(vec3(-0.5, 0.85, 0.5));
+            vec3 l = normalize(vec3(-0.2, 1.0, 0.2)); // du puits, au-dessus (06/11)
             float trait = pow(max(dot(n, normalize(l + v)), 0.0), 90.0);
             float fresnel = 0.04 + 0.96 * pow(1.0 - c, 5.0);
             vec3 reflet = (vec3(1.0, 0.95, 0.95) * trait * 1.4 + entourage(reflect(-v, n)) * fresnel) * uRefletsV * gros;
             gl_FragColor = vec4(corps * alpha + reflet, alpha);
+            // Dans la passe de reflet : éteint avec la hauteur (prémultiplié : tout est atténué)
+            if (uReflet > 0.5) gl_FragColor *= exp(-max(vMonde.y, 0.0) / uLongueurReflet);
             #include <tonemapping_fragment>
             #include <colorspace_fragment>
           }`,
       }),
-    [],
+    [uSculpture],
   )
 
   absorbe.uniforms.uTeinte.value.set(r.absorption)
   absorbe.uniforms.uDensite.value = r.densite
+  absorbe.uniforms.uPeinture.value = r.peinture
   const ur = refracte.uniforms
   ur.uTeinte.value.set(r.absorption)
   ur.uDensite.value = r.densite
   ur.uRefraction.value = r.refraction
   ur.uDispersion.value = r.dispersion
+  ur.uPeinture.value = r.peinture
   const u = verre.uniforms
   u.uTeinte.value.set(r.teinte)
   u.uAretes.value.set(r.aretes)
@@ -318,6 +418,7 @@ export function OeuvreVerre({ config, modele }: { config: SalleConfig; modele: s
   u.uArriere.value = r.arriere
   u.uModele.value = r.modele
   u.uEclats.value = r.eclats
+  u.uLumierePeinture.value = r.lumierePeinture
   const w = vaisseaux.uniforms
   w.uRouge.value.set(r.rouge)
   w.uRougeFin.value.set(r.rougeFin)
@@ -325,6 +426,7 @@ export function OeuvreVerre({ config, modele }: { config: SalleConfig; modele: s
   w.uEclatFin.value = r.eclatFin
   w.uTransparence.value = r.transparence
   w.uRefletsV.value = r.refletsVaisseaux
+  w.uPeintureV.value = r.peintureVaisseaux
 
   // Copie du modèle ; le verre y est doublé : d'abord l'absorption, puis la lumière ajoutée
   const scene = useMemo(() => {
@@ -348,8 +450,34 @@ export function OeuvreVerre({ config, modele }: { config: SalleConfig; modele: s
       refractions.push(n, f)
     }
     copie.userData.passes = { absorptions, refractions }
+
+    // Textures du modèle (couleur, relief), lues sur ses matières d'origine ; données des vaisseaux dans les UV2
+    const lire = (nom: string, cibles: UniformsCartes[]) => {
+      let mesh: THREE.Mesh | undefined
+      copie.traverse((o) => {
+        const m = o as THREE.Mesh
+        if (!mesh && m.isMesh && (m.material as THREE.Material).name === nom) mesh = m
+      })
+      const mat = mesh?.material as THREE.MeshStandardMaterial | undefined
+      for (const c of cibles) {
+        c.uCarte.value = mat?.map ?? null
+        c.uAvecCarte.value = mat?.map ? 1 : 0
+        c.uRelief.value = mat?.normalMap ?? null
+        c.uAvecRelief.value = mat?.normalMap ? 1 : 0
+        if (mat?.normalScale) c.uEchelleRelief.value.copy(mat.normalScale)
+      }
+      return mesh
+    }
+    lire('Verre', [absorbe.uniforms, refracte.uniforms, verre.uniforms] as unknown as UniformsCartes[])
+    const v = lire('Vaisseaux', [vaisseaux.uniforms] as unknown as UniformsCartes[])
+    vaisseaux.uniforms.uAvecDonnees.value = v?.geometry.getAttribute('uv1') ? 1 : 0
+    copie.userData.echellesRelief = [absorbe, refracte, verre, vaisseaux].map((m) => m.uniforms.uEchelleRelief.value.clone())
     return copie
-  }, [gltf.scene, absorbe, noir, refracte])
+  }, [gltf.scene, absorbe, noir, refracte, verre, vaisseaux])
+
+  // Force du relief : échelle des normales du modèle × réglage
+  const echelles = scene.userData.echellesRelief as THREE.Vector2[]
+  ;[absorbe, refracte, verre, vaisseaux].forEach((m, i) => m.uniforms.uEchelleRelief.value.copy(echelles[i]).multiplyScalar(r.relief))
 
   // Image de la salle sans l'œuvre, pour la réfraction : après la navigation et le reflet (caméra à jour), avant
   // les effets d'image (priorité 1). Image linéaire (cible en demi-flottants : three n'y applique ni courbe ni
@@ -405,11 +533,16 @@ export function OeuvreVerre({ config, modele }: { config: SalleConfig; modele: s
     })
   }, [scene, verre, vaisseaux, absorbe, noir, refracte])
 
+  // Les vaisseaux n'ont qu'une face : la passe de reflet la retourne (la symétrie inverse le sens des faces)
+  const retournees = useMemo(() => [vaisseaux] as unknown as THREE.MeshStandardMaterial[], [vaisseaux])
   return (
-    <primitive
-      object={scene}
-      position={config.sculpture.position}
-      rotation-y={THREE.MathUtils.degToRad(config.sculpture.rotationY)}
-    />
+    <>
+      <primitive
+        object={scene}
+        position={config.sculpture.position}
+        rotation-y={THREE.MathUtils.degToRad(config.sculpture.rotationY)}
+      />
+      <PasseReflet sculpture={scene} materiaux={retournees} uSol={uSol} uSculpture={uSculpture} />
+    </>
   )
 }

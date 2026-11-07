@@ -19,8 +19,8 @@ Décisions de Ludovic (05/11) : grande salle de 40 m à 17,5 m, sans puits ni fe
 dehors très lumineux et simple ; vue d'arrivée dans l'espace central à 8,5 m.
 Unités : mètres. Repère Blender : Z vers le haut (Y du site = Z Blender, Z du site = -Y Blender).
 """
-import bpy, bmesh, sys, os, time, math
-from mathutils import Vector
+import bpy, bmesh, sys, os, time, math, json
+from mathutils import Vector, Matrix
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:]
 RES = int(argv[0]) if len(argv) > 0 else 2048
@@ -53,13 +53,29 @@ SOLEIL_COULEUR, CIEL_COULEUR = "#fff1dc", "#c9d6e6"
 # --- Espace central --------------------------------------------------------------------------------------
 INT, EXT, PLAT, CONGE = 15.5, 18.971, 16.0, 1.0
 OUV = 4 * math.sqrt(2)
-H_INT, TOIT = 6.0, 1.0
+# Plafond de l'espace central doublé le 06/11 (6 → 12 m, demande de Ludovic)
+H_INT, TOIT = 12.0, 1.0
+# Hauteur des deux ouvertures de l'espace central (07/11, demande de Ludovic : 4 m ; avant, toute la hauteur) :
+# un linteau les ferme au-dessus
+H_OUV = 4.0
 # Plus de socle depuis le 05/11 (demande de Ludovic) : l'œuvre flotte à la même hauteur (pied du modèle à OEUVRE_Z)
 OEUVRE_Z = 0.8
-# Éclairages discrets dans les quatre angles de l'espace central (05/11, demande de Ludovic) : projecteurs
-# encastrés au sol, à COIN_RETRAIT de l'angle sur sa bissectrice, tournés vers le haut et vers l'angle ; blanc chaud
-COIN_RETRAIT, COIN_INCLINAISON, COIN_CONE = 0.7, 12.0, 75.0
-COIN_FORCE, COIN_COULEUR = 200.0 * ECHELLE, "#ffd9ae"
+# Puits de lumière au-dessus de l'œuvre (06/11, demande de Ludovic, d'après references/souffle) : cylindre de
+# PUITS_D de diamètre (l'œuvre fait 3,4 m de large), percé dans le toit de l'espace central et monté jusqu'au plafond
+# de la grande salle (5,5 m de profondeur avec le plafond à 12 m : sa source n'est vue d'aucune place de la visite),
+# paroi de PUITS_E.
+# Sa lumière : un disque caché tout en haut, blanc froid, tourné vers le bas (PUITS_FORCE, PUITS_OUVERTURE : angle du
+# faisceau). Remplace les projecteurs des angles (05/11), retirés à sa demande.
+PUITS_D, PUITS_E = 4.4, 0.3
+PUITS_FORCE, PUITS_COULEUR, PUITS_OUVERTURE = 3000.0 * ECHELLE, "#dbe6ff", 30.0
+# Lumière rasante au pied des murs de l'espace central (06/11, d'après la seconde référence : murs bleus éclairés
+# par le bas) : rubans cachés au sol, contre les murs, tournés vers le haut ; 0 pour l'éteindre
+LAVAGE_FORCE, LAVAGE_COULEUR, LAVAGE_RETRAIT = 40.0 * ECHELLE, "#6f8fdc", 0.25
+# Alternance douce de deux couleurs le long des rubans (07/11, demande de Ludovic : bleu et beige) : la couleur
+# passe de LAVAGE_COULEUR à LAVAGE_COULEUR2 et revient sur LAVAGE_PERIODE mètres, en partant du début de chaque
+# tronçon ; LAVAGE_MELANGE de 0 (couleur 1 seule) à 1 (alternance complète). Chaque tronçon est fait de lampes de
+# LAVAGE_PAS mètres, chacune de sa couleur (même formule que l'aperçu du site, EclairageDirect.tsx).
+LAVAGE_COULEUR2, LAVAGE_PERIODE, LAVAGE_MELANGE, LAVAGE_PAS = "#e3c9a1", 4.0, 0.0, 0.5
 BANC_R, BANC_P, BANC_H = 6.47, 0.76, 0.45
 BANCS = [(-45 - 22.5, -45 + 22.5), (135 - 22.5, 135 + 22.5)]
 # L'œuvre (souffle.py), au-dessus du sol, face avant vers la vue d'arrivée (sud-ouest) comme dans le site ; sa lueur
@@ -69,6 +85,22 @@ OEUVRE_ROTATION = -45.0
 # (bleu ramené de 0,8 à 0,15 et rouge à 0,3 le 05/11 : il teintait trop la salle pour Ludovic ; bleu remonté à 0,3 ensuite, à sa demande, avec les projecteurs des angles de 120 à 200)
 OEUVRE_BLEU, OEUVRE_BLEU_FORCE = (0.08, 0.2, 1.0, 1), 0.3 * ECHELLE
 OEUVRE_ROUGE, OEUVRE_ROUGE_FORCE = (1.0, 0.04, 0.15, 1), 0.3 * ECHELLE
+
+# Réglages de l'éclairage figés depuis le site (07/11, touche M « Éclairage », bouton « Figer ») : ils remplacent les
+# valeurs ci-dessus et les couleurs de l'espace central (COULEURS_CENTRE, plus bas). Forces dans les unités ci-dessus,
+# avant ECHELLE. En retour, ce script écrit la place de ses lumières pour l'aperçu en direct du site
+# (src/salles/pavillon/lumieres.json).
+REGLAGES_SITE = os.path.join(HERE, "..", "src", "salles", "pavillon", "eclairage.json")
+ECLAIRAGE = json.load(open(REGLAGES_SITE)) if os.path.exists(REGLAGES_SITE) else {}
+PUITS_ACTIF = True
+if ECLAIRAGE:
+    p_, r_, l_ = ECLAIRAGE["puits"], ECLAIRAGE["rubans"], ECLAIRAGE["lueur"]
+    PUITS_ACTIF = p_["actif"]
+    PUITS_FORCE, PUITS_COULEUR, PUITS_OUVERTURE = p_["force"] * ECHELLE, p_["couleur"], p_["ouverture"]
+    LAVAGE_FORCE, LAVAGE_COULEUR = (r_["force"] if r_["actif"] else 0) * ECHELLE, r_["couleur"]
+    LAVAGE_COULEUR2 = r_.get("couleur2", LAVAGE_COULEUR2)
+    LAVAGE_PERIODE, LAVAGE_MELANGE = r_.get("periode", LAVAGE_PERIODE), r_.get("melange", LAVAGE_MELANGE)
+    OEUVRE_BLEU_FORCE, OEUVRE_ROUGE_FORCE = l_["bleu"] * ECHELLE, l_["rouge"] * ECHELLE
 GRILLE = 1.5
 DEHORS_R, CIEL_H = 100.0, 60.0          # sous la limite de vue de la caméra du site (150 m)
 ECRAN = 32.0                            # écran du ciel autour de la salle (voir plus bas)
@@ -96,10 +128,18 @@ def mat(name, color, rough=0.9):
 
 # Albédos = couleurs du site (salle provisoire) ; rugosités à peine différentes pour que gltf-transform
 # ne fusionne pas des matières de même couleur (elles n'ont pas le même atlas)
+# Dedans de l'espace central (06/11, puits de lumière, d'après references/souffle) : gris froids, sol et plafond
+# sombres, intérieur du puits clair (il s'illumine comme l'oculus de la première référence) ; mêmes couleurs dans
+# la config du site (src/salles/pavillon/config.ts)
+COULEURS_CENTRE = {"SolCentre": "#4b5059", "MurCentre": "#7c8694", "PlafondCentre": "#3b3f47", "Banc": "#8e959f",
+                   "Puits": "#a3a9b1"}
+COULEURS_CENTRE.update(ECLAIRAGE.get("couleurs", {}))
 MATS = [mat("Mur", lineaire("#c1bcb4")), mat("Sol", lineaire("#a09b96"), 0.6), mat("Plafond", lineaire("#bab6b1")),
-        mat("SolCentre", lineaire("#a09b96"), 0.61), mat("Banc", lineaire("#b1aca5")),
-        mat("MurCentre", lineaire("#c1bcb4"), 0.91), mat("PlafondCentre", lineaire("#bab6b1"), 0.91)]
-MUR, SOL, PLAF, SOL_C, BANC, MUR_C, PLAF_C = range(7)
+        mat("SolCentre", lineaire(COULEURS_CENTRE["SolCentre"]), 0.61), mat("Banc", lineaire(COULEURS_CENTRE["Banc"])),
+        mat("MurCentre", lineaire(COULEURS_CENTRE["MurCentre"]), 0.91),
+        mat("PlafondCentre", lineaire(COULEURS_CENTRE["PlafondCentre"]), 0.91),
+        mat("Puits", lineaire(COULEURS_CENTRE["Puits"]), 0.92)]
+MUR, SOL, PLAF, SOL_C, BANC, MUR_C, PLAF_C, PUITS = range(8)
 ACIER = mat("Acier", lineaire("#161616"), 0.45)
 ACIER.node_tree.nodes["Principled BSDF"].inputs["Metallic"].default_value = 0.7
 DEHORS = mat("Dehors", lineaire("#d9d2c6"), 0.95)
@@ -231,10 +271,36 @@ for q in (0, 2):
     pleins.append(prisme(f"Pavillon{q}", tourner(contour, q), -1, H_INT + 0.5))
     faces_int.append(tourner(dedans, q))
 pleins.append(prisme("Toit", contour_pavillon(), H_INT, H_INT + TOIT))
+# Linteaux des deux ouvertures (nord-est, et sud-ouest par symétrie), de H_OUV au toit ; ils entrent de 5 cm dans
+# les murs voisins (pas de faces confondues)
+_d = OUV / 2 / math.sqrt(2)
+_m = INT / 2
+_k = (EXT - INT) / 2
+_l = 0.05 / math.sqrt(2)
+for q in (0, 2):
+    A_ = (_m + _d + _l, _m - _d - _l)
+    B_ = (_m - _d - _l, _m + _d + _l)
+    pleins.append(prisme(f"Linteau{q}", tourner([A_, (A_[0] + _k, A_[1] + _k), (B_[0] + _k, B_[1] + _k), B_], q),
+                         H_OUV, H_INT + 0.5))
 pleins += [prisme("Banc", arc(a0, a1, BANC_R + BANC_P, 3) + arc(a1, a0, BANC_R, 3), -1, BANC_H) for a0, a1 in BANCS]
+# Paroi du puits, du toit de l'espace central au plafond de la grande salle (et au-delà, dans la pierre)
+R_PUITS = PUITS_D / 2
+paroi = prisme("PuitsParoi", cercle(R_PUITS + PUITS_E, 128), H_INT + TOIT - 0.1, H + 0.5)
+creux = prisme("PuitsCreux", cercle(R_PUITS, 128), H_INT + TOIT - 0.2, H + 0.6)
+booleen(paroi, "DIFFERENCE", creux)
+bpy.data.objects.remove(creux)
+if PUITS_ACTIF:
+    pleins.append(paroi)
+else:
+    bpy.data.objects.remove(paroi)
 c_pleins = collection("Pleins", pleins)
 booleen(interieur, "DIFFERENCE", c_pleins)
 jeter(c_pleins)
+# Trou du puits dans le toit de l'espace central (il rejoint l'air enclos par sa paroi)
+if PUITS_ACTIF:
+    trou = prisme("PuitsTrou", cercle(R_PUITS, 128), H_INT - 0.3, H_INT + TOIT + 0.3)
+    booleen(interieur, "UNION", trou)
+    bpy.data.objects.remove(trou)
 
 bloc = prisme("Pierre", rect(-h - T, -h - T, h + T, h + T), -0.5, H + 0.8)
 outils = [interieur]
@@ -298,8 +364,15 @@ def matiere(f):
     c, n = f.calc_center_median(), f.normal
     if abs(c.z) < 1e-3 and n.z > 0.9:
         return SOL_C if dans_centre(c) else SOL
+    # Dedans du puits : sa paroi (tournée vers l'axe), du trou dans le toit jusqu'en haut, et son fond
+    if PUITS_ACTIF and math.hypot(c.x, c.y) < R_PUITS + 0.02 and c.z > H_INT - 1e-3:
+        return PUITS
     if math.hypot(c.x, c.y) < BANC_R + BANC_P + 0.1 and 1e-3 < c.z < BANC_H + 1e-3:
         return BANC
+    # Tableaux des deux ouvertures (côtés et dessous du linteau) : comme les murs de l'espace central (07/11)
+    if (c.x * c.y > 0 and INT - 0.01 < abs(c.x + c.y) < EXT + 0.01 and abs(c.y - c.x) / math.sqrt(2) < OUV / 2 + 0.01
+            and 1e-3 < c.z < H_OUV + 1e-3 and abs(n.x + n.y) < 0.1):
+        return MUR_C
     # Dedans de l'espace central : faces intérieures des murs (tournées vers le centre), plafond
     if dans_centre(c, 0.01) and c.z > 1e-3:
         vers_centre = -(n.x * c.x + n.y * c.y) / max(math.hypot(c.x, c.y), 1e-6)
@@ -322,7 +395,7 @@ def ajouter(dst, f, mi):
 
 for f in bm.faces:
     m = matiere(f)
-    ajouter(groupes["Mobilier"] if m in (SOL_C, BANC, MUR_C, PLAF_C) else groupes["Salle"], f, m)
+    ajouter(groupes["Mobilier"] if m in (SOL_C, BANC, MUR_C, PLAF_C, PUITS) else groupes["Salle"], f, m)
 bm.free()
 
 
@@ -373,8 +446,9 @@ huisseries = objet("Huisseries", b); huisseries.data.materials.append(ACIER)
 # --- L'œuvre dans le précalcul : sa lueur seulement (le verre laisse passer la lumière et luit en bleu, les
 # vaisseaux luisent en rouge) ; elle colore le socle, le sol et les murs proches. Depuis le 05/11, plus de lumière
 # ronde au plafond ni de gorge en haut des murs, ni de socle (demande de Ludovic) : l'espace central est éclairé
-# par ses ouvertures, les projecteurs des angles et l'œuvre. Modèle : blender/souffle.py (sculpture-souffle/souffle.blend).
-with bpy.data.libraries.load(os.path.join(HERE, "sculpture-souffle", "souffle.blend")) as (src, dst):
+# par ses ouvertures, les projecteurs des angles et l'œuvre. Modèle : depuis le 06/11, celui du collègue de Ludovic
+# (blender/poumons.py, sculpture-souffle/poumons.blend) ; avant, blender/souffle.py (sculpture-souffle/souffle.blend).
+with bpy.data.libraries.load(os.path.join(HERE, "sculpture-souffle", "poumons.blend")) as (src, dst):
     dst.objects = ["Verre", "Vaisseaux"]
 for o in dst.objects:
     scn.collection.objects.link(o)
@@ -403,16 +477,55 @@ if f.normal.z < 0:
     f.normal_flip()
 dehors = objet("Dehors", b); dehors.data.materials.append(DEHORS)
 
-# Projecteurs des angles de l'espace central (angles intérieurs aux sommets du carré sur la pointe)
-for nom, (ax, ay) in (("N", (0, INT)), ("E", (INT, 0)), ("S", (0, -INT)), ("O", (-INT, 0))):
-    vers = Vector((ax, ay, 0)).normalized()
-    ld = bpy.data.lights.new(f"Coin{nom}", "SPOT")
-    ld.energy = COIN_FORCE; ld.color = lineaire(COIN_COULEUR)
-    ld.spot_size = math.radians(COIN_CONE); ld.spot_blend = 1.0; ld.shadow_soft_size = 0.15
-    lo = bpy.data.objects.new(f"Coin{nom}", ld); scn.collection.objects.link(lo)
-    lo.location = Vector((ax, ay, 0.05)) - vers * COIN_RETRAIT
-    axe = (Vector((0, 0, 1)) * math.cos(math.radians(COIN_INCLINAISON)) + vers * math.sin(math.radians(COIN_INCLINAISON)))
-    lo.rotation_euler = axe.to_track_quat("-Z", "Y").to_euler()
+# Lumière du puits : disque caché tout en haut, tourné vers le bas (une lampe « aire » est tournée vers -Z)
+if PUITS_ACTIF:
+    ld = bpy.data.lights.new("Puits", "AREA")
+    ld.shape = "DISK"; ld.size = PUITS_D - 0.1; ld.energy = PUITS_FORCE; ld.color = lineaire(PUITS_COULEUR)
+    ld.spread = math.radians(PUITS_OUVERTURE)
+    lo = bpy.data.objects.new("Puits", ld); scn.collection.objects.link(lo)
+    lo.location = (0, 0, H - 0.15)
+RUBANS = []   # place des rubans, pour l'aperçu en direct du site
+
+# Lumière rasante au pied des murs de l'espace central : un ruban par pan de mur, à LAVAGE_RETRAIT du mur, tourné
+# vers le haut et un peu vers le mur ; deux pans, au nord-est et au sud-ouest, sont coupés par les ouvertures
+if True:   # rubans posés même éteints (force nulle) : l'aperçu du site les rallume
+    coins = [(INT, 0), (0, INT), (-INT, 0), (0, -INT)]
+    for i in range(4):
+        a, b_ = Vector((*coins[i], 0)), Vector((*coins[(i + 1) % 4], 0))
+        u = (b_ - a).normalized()
+        dedans = -(a + b_).normalized()                      # vers le centre
+        longueur = (b_ - a).length
+        troncons = [(1.2, longueur - 1.2)]
+        if i in (0, 2):                                      # pans nord-est et sud-ouest : ouverture au milieu
+            troncons = [(1.2, longueur / 2 - OUV / 2 - 0.6), (longueur / 2 + OUV / 2 + 0.6, longueur - 1.2)]
+        # La lampe éclaire vers son -Z local ; son grand côté (X local) le long du mur
+        axe = (Vector((0, 0, 1)) * math.cos(math.radians(15)) - dedans * math.sin(math.radians(15))).normalized()
+        z = -axe
+        x = (u - z * u.dot(z)).normalized()
+        c1, c2 = Vector(lineaire(LAVAGE_COULEUR)), Vector(lineaire(LAVAGE_COULEUR2))
+        for j, (t0, t1) in enumerate(troncons):
+            debut = a + u * t0 + dedans * LAVAGE_RETRAIT + Vector((0, 0, 0.03))
+            n_ = max(1, round((t1 - t0) / LAVAGE_PAS))
+            pas = (t1 - t0) / n_
+            for k in range(n_):
+                s_ = (k + 0.5) * pas                          # distance au début du tronçon
+                w_ = LAVAGE_MELANGE * (0.5 - 0.5 * math.cos(2 * math.pi * s_ / LAVAGE_PERIODE))
+                ld = bpy.data.lights.new(f"Lavage{i}{j}_{k}", "AREA")
+                ld.shape = "RECTANGLE"; ld.size = pas; ld.size_y = 0.06
+                ld.energy = LAVAGE_FORCE * pas; ld.color = tuple(c1.lerp(c2, w_))
+                lo = bpy.data.objects.new(f"Lavage{i}{j}_{k}", ld); scn.collection.objects.link(lo)
+                lo.location = debut + u * s_
+                lo.rotation_euler = Matrix((x, z.cross(x), z)).transposed().to_euler()
+            RUBANS.append((debut, debut + u * (t1 - t0), axe))
+
+# Place des lumières pour l'aperçu en direct du site, dans son repère (Blender (x, y, z) = site (x, z, -y))
+site = lambda v: [round(v.x, 4), round(v.z, 4), round(-v.y, 4)]
+with open(os.path.join(HERE, "..", "src", "salles", "pavillon", "lumieres.json"), "w") as f_:
+    json.dump({"puits": {"source": site(Vector((0, 0, H - 0.15))), "rayonSource": (PUITS_D - 0.1) / 2,
+                         "rayon": R_PUITS, "hauteurOuverture": H_INT, "echelle": ECHELLE},
+               "rubans": [{"a": site(a_), "b": site(b_), "axe": site(x_)} for a_, b_, x_ in RUBANS]}, f_, indent=1)
+if len(argv) > 3 and argv[3] == "lumieres":   # seulement la place des lumières, sans rendu ni précalcul
+    sys.exit(0)
 
 # --- Soleil et ciel ----------------------------------------------------------------------------------------
 sun_d = bpy.data.lights.new("Soleil", "SUN"); sun_d.energy = SOLEIL_FORCE; sun_d.angle = math.radians(SOLEIL_ANGLE)
@@ -443,7 +556,8 @@ if ESSAI:
     scn.cycles.samples = SAMPLES; scn.cycles.use_denoising = True
     scn.view_settings.view_transform = "AgX"; scn.view_settings.exposure = math.log2(3.4)
     vues = {"arrivee": ((-6.01, -6.01, 1.7), (0, 0, 2.6)), "coin-est": ((-2, 2, 1.7), (INT, 0, 2.0)),
-            "coin-nord": ((4, -4, 1.7), (0, INT, 2.0))}
+            "coin-nord": ((4, -4, 1.7), (0, INT, 2.0)), "puits": ((-3.9, -3.9, 1.7), (0, 0, 11.0)),
+            "hall": ((-17, -17, 1.7), (0, 0, 10.0)), "ouverture": ((-4.5, -8.5, 1.7), (-9.0, -9.0, 2.6))}
     cd = bpy.data.cameras.new("Essai"); cd.lens = 18
     cam = bpy.data.objects.new("Essai", cd); scn.collection.objects.link(cam); scn.camera = cam
     for nom, (pos, cible) in vues.items():

@@ -3,6 +3,8 @@ import type { SalleConfig } from '../types'
 import { salleProvisoire } from '../provisoire/config'
 import lightmapPavillon from '../provisoire/pavillon-lightmap.json'
 import lightmapMobilierPavillon from '../provisoire/pavillon-lightmap-mobilier.json'
+import eclairagePavillon from './eclairage.json'
+import lumieresPavillon from './lumieres.json'
 
 /**
  * Le pavillon de « Souffle d'éclats » (plan de Ludovic du 05/11, plans/Fichier 2.svg ; plan coté et
@@ -33,25 +35,30 @@ export const sallePavillon: SalleConfig = {
     Mur: { couleur: '#c1bcb4', lightmap: 'salle' },
     Sol: { couleur: '#a09b96', lightmap: 'salle' },
     Plafond: { couleur: '#bab6b1', lightmap: 'salle' },
-    SolCentre: { couleur: '#a09b96', lightmap: 'mobilier' },
-    Banc: { couleur: '#b1aca5', lightmap: 'mobilier' },
-    // Dedans de l'espace central (noir essayé le 05/11, trop radical pour Ludovic)
-    MurCentre: { couleur: '#c1bcb4', lightmap: 'mobilier' },
-    PlafondCentre: { couleur: '#bab6b1', lightmap: 'mobilier' },
+    // Dedans de l'espace central : gris froids, sol et plafond sombres, puits clair (06/11, puits de lumière d'après
+    // references/souffle ; mêmes couleurs que COULEURS_CENTRE de pavillon.py)
+    SolCentre: { couleur: '#4b5059', lightmap: 'mobilier' },
+    Banc: { couleur: '#8e959f', lightmap: 'mobilier' },
+    MurCentre: { couleur: '#7c8694', lightmap: 'mobilier' },
+    PlafondCentre: { couleur: '#3b3f47', lightmap: 'mobilier' },
+    Puits: { couleur: '#a3a9b1', lightmap: 'mobilier' },
     Acier: { couleur: '#1e1e1e', lumineuse: 1 }, // huisseries des baies, sans lightmap
     Dehors: { couleur: '#d9d2c6', lumineuse: 0.6 }, // sol du dehors, clair (demande de Ludovic)
     Ciel: { couleur: '#c9d6e6', lumineuse: 0.5 },
   },
-  // Poumons de verre (blender/souffle.py, 05/11), flottant (pied à 1,15 m du sol, sans socle depuis le 05/11) ;
-  // face avant vers la vue d'arrivée
+  // Poumons de verre, flottant (pied à 1,15 m du sol, sans socle depuis le 05/11) ; face avant vers la vue d'arrivée.
+  // Depuis le 06/11, modèle du collègue de Ludovic (blender/poumons.py ; avant : blender/souffle.py, souffle.glb)
   sculpture: {
-    modele: versionne('/models/souffle.glb'),
+    modele: versionne('/models/poumons.glb'),
     verre: true,
     position: [0, 0.8, 0],
     rotationY: -45,
+    // Pas de reflet au sol (essayé le 07/11, retiré à la demande de Ludovic ; OeuvreVerre sait le dessiner)
     reflet: false,
   },
   faisceau: false,
+  // Éclairage de l'espace central réglable en direct puis figé (touche M « Éclairage », en dev ; 07/11)
+  eclairage: { reglages: eclairagePavillon, lumieres: lumieresPavillon, atlas: 'mobilier' },
   // Halo : la salle est sombre (sans lampes) et l'œuvre peu exposée ; il démarre plus bas pour que les vaisseaux
   // rayonnent, comme sur l'image
   effets: { courbe: 'aces', halo: 0.35, seuilHalo: 0.3 },

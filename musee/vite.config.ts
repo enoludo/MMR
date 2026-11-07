@@ -2,7 +2,8 @@ import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
-import { readFileSync, readdirSync } from 'node:fs'
+import { createWriteStream, readFileSync, readdirSync } from 'node:fs'
+import { spawn } from 'node:child_process'
 import path from 'node:path'
 
 /** Empreinte du contenu de chaque fichier de public/models et public/assets, par adresse (voir src/version.ts) */
@@ -19,6 +20,9 @@ function empreintes() {
   }
   return resultat
 }
+
+/** Calcul de la lumière lancé par le bouton « Figer » de l'éclairage (voir /__eclairage) */
+let calculEclairage: { etat: 'libre' | 'calcul' | 'fini' | 'erreur'; debut?: number; fin?: number; message?: string } = { etat: 'libre' }
 
 /**
  * En développement seulement : enregistre dans public/assets/captures les fichiers envoyés
@@ -60,6 +64,47 @@ function enregistrementCaptures(): Plugin {
         } catch (e) {
           res.statusCode = 400
           res.end(String(e))
+        }
+      })
+      // Éclairage réglé en direct puis figé (src/scene/EclairageDirect.tsx, pavillon, 07/11) : POST écrit
+      // src/salles/pavillon/eclairage.json et lance le calcul (pavillon.py puis chaine.sh, ≈ 20 min, journal dans
+      // blender/salle-pavillon/figer.log) ; GET donne l'état du calcul. Pillow pour chaine.sh : blender/.pylib.
+      serveur.middlewares.use('/__eclairage', async (req, res) => {
+        res.setHeader('Content-Type', 'application/json')
+        if (req.method === 'GET') return res.end(JSON.stringify(calculEclairage))
+        const morceaux: Buffer[] = []
+        for await (const m of req) morceaux.push(m as Buffer)
+        try {
+          const { salle, reglages: r } = JSON.parse(Buffer.concat(morceaux).toString())
+          const couleur = (c: unknown) => typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c)
+          const nombre = (x: unknown) => typeof x === 'number' && Number.isFinite(x) && x >= 0
+          if (req.method !== 'POST' || salle !== 'pavillon' || typeof r?.puits?.actif !== 'boolean' ||
+            !nombre(r.puits.force) || !couleur(r.puits.couleur) || !nombre(r.puits.ouverture) ||
+            typeof r.rubans?.actif !== 'boolean' || !nombre(r.rubans.force) || !couleur(r.rubans.couleur) ||
+            !couleur(r.rubans.couleur2) || !nombre(r.rubans.melange) || r.rubans.melange > 1 || !(r.rubans.periode > 0) ||
+            !nombre(r.lueur?.bleu) || !nombre(r.lueur?.rouge) || typeof r.couleurs !== 'object' ||
+            !Object.entries(r.couleurs).every(([k, c]) => /^[A-Za-z]+$/.test(k) && couleur(c)))
+            throw new Error('réglages refusés')
+          if (calculEclairage.etat === 'calcul') throw new Error('un calcul est déjà en cours')
+          await writeFile(path.resolve(__dirname, 'src/salles/pavillon/eclairage.json'), JSON.stringify(r, null, 2) + '\n')
+          const dossier = path.resolve(__dirname, 'blender')
+          const journal = createWriteStream(path.join(dossier, 'salle-pavillon', 'figer.log'))
+          const blender = '/Applications/Blender.app/Contents/MacOS/Blender'
+          const commande = `${blender} -b --python-use-system-env -P pavillon.py -- 2048 768 512 && ` +
+            `PYLIB=${path.join(dossier, '.pylib')} ./chaine.sh 2048 pavillon`
+          calculEclairage = { etat: 'calcul', debut: Date.now() }
+          const p = spawn('/bin/zsh', ['-c', commande], { cwd: dossier })
+          p.stdout.pipe(journal)
+          p.stderr.pipe(journal)
+          p.on('close', (code) => {
+            calculEclairage = code === 0
+              ? { etat: 'fini', debut: calculEclairage.debut, fin: Date.now() }
+              : { etat: 'erreur', debut: calculEclairage.debut, fin: Date.now(), message: `code ${code}, voir blender/salle-pavillon/figer.log` }
+          })
+          res.end(JSON.stringify(calculEclairage))
+        } catch (e) {
+          res.statusCode = 400
+          res.end(JSON.stringify({ erreur: String(e) }))
         }
       })
       // Points de vue réglés en vue libre (src/ui/VueLibre.tsx) : src/salles/points-de-vue.json

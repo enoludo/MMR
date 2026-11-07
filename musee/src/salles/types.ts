@@ -172,4 +172,25 @@ export interface SalleConfig {
   dehors?: boolean
   /** Ouvertures sur le ciel (vues depuis l'intérieur) : centre et taille [x, z] */
   ciel: { centre: Vec3; taille: [number, number] }[]
+  /**
+   * Éclairage réglable en direct puis figé (pavillon, 07/11 ; scene/EclairageDirect.tsx, en dev) : réglages figés
+   * (lus par le script Blender de la salle), place de ses lumières (écrite par ce script) et atlas de lightmap des
+   * matières éclairées en direct.
+   */
+  eclairage?: { reglages: EclairageSite; lumieres: LumieresSite; atlas: string }
+}
+
+/** Réglages de l'éclairage figés (src/salles/pavillon/eclairage.json, lu par blender/pavillon.py) */
+export interface EclairageSite {
+  puits: { actif: boolean; force: number; couleur: string; ouverture: number }
+  /** Alternance douce de couleur et couleur2 sur `periode` mètres, `melange` de 0 à 1 (07/11) */
+  rubans: { actif: boolean; force: number; couleur: string; couleur2?: string; melange?: number; periode?: number }
+  lueur: { bleu: number; rouge: number }
+  couleurs: Record<string, string>
+}
+
+/** Place des lumières du précalcul, dans le repère de la salle (écrite par blender/pavillon.py) */
+export interface LumieresSite {
+  puits: { source: number[]; rayonSource: number; rayon: number; hauteurOuverture: number; echelle: number }
+  rubans: { a: number[]; b: number[]; axe: number[] }[]
 }

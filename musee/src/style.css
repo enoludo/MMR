@@ -286,7 +286,11 @@ button { font: inherit; color: inherit; }
   left: 0; width: clamp(540px, 33.333vw, 640px); /* 540 : les deux cartouches et les marges */
   display: flex; flex-direction: column; justify-content: safe center; gap: 48px;
   pointer-events: none; /* les zones vides laissent passer le regard et le scroll */
+  /* Fenêtre basse : le contenu défile, sans barre de défilement visible (07/11, demande de Ludovic : barre
+     grise à côté du titre de Huntington et du Seuil, qui ont un bloc de soutien en plus) */
+  scrollbar-width: none;
 }
+.salle-accueil::-webkit-scrollbar { display: none; }
 .salle-accueil > * { pointer-events: auto; }
 /* Popup ouvert : le premier écran part élément par élément (useApparition, cascade) ; le
    panneau lui-même (fond sur mobile) s'efface ensuite */

@@ -9,6 +9,7 @@ import { sansReflets } from '../renoncements'
 import { Faisceau, tableFaisceau } from './Faisceau'
 import { Poussiere } from './Poussiere'
 import { OeuvreVerre } from './OeuvreVerre'
+import { EclairageDirect } from './EclairageDirect'
 import { MAX_PORTES, appliquerPierre, creerUniformsSalle, reglerPierre, uniformsOmbres } from './pierre'
 import { configActuelle, configArriveeLue, groupesSalles, poidsArrivee, salleActuelle, salleArrivee } from './passage'
 import { prechargerLightmaps, useLightmaps } from './lightmaps'
@@ -162,10 +163,13 @@ export function Salle({ config }: { config: SalleConfig }) {
   return (
     <group ref={racine}>
       <primitive object={scene} />
+      {import.meta.env.DEV && config.eclairage && (
+        <EclairageDirect config={config} scene={scene} uSalle={uSalle} lumiere={r.lumiere} />
+      )}
       <Ciel config={config} />
       {config.sculpture.modele &&
         (config.sculpture.verre ? (
-          <OeuvreVerre config={config} modele={config.sculpture.modele} />
+          <OeuvreVerre config={config} modele={config.sculpture.modele} uSol={uReflet} longueurReflet={reflet.longueur} />
         ) : (
           <Sculpture config={config} modele={config.sculpture.modele} uSol={uReflet} longueurReflet={reflet.longueur} />
         ))}

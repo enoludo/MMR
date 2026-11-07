@@ -24,8 +24,9 @@ if [[ $OE == rotonde ]]; then
 fi
 export PYTHONPATH=$PYLIB
 run lightmap.py -- $D/lightmap-dn.exr ../public/models/${P}salle-lightmap.webp
-# Percentile de l'échelle du mobilier : plus bas quand le socle a une lueur (écrêtée, voir lightmap.py)
-if [[ $OE == huntington || $OE == rotonde || $OE == pavillon ]]; then PCT=98; else PCT=99.95; fi
+# Percentile de l'échelle du mobilier : plus bas quand le socle a une lueur (écrêtée, voir lightmap.py). Pas le
+# pavillon depuis le 07/11 : la flaque du puits, large, était écrêtée en un plateau blanc
+if [[ $OE == huntington || $OE == rotonde ]]; then PCT=98; else PCT=99.95; fi
 run lightmap.py -- $D/lightmap-mobilier-dn.exr ../public/models/${P}salle-lightmap-mobilier.webp $PCT
 mv ../public/models/${P}salle-lightmap.json ../src/salles/provisoire/${P}lightmap.json
 mv ../public/models/${P}salle-lightmap-mobilier.json ../src/salles/provisoire/${P}lightmap-mobilier.json

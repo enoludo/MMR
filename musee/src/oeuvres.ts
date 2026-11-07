@@ -176,10 +176,15 @@ export const oeuvres: Oeuvre[] = [
     id: 'souffle-d-eclats',
     titre: "Souffle d'éclats",
     maladie: '',
-    image: versionne('/assets/images/souffle-declats.webp'),
+    // Capture de sa salle (vue d'entrée, faite par Ludovic le 07/11) ; l'ancien visuel : /assets/images/souffle-declats.webp
+    image: versionne('/assets/captures/souffle-d-eclats.webp'),
+    vignette: versionne('/assets/images/souffle-declats.webp'),
+    vueEntree: '/assets/captures/souffle-d-eclats',
+    cartouches: capturesCartouches('souffle-d-eclats'),
+    survol: videosSurvol('souffle-d-eclats'),
     maladieTexte: maladieAVenir('À venir'),
     manifeste: A_VENIR,
-    // Pavillon (05/11, demande de Ludovic) : le socle de Huntington, sans œuvre en 3D pour l'instant
+    // Pavillon (05/11, demande de Ludovic), poumons de verre du collègue de Ludovic (06/11)
     salle: sallePavillon,
     vues: VUES_PROVISOIRES,
   },

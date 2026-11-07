@@ -1,0 +1,27 @@
+{
+  "puits": {
+    "actif": true,
+    "force": 50,
+    "couleur": "#dbe6ff",
+    "ouverture": 18
+  },
+  "rubans": {
+    "actif": true,
+    "force": 40,
+    "couleur": "#6f8fdc",
+    "couleur2": "#e3c9a1",
+    "melange": 1,
+    "periode": 6
+  },
+  "lueur": {
+    "bleu": 0.3,
+    "rouge": 0.3
+  },
+  "couleurs": {
+    "SolCentre": "#4b5059",
+    "MurCentre": "#7c8694",
+    "PlafondCentre": "#3b3f47",
+    "Banc": "#8e959f",
+    "Puits": "#a3a9b1"
+  }
+}
