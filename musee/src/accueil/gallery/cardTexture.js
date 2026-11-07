@@ -1,10 +1,13 @@
 import * as THREE from 'three';
 
-// 16:9, matching CONFIG.cardWidth/cardHeight — every card, whatever its
+import { CONFIG } from '../config.js';
+
+// Same shape as CONFIG.cardWidth/cardHeight (16:9, or the mobile format: see
+// formatCartes in config.js) — every card, whatever its
 // source photo's native aspect ratio, ends up the same shape. Blur is no
 // longer baked in here (see SpiralGallery's shader-based blur) so this can
 // afford to be a bit crisper than the old multi-tier textures.
-export const CARD_TEXTURE_SIZE = { width: 960, height: 540 };
+export const CARD_TEXTURE_SIZE = { width: 960, height: Math.round((960 * CONFIG.cardHeight) / CONFIG.cardWidth) };
 
 /** Source rectangle that crops (never stretches) `source` to the canvas's aspect ratio, like CSS object-fit: cover. */
 export function coverRect(source, targetAspect) {

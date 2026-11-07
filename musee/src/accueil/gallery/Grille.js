@@ -37,11 +37,12 @@ export const reglagesGrille = {
 };
 
 /**
- * Écran étroit (moins de 423 px, style.css) : les onglets Spirale / Grille ne tiennent pas au centre du
- * header et passent dessous (48 px et 8 px d'écart) : la grille descend d'autant.
+ * Mobile (760 px de large au plus, comme `max-width: 760px` de style.css ; maquette 540:975, 07/11) :
+ * les onglets Spirale / Grille sont en bas de l'écran, plus dans le header ; la première rangée commence
+ * 18 px sous le header (12 + 48 px).
  */
-const ONGLETS_DESSOUS = 423;
-const HAUT_ONGLETS = 56;
+const MOBILE = 760;
+const HAUT_MOBILE = 78;
 
 /** Sous la vignette (maquette 477:1404) : 16 px, le titre (26), 6 px, les étiquettes (24) */
 const LEGENDE = 72;
@@ -55,7 +56,7 @@ export function dispositionGrille(largeur, hauteur, n) {
   const l = (largeur - 2 * marge - (colonnes - 1) * r.ecart) / colonnes;
   const h = l * FORMAT;
   const pas = h + LEGENDE + r.ecartLignes;
-  const haut = r.haut + (largeur < ONGLETS_DESSOUS ? HAUT_ONGLETS : 0);
+  const haut = largeur <= MOBILE ? HAUT_MOBILE : r.haut;
   const cases = [];
   for (let i = 0; i < n; i += 1) {
     const c = i % colonnes;

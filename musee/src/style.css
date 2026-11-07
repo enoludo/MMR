@@ -106,7 +106,7 @@ button { font: inherit; color: inherit; }
 /* Le délai ne joue qu'à la sortie de l'écran d'accueil (html.intro-depart, ui/Intro.tsx) : ailleurs, le
    header de la salle doit remplacer celui de la spirale dans la même image (01/11, saut vu par Ludovic) */
 .intro-depart .entete { transition: opacity 0.8s ease 0.5s, visibility 0s 0.5s; }
-.intro-active .entete, .intro-active .accueil__fleches, .intro-active .pied, .intro-active .recherche { opacity: 0; visibility: hidden; transition: none; }
+.intro-active .entete, .intro-active .accueil__fleches, .intro-active .barre-mobile, .intro-active .pied, .intro-active .recherche { opacity: 0; visibility: hidden; transition: none; }
 
 .entete {
   position: fixed; top: var(--marge); left: var(--marge); right: var(--marge); z-index: 30;
@@ -136,6 +136,8 @@ button { font: inherit; color: inherit; }
    de l'image des transitions (z-index 5), comme dans les salles */
 .accueil { position: absolute; inset: 0; background: var(--fond); }
 .accueil__toile { position: fixed; inset: 0; touch-action: none; cursor: var(--curseur-deplacer); }
+/* Barre du bas de l'accueil sur mobile (onglets et flèches ou loupe, bloc mobile plus bas) */
+.barre-mobile { display: none; }
 /* Flèches précédente / suivante (bloc Figma « SliderControls ») */
 .accueil__fleches {
   position: fixed; z-index: 20; left: 50%; bottom: var(--marge); transform: translateX(-50%);
@@ -205,7 +207,8 @@ button { font: inherit; color: inherit; }
 /* Mécène ou partenaire : même fond, texte rouge */
 .grille__etiquette--mecene { color: #ff5c5c; }
 /* Recherche et filtres de la vue Grille (« SearchBar » 58:455) : en bas, centrés, à 24 px du bord ;
-   champ de 339 px, filtres à leur largeur, 12 px entre eux */
+   champ de 339 px, filtres à leur largeur, 12 px entre eux. Sur mobile, ouverte par la loupe de la
+   barre du bas (.barre-mobile, plus bas) */
 .recherche {
   position: fixed; left: 50%; bottom: var(--marge); z-index: 11; transform: translateX(-50%);
   display: flex; gap: 12px; width: max-content; max-width: calc(100vw - 2 * var(--marge));
@@ -242,8 +245,8 @@ button { font: inherit; color: inherit; }
 
 /* Transitions vers les salles (ui/Transition.tsx) : la spirale, figée, grandit avec la carte ;
    le titre part et revient lettre par lettre (Overlay.js), le centre du header s'efface */
-.accueil__fleches { transition: opacity 0.3s ease; }
-.accueil--transition .accueil__fleches { opacity: 0; pointer-events: none; }
+.accueil__fleches, .barre-mobile { transition: opacity 0.3s ease; }
+.accueil--transition .accueil__fleches, .accueil--transition .barre-mobile { opacity: 0; pointer-events: none; }
 /* Retour d'une salle : la spirale se prépare, cachée, sous la salle (main.tsx) */
 .accueil--cachee { visibility: hidden; }
 .accueil--transition .accueil__cta { pointer-events: none; }
@@ -573,16 +576,35 @@ button { font: inherit; color: inherit; }
     --sortie-feuille: 0.4s cubic-bezier(.4, 0, 1, 1);
     --entree-feuille: 0.6s cubic-bezier(.32, .72, 0, 1) 0.28s;
   }
-  .onglets__onglet { height: 40px; padding: 0 12px; font-size: 13px; }
   /* Logo MMR de 48 px de haut, comme la maquette (36 essayé le 05/11 puis abandonné) ; accueil
-     (spirale, grille) et salles ont le même header, pas de saut à l'entrée (05/11) ; les onglets Spirale / Grille restent au centre du header s'ils
-     tiennent entre le logo et les boutons, sinon ils passent juste dessous (fin du bloc mobile) */
+     (spirale, grille) et salles ont le même header, pas de saut à l'entrée (05/11) */
   .entete { top: 12px; left: 18px; right: 12px; }
-  /* Onglets centrés sur l'écran, pas sur le header (marges inégales : 3 px de décalage) */
-  .entete__centre { left: calc(50% - 3px); }
   .menu { top: calc(12px + var(--haut) + 8px); right: 12px; }
-  /* Dans une salle, le titre du header laisse la place au bouton retour du bas */
-  .salle-ui .entete__centre { display: none; }
+  /* Rien au centre du header : dans une salle, le titre laisse la place au bouton retour du bas ; sur
+     l'accueil, les onglets Spirale / Grille sont dans la barre du bas (maquettes 540:687 et 540:975) */
+  .salle-ui .entete__centre, .accueil .entete__centre { display: none; }
+
+  /* Accueil (07/11, maquettes 540:687 spirale et 540:975 grille) : barre du bas à 16 px du bord, onglets
+     au milieu, 12 px d'écart ; flèches autour sur la spirale, loupe à droite sur la grille. Les boutons
+     de l'autre vue se replient (largeur et écart à 0) : les onglets glissent à leur place. La barre
+     remplace les flèches et la recherche de l'ordinateur. */
+  .accueil__fleches { display: none; }
+  .barre-mobile {
+    position: fixed; z-index: 20; left: 0; right: 0; bottom: var(--marge);
+    display: flex; justify-content: center; align-items: center; pointer-events: none;
+  }
+  .barre-mobile > * { pointer-events: auto; }
+  .barre-mobile .masque { max-width: var(--haut); transition: max-width 0.5s cubic-bezier(.65, 0, .35, 1), margin 0.5s cubic-bezier(.65, 0, .35, 1); }
+  .barre-mobile .masque--spirale:first-child { margin-right: 12px; }
+  .barre-mobile .masque--spirale:not(:first-child), .barre-mobile .masque--grille { margin-left: 12px; }
+  .barre-mobile.barre-mobile--grille .masque--spirale, .barre-mobile:not(.barre-mobile--grille) .masque--grille { max-width: 0; margin: 0; }
+  /* Recherche : ouverte par la loupe, au-dessus de la barre (champ sur toute la largeur, filtres dessous) */
+  .recherche {
+    bottom: calc(var(--marge) + var(--haut) + 12px);
+    opacity: 0; visibility: hidden; translate: 0 12px;
+    transition: opacity 0.3s ease, visibility 0s 0.3s, translate 0.3s ease;
+  }
+  .accueil--recherche .recherche { opacity: 1; visibility: visible; translate: 0 0; transition: opacity 0.3s ease, translate 0.3s ease; }
 
   /* Par-dessus la 3D, le seul voile de la maquette : noir en haut et en bas (pas de vignette radiale) ;
      recopié dans l'image des transitions (degrade, ui/ToileTransition.ts) */
@@ -734,13 +756,6 @@ button { font: inherit; color: inherit; }
   .popup__chiffre dd { font-size: 20px; }
   .popup__lien { align-self: stretch; justify-content: center; margin-top: 0; }
 }
-/* Onglets de 127 px centrés sur l'écran, logo de 122 à 18 px du bord, boutons de 104 à 12 px, 8 px
-   d'écart au moins : au centre du header à partir de 423 px de large (le logo limite). En dessous, 8 px
-   sous le header ; la grille descend d'autant (ONGLETS_DESSOUS, Grille.js) */
-@media (max-width: 422px) {
-  .accueil .entete__centre { top: calc(var(--haut) + 8px); }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .page { animation: none; }
   .salle-accueil, .popup { transition: opacity 0.3s ease, visibility 0.3s; }

@@ -1,5 +1,14 @@
-import { useEffect, useRef } from 'react'
-import { CONFIG } from './config.js'
+import { useEffect, useRef, useState } from 'react'
+import {
+  CLE_FORMAT_CARTES,
+  CONFIG,
+  ECART_MOBILE,
+  FORMATS_CARTES_MOBILE,
+  MOBILE_AU_CHARGEMENT,
+  PAS_DE_BASE,
+  ecarterRessort,
+  formatCartesMobileChoisi,
+} from './config.js'
 import { SpiralGallery } from './gallery/SpiralGallery.js'
 import { VirtualScroll } from './gallery/VirtualScroll.js'
 import { Overlay, reglagesTitres } from './gallery/Overlay.js'
@@ -7,7 +16,7 @@ import { LegendesGrille, dispositionGrille, rangsDepuis, reglagesGrille } from '
 import gsap from 'gsap'
 import { useControls } from 'leva'
 import { boutonCopier } from '../reglages'
-import { CaretDownIcon, MagnifyingGlassIcon } from '@phosphor-icons/react'
+import { CaretDownIcon, MagnifyingGlassIcon, XIcon } from '@phosphor-icons/react'
 import { BackgroundTint } from './gallery/BackgroundTint.js'
 import { getCenteredSlot } from './gallery/centeredSlot.js'
 import { cartesSpirale, salleOuverte } from '../oeuvres'
@@ -80,12 +89,20 @@ export function Accueil() {
   const transition = useEtat((e) => e.transition)
   const fleches = useRef<HTMLDivElement>(null)
   const recherche = useRef<HTMLDivElement>(null)
+  /** Mobile : barre du bas (flèches ou loupe autour des onglets) et recherche ouverte par la loupe */
+  const barre = useRef<HTMLDivElement>(null)
+  const saisie = useRef<HTMLInputElement>(null)
+  const [rechercheOuverte, ouvrirRecherche] = useState(false)
   const vueAffichee = useRef<string | null>(null)
+  /** Écart vertical voulu entre les cartes sur mobile (touche M), appliqué par la boucle de la spirale */
+  const ecartVoulu = useRef(ECART_MOBILE)
   // Flèches (spirale) et recherche (grille) : les unes chassent les autres au changement de vue
   useEffect(() => {
-    const pilules = (el: HTMLElement | null) => [...(el?.querySelectorAll<HTMLElement>('.masque > *') ?? [])]
-    const sortants = pilules(vue === 'grille' ? fleches.current : recherche.current)
-    const entrants = pilules(vue === 'grille' ? recherche.current : fleches.current)
+    const pilules = (el: HTMLElement | null, choix = '.masque > *') => [...(el?.querySelectorAll<HTMLElement>(choix) ?? [])]
+    const pilulesSpirale = [...pilules(fleches.current), ...pilules(barre.current, '.masque--spirale > *')]
+    const pilulesGrille = [...pilules(recherche.current), ...pilules(barre.current, '.masque--grille > *')]
+    const sortants = vue === 'grille' ? pilulesSpirale : pilulesGrille
+    const entrants = vue === 'grille' ? pilulesGrille : pilulesSpirale
     gsap.killTweensOf([...sortants, ...entrants])
     // Premier affichage : en place, sans mouvement
     if (vueAffichee.current === null || reduitMouvement()) {
@@ -98,6 +115,38 @@ export function Accueil() {
     gsap.to(sortants, { ...SORTIE_PILULES })
     gsap.fromTo(entrants, { ...ENTREE_PILULES }, { ...APPARITION_PILULES, delay: reglagesTitres.delaiEntree })
   }, [vue])
+  // Mobile : la recherche se referme en quittant la grille et pendant les transitions ; Échap la referme
+  useEffect(() => {
+    if (vue !== 'grille' || transition) ouvrirRecherche(false)
+  }, [vue, transition])
+  useEffect(() => {
+    if (!rechercheOuverte) return
+    saisie.current?.focus()
+    const touche = (e: KeyboardEvent) => e.key === 'Escape' && ouvrirRecherche(false)
+    window.addEventListener('keydown', touche)
+    return () => window.removeEventListener('keydown', touche)
+  }, [rechercheOuverte])
+  // Touche M : spirale sur mobile (config.js, 07/11) : format des cartes, appliqué en rechargeant la
+  // page ; écart vertical (pas du ressort), en direct (la boucle de la spirale le prend en compte)
+  const { ecart } = useControls('Spirale (mobile)', {
+    ...boutonCopier('Spirale (mobile)'),
+    format: {
+      value: formatCartesMobileChoisi(),
+      options: Object.keys(FORMATS_CARTES_MOBILE),
+      label: 'format (recharge la page)',
+      onChange: (f: string, _chemin: string, contexte: { initial: boolean }) => {
+        if (contexte.initial || f === formatCartesMobileChoisi()) return
+        try {
+          localStorage.setItem(CLE_FORMAT_CARTES, f)
+        } catch {
+          return
+        }
+        location.reload()
+      },
+    },
+    ecart: { value: ECART_MOBILE, min: 1, max: 3, step: 0.05, label: 'écart vertical (× le pas de l’ordinateur)' },
+  })
+  ecartVoulu.current = ecart
   // Touche M : croisement des titres au changement de carte (Overlay.js)
   reglagesTitres.delaiEntree = useControls('Titres de la spirale', {
     ...boutonCopier('Titres de la spirale'),
@@ -340,6 +389,18 @@ export function Accueil() {
       // Entrée : la carte cliquée vient se placer exactement au centre (la même position qu'au retour),
       // l'image de la transition la suit ; sinon, figée pendant une transition
       // (en grille, la carte reste dans sa case)
+      // Mobile : écart vertical changé à la touche M (hors transition) : même carte au centre, cases refaites
+      const pasVoulu = ecartVoulu.current
+      if (MOBILE_AU_CHARGEMENT && !transition && !enGrille && Math.abs(CONFIG.pitch - pasVoulu * PAS_DE_BASE.pitch) > 1e-6) {
+        const rapport = ecarterRessort(pasVoulu)
+        y *= rapport
+        scroll.virtualOffset *= rapport
+        if (centrage) {
+          centrage.depart *= rapport
+          centrage.cible *= rapport
+        }
+        galerie.buildSlots(galerie.slotCount)
+      }
       if (versSalle && !enGrille) y += (galerie.offsetForCard(transition.oeuvre, y) - y) * 0.15
       else if (centrage) {
         const u = centrage.duree ? Math.min(1, (performance.now() - centrage.debut) / 1000 / centrage.duree) : 1
@@ -453,9 +514,28 @@ export function Accueil() {
     }
   }, [])
 
+  const onglets = (
+    <div className="onglets" role="tablist" aria-label="Mode d'affichage">
+      {(['spirale', 'grille'] as const).map((v) => (
+        <button
+          key={v}
+          type="button"
+          role="tab"
+          aria-selected={vue === v}
+          className={`onglets__onglet ${vue === v ? 'actif' : ''}`}
+          onClick={() => store.set({ vueAccueil: v })}
+        >
+          {v === 'spirale' ? 'Spirale' : 'Grille'}
+        </button>
+      ))}
+    </div>
+  )
+
   return (
     <div
       className={`accueil ${transition ? 'accueil--transition' : ''} ${vue === 'grille' ? 'accueil--grille' : ''} ${
+        rechercheOuverte ? 'accueil--recherche' : ''
+      } ${
         transition?.sens === 'sortie' && (transition.phase === 'retour' || transition.phase === 'photo') ? 'accueil--cachee' : ''
       }`}
       ref={fond}
@@ -464,24 +544,8 @@ export function Accueil() {
       {/* Vue Grille : titres et étiquettes sous les vignettes, écrits par gallery/Grille.js */}
       <div className="grille" ref={grille} />
 
-      <EnTete
-        centre={
-          <div className="onglets" role="tablist" aria-label="Mode d'affichage">
-            {(['spirale', 'grille'] as const).map((v) => (
-              <button
-                key={v}
-                type="button"
-                role="tab"
-                aria-selected={vue === v}
-                className={`onglets__onglet ${vue === v ? 'actif' : ''}`}
-                onClick={() => store.set({ vueAccueil: v })}
-              >
-                {v === 'spirale' ? 'Spirale' : 'Grille'}
-              </button>
-            ))}
-          </div>
-        }
-      />
+      {/* Onglets au centre du header sur ordinateur ; sur mobile, dans la barre du bas (.barre-mobile) */}
+      <EnTete centre={onglets} />
 
       <div className="accueil__carte" aria-live="polite">
         <div className="accueil__info">
@@ -503,11 +567,11 @@ export function Accueil() {
       </div>
 
       {/* Vue Grille : recherche et filtres en bas de l'écran (maquette Figma « SearchBar » 58:455) ;
-          pas encore reliés à la grille */}
+          pas encore reliés à la grille. Sur mobile, ouverte au-dessus de la barre du bas par la loupe */}
       <div className="recherche" ref={recherche} inert={vue !== 'grille'}>
         <span className="masque masque--champ">
           <label className="recherche__champ">
-            <input className="recherche__saisie" type="search" placeholder="Rechercher" aria-label="Rechercher une œuvre" />
+            <input ref={saisie} className="recherche__saisie" type="search" placeholder="Rechercher" aria-label="Rechercher une œuvre" />
             <span className="recherche__icone">
               <MagnifyingGlassIcon size={16} aria-hidden />
             </span>
@@ -523,6 +587,33 @@ export function Accueil() {
             </button>
           </span>
         ))}
+      </div>
+
+      {/* Mobile (maquettes 540:687 et 540:975, 07/11) : barre du bas, onglets entre les flèches (spirale) ou
+          suivis de la loupe (grille) ; les boutons de l'autre vue se replient, les onglets glissent */}
+      <div className={`barre-mobile ${vue === 'grille' ? 'barre-mobile--grille' : ''}`} ref={barre}>
+        <span className="masque masque--spirale" inert={vue === 'grille'}>
+          <button type="button" className="bouton-rond" aria-label="Carte précédente" onClick={() => defiler.current(-1)}>
+            <IconeFleche />
+          </button>
+        </span>
+        {onglets}
+        <span className="masque masque--spirale" inert={vue === 'grille'}>
+          <button type="button" className="bouton-rond" aria-label="Carte suivante" onClick={() => defiler.current(1)}>
+            <IconeFleche suivant />
+          </button>
+        </span>
+        <span className="masque masque--grille" inert={vue !== 'grille'}>
+          <button
+            type="button"
+            className="bouton-rond"
+            aria-label={rechercheOuverte ? 'Fermer la recherche' : 'Rechercher'}
+            aria-expanded={rechercheOuverte}
+            onClick={() => ouvrirRecherche((o) => !o)}
+          >
+            {rechercheOuverte ? <XIcon size={16} aria-hidden /> : <MagnifyingGlassIcon size={16} aria-hidden />}
+          </button>
+        </span>
       </div>
 
       {/* Chaque bouton dans son masque, d'où il sort par le haut et où il entre par le bas */}
