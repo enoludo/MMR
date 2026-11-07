@@ -1,6 +1,31 @@
 // Central tuning knobs for the spiral gallery.
 // Slots are purely visual placeholders in 3D space; the data (cards.json)
 // is mapped onto them independently (see SpiralGallery#buildSlots).
+/**
+ * Site React (07/11, demande de Ludovic) : format des cartes sur mobile (largeur / hauteur), 4/3 par
+ * défaut : sur un écran vertical, le 16/9 occupait mal la place. Autres formats à essayer à la touche
+ * M (« Spirale (mobile) », Accueil.tsx), gardés dans le navigateur, appliqués au chargement de la page
+ * (les cartes et leurs images sont préparées une fois) ; la largeur des cartes ne change pas, leur
+ * hauteur suit. Même seuil que le mobile de style.css (760 px), pris au chargement. La grille suit le
+ * même format.
+ */
+export const MOBILE_AU_CHARGEMENT = typeof window !== 'undefined' && window.innerWidth <= 760;
+export const FORMATS_CARTES_MOBILE = { '16/9': 16 / 9, '4/3': 4 / 3, '1/1': 1 };
+export const CLE_FORMAT_CARTES = 'mmr-format-cartes-mobile';
+export function formatCartesMobileChoisi() {
+  try {
+    const f = localStorage.getItem(CLE_FORMAT_CARTES);
+    if (f in FORMATS_CARTES_MOBILE) return f;
+  } catch {
+    // navigation privée : format par défaut
+  }
+  return '4/3';
+}
+function formatCartes() {
+  if (!MOBILE_AU_CHARGEMENT) return 16 / 9;
+  return FORMATS_CARTES_MOBILE[formatCartesMobileChoisi()];
+}
+
 export const CONFIG = {
   // The spiral is a true helix, like a spring/coil: a single constant
   // `radius`, with angle and height rigidly tied together by `pitch` (the
@@ -37,7 +62,7 @@ export const CONFIG = {
   },
 
   cardWidth: 2.56,
-  cardHeight: 1.44, // exactly 16:9
+  cardHeight: 2.56 / formatCartes(), // 16:9, sauf sur mobile si un autre format est choisi (formatCartes)
 
   // Rounds every corner of the card, edges included — it's an actual
   // geometry radius (the card shape is extruded from a rounded rectangle,
@@ -131,6 +156,30 @@ export const CONFIG = {
   // longer idle window auto-rotate uses.
   snapDebounceMs: 180,
 };
+
+/**
+ * Site React (07/11, demande de Ludovic) : sur mobile, ressort moins serré, plus d'écart vertical
+ * entre les cartes : le pas (`pitch`) est multiplié par `ECART_MOBILE` (touche M « Spirale
+ * (mobile) », en direct). Molette, glisser et rotation automatique sont dans la même unité que le
+ * pas : multipliés d'autant, les cartes passent au même rythme. Accueil.tsx recale la spirale (même
+ * carte au centre) et reconstruit ses cases quand le pas change. 1,15 : avec des cartes 4/3, on
+ * retrouve l'écart du 16/9 et l'on voit encore le haut et le bas des cartes du tour voisin (à 1,5,
+ * elles sortaient de l'écran en 375 × 667).
+ */
+export const ECART_MOBILE = 1.15;
+export const PAS_DE_BASE = {
+  pitch: CONFIG.pitch,
+  wheelSensitivity: CONFIG.wheelSensitivity,
+  dragSensitivity: CONFIG.dragSensitivity,
+  autoRotateSpeed: CONFIG.autoRotateSpeed,
+};
+/** Pas du ressort multiplié par `facteur` (1 = celui de l'ordinateur) ; renvoie le rapport nouveau / ancien pas */
+export function ecarterRessort(facteur) {
+  const avant = CONFIG.pitch;
+  for (const cle of Object.keys(PAS_DE_BASE)) CONFIG[cle] = PAS_DE_BASE[cle] * facteur;
+  return CONFIG.pitch / avant;
+}
+if (MOBILE_AU_CHARGEMENT) ecarterRessort(ECART_MOBILE);
 
 export function getSlotCountForWidth(width) {
   const turns =
