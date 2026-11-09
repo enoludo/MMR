@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, type RefObject } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
@@ -9,6 +9,8 @@ import { sansReflets } from '../renoncements'
 import { Faisceau, tableFaisceau } from './Faisceau'
 import { Poussiere } from './Poussiere'
 import { OeuvreVerre } from './OeuvreVerre'
+import { dessinsDirects } from './Effets'
+import { FONDU_DEBUT, FONDU_FIN, PetitesLumieres, uSurEchantillonnage } from './PetitesLumieres'
 import { EclairageDirect } from './EclairageDirect'
 import { MAX_PORTES, appliquerPierre, creerUniformsJoints, creerUniformsLueur, creerUniformsSalle, reglerPierre, uniformsOmbres, type UniformsJoints, type UniformsLueur } from './pierre'
 import { etatIncandescence } from './incandescence'
@@ -107,17 +109,37 @@ export function Salle({ config }: { config: SalleConfig }) {
     uReflet.uForceReflet.value = config.sculpture.reflet === false || sansReflets() ? 0 : reflet.force
   })
 
+  // Image de la salle vue depuis l'œuvre (EnvSalle), reflétée par les matières en métal et par l'œuvre de verre
+  const gl = useThree((s) => s.gl)
+  const avecMetal = Object.values(config.matieres).some((m) => m.metal)
+  const avecEnv = avecMetal || !!config.sculpture.verre
+  const envSalle = useMemo(() => (avecEnv ? creerEnvSalle(gl) : null), [avecEnv, gl])
+  useEffect(() => () => envSalle?.dispose(), [envSalle])
+
   const materiaux = useMemo(() => {
     const parNom: Record<string, THREE.Texture> = {}
     nomsLightmaps.forEach((n, i) => {
       parNom[n] = textures[i] // encodage logarithmique, décodé dans le shader (voir lightmaps.ts)
     })
-    const m: Record<string, THREE.MeshBasicMaterial> = {}
-    for (const [nom, { couleur, lightmap, lumineuse }] of Object.entries(config.matieres)) {
+    const m: Record<string, THREE.MeshBasicMaterial | THREE.MeshStandardMaterial> = {}
+    for (const [nom, { couleur, lightmap, lumineuse, metal, petit }] of Object.entries(config.matieres)) {
+      if (metal) {
+        // Métal (aluminium du pavillon, 09/11) : éclairé en direct, il reflète la salle (MetalSalle)
+        m[nom] = new THREE.MeshStandardMaterial({
+          color: couleur,
+          metalness: 1,
+          roughness: metal.rugosite,
+          envMap: envSalle?.texture ?? null,
+          envMapIntensity: metal.reflets ?? 1,
+        })
+        m[nom].name = nom
+        continue
+      }
       if (lumineuse !== undefined || !lightmap) {
         // Paroi lumineuse (fentes de la rotonde) : sans lightmap ni grain, comme l'émission de Blender
         m[nom] = new THREE.MeshBasicMaterial({ color: new THREE.Color(couleur).multiplyScalar(lumineuse ?? 1) })
         m[nom].name = nom
+        if (petit) eclatSelonTaille(m[nom], petit)
         continue
       }
       m[nom] = new THREE.MeshBasicMaterial({ lightMap: parNom[lightmap], color: couleur })
@@ -137,11 +159,11 @@ export function Salle({ config }: { config: SalleConfig }) {
     }
     return m
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [textures, rapports, config, uSalle])
+  }, [textures, rapports, config, uSalle, envSalle])
 
   useEffect(() => {
     for (const m of Object.values(materiaux)) {
-      if (!m.userData.lightmap) continue
+      if (!m.userData.lightmap || !(m instanceof THREE.MeshBasicMaterial)) continue
       // MeshBasicMaterial divise la lightmap par π : on compense
       m.lightMapIntensity = m.userData.lightmap.echelle * Math.PI * r.lumiere
       reglerPierre(m, r)
@@ -173,13 +195,16 @@ export function Salle({ config }: { config: SalleConfig }) {
       <primitive object={scene} />
       {config.joints && <ReglagesJoints config={config} uJoints={uJoints} />}
       {config.lueurOeuvre && <LueurOeuvre config={config} uLueur={uLueur} />}
+      {Object.values(config.matieres).some((m) => m.petit) && <PetitesLumieres config={config} scene={scene} />}
+      {envSalle && <EnvSalle env={envSalle} materiaux={materiaux} scene={scene} racine={racine} />}
+      {avecMetal && <ReglagesMetal config={config} materiaux={materiaux} />}
       {import.meta.env.DEV && config.eclairage && (
         <EclairageDirect config={config} scene={scene} uSalle={uSalle} lumiere={r.lumiere} />
       )}
       <Ciel config={config} />
       {config.sculpture.modele &&
         (config.sculpture.verre ? (
-          <OeuvreVerre config={config} modele={config.sculpture.modele} uSol={uReflet} longueurReflet={reflet.longueur} />
+          <OeuvreVerre config={config} modele={config.sculpture.modele} uSol={uReflet} longueurReflet={reflet.longueur} env={envSalle} />
         ) : (
           <Sculpture config={config} modele={config.sculpture.modele} uSol={uReflet} longueurReflet={reflet.longueur} />
         ))}
@@ -597,3 +622,131 @@ function LueurOeuvre({ config, uLueur }: { config: SalleConfig; uLueur: Uniforms
   })
   return null
 }
+
+/**
+ * Image de l'environnement des matières en métal (09/11, aluminium du pavillon) : la salle vue depuis un point au
+ * centre (six vues, `CubeCamera`), convertie par three pour les reflets flous (PMREM). Prête dès la création (noire,
+ * déjà convertie une fois) : les matières sont compilées avec leurs reflets, sans recompiler à la première prise.
+ */
+function creerEnvSalle(gl: THREE.WebGLRenderer) {
+  const env = new THREE.WebGLCubeRenderTarget(256, { type: THREE.HalfFloatType, generateMipmaps: false })
+  gl.initRenderTarget(env)
+  const avant = gl.getRenderTarget()
+  for (let face = 0; face < 6; face++) {
+    gl.setRenderTarget(env, face)
+    gl.clear()
+  }
+  gl.setRenderTarget(avant)
+  env.texture.needsPMREMUpdate = true
+  return env
+}
+
+/**
+ * Point de la prise de vue des reflets, dans le repère de la salle : au milieu de l'œuvre (09/11 ; 0,7 m pour le
+ * métal seul), d'où le verre la voit ; l'écart pour la barrière et le pupitre, plus bas, se remarque à peine
+ */
+const POINT_ENV = new THREE.Vector3(0, 2, 0)
+
+/**
+ * Réglages du métal de la salle (touche M, « Métal · <salle> » : rugosité, reflets ; sa couleur est dans « Couleurs »)
+ */
+function ReglagesMetal({ config, materiaux }: { config: SalleConfig; materiaux: Record<string, THREE.Material> }) {
+  const noms = useMemo(() => Object.keys(config.matieres).filter((n) => config.matieres[n].metal), [config])
+  const d = config.matieres[noms[0]].metal!
+  const r = useReglagesSalle(config, 'Métal', {
+    rugosite: { value: d.rugosite, min: 0, max: 1, step: 0.01, label: 'rugosité' },
+    reflets: { value: d.reflets ?? 1, min: 0, max: 4, step: 0.05, label: 'force des reflets' },
+  })
+  useEffect(() => {
+    for (const n of noms) {
+      const m = materiaux[n] as THREE.MeshStandardMaterial
+      m.roughness = r.rugosite
+      m.envMapIntensity = r.reflets
+    }
+  }, [materiaux, noms, r])
+  return null
+}
+
+/**
+ * Prise de vue de l'environnement de la salle (métal, verre de l'œuvre) : quelques images après le montage, puis de
+ * nouveau quand la salle change de place (salle d'arrivée d'un passage, recalée à l'origine à l'arrivée). Sont cachés
+ * pendant la prise : les objets en métal et l'œuvre de verre (ils ne peuvent pas lire l'image qu'on écrit ; marqués
+ * `userData.horsEnv` pour l'œuvre), et la poussière.
+ */
+function EnvSalle({
+  env,
+  materiaux,
+  scene,
+  racine,
+}: {
+  env: THREE.WebGLCubeRenderTarget
+  materiaux: Record<string, THREE.Material>
+  scene: THREE.Object3D
+  racine: RefObject<THREE.Group | null>
+}) {
+  const gl = useThree((s) => s.gl)
+  const monde = useThree((s) => s.scene)
+  const metaux = useMemo(
+    () => new Set(Object.values(materiaux).filter((m) => (m as THREE.MeshStandardMaterial).isMeshStandardMaterial)),
+    [materiaux],
+  )
+  const camera = useMemo(() => new THREE.CubeCamera(0.05, 150, env), [env])
+  const etat = useRef({ images: 0, place: new THREE.Matrix4() })
+  useFrame(() => {
+    const g = racine.current
+    if (!g) return
+    const e = etat.current
+    if (!g.matrixWorld.equals(e.place)) {
+      e.place.copy(g.matrixWorld)
+      e.images = 0
+    }
+    if (++e.images !== 4) return
+    camera.position.copy(POINT_ENV).applyMatrix4(g.matrixWorld)
+    const caches: THREE.Object3D[] = []
+    const cacher = (o: THREE.Object3D) => {
+      if (o.visible) {
+        o.visible = false
+        caches.push(o)
+      }
+    }
+    scene.traverse((o) => {
+      const mesh = o as THREE.Mesh
+      if (mesh.isMesh && metaux.has(mesh.material as THREE.Material)) cacher(mesh)
+    })
+    g.traverse((o) => {
+      if (o.userData.horsEnv) cacher(o)
+    })
+    for (const o of dessinsDirects) cacher(o)
+    camera.update(gl, monde)
+    for (const o of caches) o.visible = true
+    env.texture.needsPMREMUpdate = true
+  })
+  return null
+}
+
+/**
+ * Petit objet lumineux (spots encastrés du pavillon, 09/11) : de loin et vu à plat, il ne couvre plus qu'un pixel ou
+ * moins et clignote. Il s'éteint quand son épaisseur à l'écran (taille de l'objet sur la taille d'un pixel à sa
+ * surface, dans la direction la plus écrasée, ramenée aux pixels de l'image finale) passe sous FONDU_FIN pixels ; un
+ * point lumineux de taille stable prend le relais (PetitesLumieres.tsx).
+ */
+function eclatSelonTaille(m: THREE.MeshBasicMaterial, taille: number) {
+  m.onBeforeCompile = (s) => {
+    s.uniforms.uTaillePetit = { value: taille }
+    s.uniforms.uSurEchantillonnage = uSurEchantillonnage
+    s.vertexShader = s.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vPosPetit;')
+      .replace('#include <fog_vertex>', '#include <fog_vertex>\nvPosPetit = (modelMatrix * vec4(transformed, 1.0)).xyz;')
+    s.fragmentShader = s.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vPosPetit;\nuniform float uTaillePetit, uSurEchantillonnage;')
+      .replace(
+        '#include <opaque_fragment>',
+        `float piedPixel = max(length(dFdx(vPosPetit)), length(dFdy(vPosPetit)));
+        float epaisPx = uTaillePetit / max(piedPixel, 1e-6) / max(uSurEchantillonnage, 1.0);
+        outgoingLight *= smoothstep(${FONDU_DEBUT.toFixed(1)}, ${FONDU_FIN.toFixed(1)}, epaisPx);
+        #include <opaque_fragment>`,
+      )
+  }
+  m.customProgramCacheKey = () => 'petit'
+}
+

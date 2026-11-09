@@ -119,11 +119,13 @@ const GLSL_BRUIT = /* glsl */ `
 
 // Valeurs basses : l'exposition de la salle (×3,4) s'applique aussi à l'œuvre ; au-delà de ≈ 1 après exposition,
 // la courbe de couleurs pâlit le rouge en saumon et le bleu en lavande
-export function OeuvreVerre({ config, modele, uSol, longueurReflet }: {
+export function OeuvreVerre({ config, modele, uSol, longueurReflet, env }: {
   config: SalleConfig
   modele: string
   uSol: UniformsReflet
   longueurReflet: number
+  /** Image de la salle tout autour de l'œuvre (EnvSalle, Salle.tsx) : vrais reflets du verre (09/11) */
+  env?: THREE.WebGLCubeRenderTarget | null
 }) {
   const gltf = useGLTF(modele)
   // Mode « reflet » des matières, piloté par la passe de reflet (seuls uReflet et uLongueurReflet servent ici)
@@ -150,7 +152,11 @@ export function OeuvreVerre({ config, modele, uSol, longueurReflet }: {
     finesse: { value: 12, min: 1, max: 20, step: 0.5, label: 'finesse des arêtes' },
     masse: { value: 0.04, min: 0, max: 1, step: 0.01, label: 'lumière dans la masse' },
     nuages: { value: 1, min: 0, max: 1, step: 0.01, label: 'nuages dans la masse' },
-    reflets: { value: 0.6, min: 0, max: 8, step: 0.05 },
+    reflets: { value: 0.6, min: 0, max: 8, step: 0.05, label: 'reflets dessinés (ouvertures, puits)' },
+    // Verre réaliste (09/11, demande de Ludovic) : reflets de la vraie salle selon la loi du verre (Fresnel), lumière
+    // reflétée retirée de la lumière transmise, réfraction de la coque surtout au bord
+    refletsSalle: { value: 1, min: 0, max: 4, step: 0.01, label: 'reflets de la salle (réels)' },
+    refractionBord: { value: 1.2, min: -4, max: 4, step: 0.01, label: 'réfraction au bord de la coque' },
     modele: { value: 0.06, min: 0, max: 2, step: 0.01, label: 'modelé (volume)' },
     eclats: { value: 0.3, min: 0, max: 4, step: 0.01, label: 'éclats sur les bosses' },
     arriere: { value: 0.35, min: 0, max: 1, step: 0.01, label: 'faces arrière' },
@@ -246,6 +252,7 @@ export function OeuvreVerre({ config, modele, uSol, longueurReflet }: {
           uFond: { value: null },
           uTaille: { value: new THREE.Vector2(1, 1) },
           uRefraction: { value: 0.35 },
+          uRefractionBord: { value: 1.2 },
           uDispersion: { value: 0.08 },
           uTeinte: { value: new THREE.Color() },
           uDensite: { value: 0.9 },
@@ -258,22 +265,26 @@ export function OeuvreVerre({ config, modele, uSol, longueurReflet }: {
           ${GLSL_TEINTE}
           uniform sampler2D uFond;
           uniform vec2 uTaille;
-          uniform float uRefraction, uDispersion, uDensite;
+          uniform float uRefraction, uRefractionBord, uDispersion, uDensite;
           uniform vec3 uTeinte;
           varying vec3 vNormale;
           varying vec3 vVue;
           void main() {
             vec3 n = avecRelief(normalize(vNormale));
             float c = clamp(dot(n, normalize(vVue)), 0.0, 1.0);
-            // Déviation à l'écran : orientation de la surface vue de la caméra, moindre de loin
+            // Déviation à l'écran : orientation de la surface vue de la caméra, moindre de loin ; une coque mince
+            // dévie surtout au bord, où le regard traverse la paroi en biais (09/11)
             vec3 nv = normalize((viewMatrix * vec4(n, 0.0)).xyz);
-            vec2 d = nv.xy * uRefraction / max(length(vVue), 0.5);
+            float biais = pow(1.0 - c, 2.0);
+            vec2 d = nv.xy * (uRefraction + uRefractionBord * biais) / max(length(vVue), 0.5);
+            // Ce que le verre reflète ne passe pas au travers (Fresnel, verre d'indice 1,5)
+            float transmis = 1.0 - (0.04 + 0.96 * pow(1.0 - c, 5.0));
             vec2 uv = gl_FragCoord.xy / uTaille;
             vec3 fond = vec3(texture2D(uFond, uv - d * (1.0 - uDispersion)).r,
                              texture2D(uFond, uv - d).g,
                              texture2D(uFond, uv - d * (1.0 + uDispersion)).b);
             vec3 t = mix(vec3(1.0), teinteVerre(uTeinte), uDensite * (0.75 + 0.25 * pow(1.0 - c, 1.2)));
-            gl_FragColor = vec4(fond * t * t * 0.5, 1.0);
+            gl_FragColor = vec4(fond * t * t * 0.5 * transmis, 1.0);
             #include <tonemapping_fragment>
             #include <colorspace_fragment>
           }`,
@@ -302,6 +313,9 @@ export function OeuvreVerre({ config, modele, uSol, longueurReflet }: {
           uModele: { value: 0.35 },
           uEclats: { value: 0.8 },
           uLumierePeinture: { value: 0 },
+          uEnv: { value: null as THREE.Texture | null },
+          uAvecEnv: { value: 0 },
+          uRefletsSalle: { value: 1 },
           ...uniformsCartes(),
           ...uChauffe,
           ...uLumiereVerre,
@@ -317,6 +331,8 @@ export function OeuvreVerre({ config, modele, uSol, longueurReflet }: {
           uniform vec3 uPointsBronches[${POINTS_BRONCHES}];
           uniform vec3 uTeinte, uAretes;
           uniform float uBords, uFinesse, uMasse, uNuages, uReflets, uArriere, uModele, uEclats;
+          uniform samplerCube uEnv;
+          uniform float uAvecEnv, uRefletsSalle;
           varying vec3 vNormale;
           varying vec3 vVue;
           varying vec3 vLocal;
@@ -346,6 +362,8 @@ export function OeuvreVerre({ config, modele, uSol, longueurReflet }: {
             // Reflets (Schlick) : nets, ils glissent sur les bosses
             float fresnel = 0.04 + 0.96 * pow(1.0 - c, 5.0);
             couleur += entourage(reflect(-v, n)) * fresnel * uReflets;
+            // Vrais reflets (09/11) : la salle tout autour de l'œuvre (ouvertures, puits, projecteurs, murs), nets
+            if (uAvecEnv > 0.5) couleur += textureCube(uEnv, reflect(-v, n)).rgb * fresnel * uRefletsSalle;
             // Modelé : une lumière bleue venue d'en haut (le puits, depuis le 06/11 ; avant, du sud-ouest), éclaire les
             // lobes et laisse les creux sombres ; ses éclats, très serrés, accrochent les bosses
             vec3 l = normalize(vec3(-0.2, 1.0, 0.2)); // du puits, au-dessus (06/11)
@@ -489,6 +507,10 @@ export function OeuvreVerre({ config, modele, uSol, longueurReflet }: {
   u.uModele.value = r.modele
   u.uEclats.value = r.eclats
   u.uLumierePeinture.value = r.lumierePeinture
+  u.uEnv.value = env?.texture ?? null
+  u.uAvecEnv.value = env ? 1 : 0
+  u.uRefletsSalle.value = r.refletsSalle
+  refracte.uniforms.uRefractionBord.value = r.refractionBord
   const w = vaisseaux.uniforms
   w.uRouge.value.set(r.rouge)
   w.uRougeFin.value.set(r.rougeFin)
@@ -580,7 +602,7 @@ export function OeuvreVerre({ config, modele, uSol, longueurReflet }: {
   const taille = useMemo(() => new THREE.Vector2(), [])
   const couleurFond = useMemo(() => new THREE.Color(), [])
   useFrame(({ scene: monde, camera }) => {
-    const avecRefraction = r.refraction !== 0
+    const avecRefraction = r.refraction !== 0 || r.refractionBord !== 0
     const { absorptions, refractions } = scene.userData.passes as { absorptions: THREE.Mesh[]; refractions: THREE.Mesh[] }
     for (const m of absorptions) m.visible = !avecRefraction
     for (const m of refractions) m.visible = avecRefraction
@@ -625,7 +647,11 @@ export function OeuvreVerre({ config, modele, uSol, longueurReflet }: {
   })
   return (
     <>
-      <group position={config.sculpture.position} rotation-y={THREE.MathUtils.degToRad(config.sculpture.rotationY)}>
+      <group
+        position={config.sculpture.position}
+        rotation-y={THREE.MathUtils.degToRad(config.sculpture.rotationY)}
+        userData={{ horsEnv: true }}
+      >
         <primitive object={scene} />
       </group>
       <PasseReflet sculpture={scene} materiaux={retournees} uSol={uSol} uSculpture={uSculpture} />

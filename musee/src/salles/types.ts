@@ -93,8 +93,16 @@ export interface SalleConfig {
    * Matières (noms des matériaux Blender) : couleur, et atlas de lightmap utilisé. Le grain est procédural.
    * Une matière `lumineuse` (paroi lumineuse des fentes de la rotonde) n'a pas de lightmap : sa couleur
    * multipliée par cette intensité, comme l'émission de Blender.
+   * Une matière `metal` (aluminium du pavillon, 09/11) est un vrai métal éclairé en direct, qui reflète la salle
+   * (image de l'environnement prise sur place, `MetalSalle` dans Salle.tsx) : `rugosite` de 0 (miroir) à 1, `reflets`
+   * force des reflets ; sa couleur est celle du métal.
+   * `petit` (m) : taille d'un petit objet lumineux (spots encastrés du pavillon, 09/11) ; son éclat baisse quand il ne
+   * couvre plus que quelques pixels (de loin, vu à plat), sinon il clignote en apparaissant et disparaissant.
    */
-  matieres: Record<string, { couleur: string; lightmap?: string; lumineuse?: number }>
+  matieres: Record<
+    string,
+    { couleur: string; lightmap?: string; lumineuse?: number; petit?: number; metal?: { rugosite: number; reflets?: number } }
+  >
   /** `echelle` : agrandissement du modèle (le même que ECHELLE_OEUVRE dans blender/salle.py) */
   /** `reflet` : false pour une œuvre sur socle (pas de reflet au sol) */
   sculpture: {

@@ -42,11 +42,15 @@ export const sallePavillon: SalleConfig = {
     MurCentre: { couleur: '#7c8694', lightmap: 'mobilier' },
     PlafondCentre: { couleur: '#3b3f47', lightmap: 'mobilier' },
     Puits: { couleur: '#a3a9b1', lightmap: 'mobilier' },
-    Cartel: { couleur: '#d6d2ca', lightmap: 'mobilier' }, // plaque du cartel sur pupitre (07/11)
-    // Lentilles des projecteurs de l'anneau suspendu et bandes des bornes (07/11, pavillon.py), sans lightmap
+    Cartel: { couleur: '#d6d2ca', lightmap: 'mobilier' }, // plaque claire du cartel (07/11) ; en aluminium depuis le 09/11 (Alu)
+    // Lentilles des projecteurs de l'anneau suspendu et verres des spots au sol (pavillon.py), sans lightmap
     Lampe: { couleur: '#fff0dc', lumineuse: 1 },
-    Borne: { couleur: '#ffd7a3', lumineuse: 1 },
+    // Verre des spots encastrés (09/11) : 12 cm ; son éclat baisse de loin, sinon il clignote (Salle.tsx, eclatSelonTaille)
+    Borne: { couleur: '#ffd7a3', lumineuse: 1, petit: 0.12 },
     Acier: { couleur: '#1e1e1e', lumineuse: 1 }, // huisseries des baies, sans lightmap
+    // Aluminium gris foncé de la barrière autour de l'œuvre et du pupitre du cartel (09/11, demande de Ludovic) :
+    // vrai métal, qui reflète la salle (Salle.tsx, MetalSalle ; touche M « Métal »)
+    Alu: { couleur: '#7a7f87', metal: { rugosite: 0.25, reflets: 2 } },
     Dehors: { couleur: '#d9d2c6', lumineuse: 0.6 }, // sol du dehors, clair (demande de Ludovic)
     Ciel: { couleur: '#c9d6e6', lumineuse: 0.5 },
   },

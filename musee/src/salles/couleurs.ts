@@ -22,7 +22,7 @@ export function schemaCouleurs(c: SalleConfig) {
   }
   if (c.sculpture.lueur) s.lueur = { value: c.sculpture.lueur.couleur, label: 'lueur du socle' }
   for (const [nom, m] of Object.entries(c.matieres))
-    s[`matiere${nom}`] = { value: m.couleur, label: `${m.lumineuse === undefined ? 'pierre' : 'paroi lumineuse'} : ${nom}` }
+    s[`matiere${nom}`] = { value: m.couleur, label: `${m.metal ? 'métal' : m.lumineuse === undefined ? 'pierre' : 'paroi lumineuse'} : ${nom}` }
   return s
 }
 

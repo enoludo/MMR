@@ -31,7 +31,9 @@ run lightmap.py -- $D/lightmap-mobilier-dn.exr ../public/models/${P}salle-lightm
 mv ../public/models/${P}salle-lightmap.json ../src/salles/provisoire/${P}lightmap.json
 mv ../public/models/${P}salle-lightmap-mobilier.json ../src/salles/provisoire/${P}lightmap-mobilier.json
 cd ..
-npx --yes @gltf-transform/cli optimize blender/$D/salle-raw.glb $S/salle-opt.glb --compress false --simplify false --join false 2>&1 | tail -1
+# --palette false (09/11) : au-delà de cinq matières sans texture (pavillon, avec l'aluminium), optimize les fondait en
+# « PaletteMaterial… » et le site, qui reconnaît les matières par leur nom, ne les retrouvait plus
+npx --yes @gltf-transform/cli optimize blender/$D/salle-raw.glb $S/salle-opt.glb --compress false --simplify false --join false --palette false 2>&1 | tail -1
 # Grille de quantification commune à toute la scène : les sommets partagés par le sol et le carré
 # de sol fin (deux objets) restent exactement confondus, sans fissure entre eux
 npx --yes @gltf-transform/cli meshopt $S/salle-opt.glb public/models/${P}salle.glb --quantization-volume scene --quantize-position 16 --quantize-texcoord 14 2>&1 | tail -1

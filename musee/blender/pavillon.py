@@ -89,6 +89,10 @@ BANCS_DROITS = True
 BANCS_ACTIFS = False
 BANC_L, BANC_PROF, BANC_ASSISE, BANC_EP = 2.4, 0.5, 0.45, 0.06
 ANNEAU_R, ANNEAU_L, ANNEAU_H = 2.6, 0.06, 0.03
+# Depuis le 09/11 (demande de Ludovic), l'anneau est une mini barrière d'aluminium gris foncé : main courante ronde à
+# BARRIERE_H (rayon ANNEAU_R + ANNEAU_L / 2, section BARRIERE_MAIN), sur fins montants (BARRIERE_MONTANT) répartis
+# comme les projecteurs de l'anneau suspendu (PROJ_N, décalés de 22,5°) ; le pupitre du cartel est du même aluminium
+BARRIERE_H, BARRIERE_MAIN, BARRIERE_MONTANT = 0.40, 0.015, 0.008
 # Cartel dans l'axe des deux ouvertures (07/11, demande de Ludovic ; 200° avant), du côté sud-ouest, celui de la vue
 # d'arrivée, lisible en venant de l'ouverture
 CARTEL_ANGLE, CARTEL_R, CARTEL_H, CARTEL_INCL = 225.0, 3.1, 1.0, 25.0
@@ -97,12 +101,13 @@ CARTEL_L, CARTEL_P = 0.42, 0.30
 # - anneau d'acier noir suspendu (ANNEAU_HAUT de rayon, à ANNEAU_HAUT_Z, tenu au plafond par 4 tiges fines), qui porte
 #   PROJ_N petits projecteurs (cylindres de 20 cm, lentille lumineuse) tournés vers l'œuvre ; dans le précalcul, un spot
 #   devant chaque lentille (PROJ_FORCE, PROJ_CONE, PROJ_COULEUR) ;
-# - bornes de 40 cm (acier noir, bande lumineuse chaude en haut, BORNE_FORCE), de part et d'autre du chemin qui
-#   mène des deux ouvertures à l'œuvre.
+# - spots encastrés dans le sol (verre lumineux chaud de BORNE_COTE dans un cadre d'acier noir, BORNE_FORCE), de part
+#   et d'autre du chemin qui mène des deux ouvertures à l'œuvre. Jusqu'au 09/11, bornes de 40 cm : on s'y serait pris
+#   les pieds (Ludovic) ; le verre dépasse de 2 mm, le cadre de 3 mm (jamais au niveau du sol).
 ANNEAU_HAUT, ANNEAU_HAUT_Z, ANNEAU_SECTION = 3.6, 6.0, 0.05
 PROJ_N, PROJ_L, PROJ_R = 8, 0.2, 0.045
 PROJ_FORCE, PROJ_CONE, PROJ_COULEUR = 250.0 * ECHELLE, 22.0, "#fff0dc"
-BORNE_COTE, BORNE_H, BORNE_FORCE, BORNE_COULEUR = 0.12, 0.40, 250.0, "#ffd7a3"
+BORNE_COTE, BORNE_CADRE, BORNE_FORCE, BORNE_COULEUR = 0.12, 0.01, 250.0, "#ffd7a3"
 BORNES_R, BORNES_ECART = (9.0, 12.0), 1.8   # distances au centre le long du chemin, écart de part et d'autre
 # L'œuvre (souffle.py), au-dessus du sol, face avant vers la vue d'arrivée (sud-ouest) comme dans le site ; sa lueur
 OEUVRE_ROTATION = -45.0
@@ -175,6 +180,9 @@ MATS = [mat("Mur", lineaire("#c1bcb4")), mat("Sol", lineaire("#a09b96"), 0.6), m
 MUR, SOL, PLAF, SOL_C, BANC, MUR_C, PLAF_C, PUITS, CARTEL = range(9)
 ACIER = mat("Acier", lineaire("#161616"), 0.45)
 ACIER.node_tree.nodes["Principled BSDF"].inputs["Metallic"].default_value = 0.7
+ALU = mat("Alu", lineaire("#7a7f87"), 0.3)    # aluminium gris foncé (barrière, pupitre) ; dans le site, vrai métal
+ALU.node_tree.nodes["Principled BSDF"].inputs["Metallic"].default_value = 1.0
+ALU_PIECES = []   # pavés d'aluminium (centre, demi-axes x, y, z), avec les huisseries (indice ALU_I)
 DEHORS = mat("Dehors", lineaire("#d9d2c6"), 0.95)
 
 
@@ -475,9 +483,9 @@ monte = (-rad * math.cos(math.radians(CARTEL_INCL)) + Vector((0, 0, 1)) * math.s
 normale = tan_.cross(monte).normalized()
 if normale.z < 0:
     normale = -normale
-boite(groupes["Mobilier"], pied + Vector((0, 0, CARTEL_H)), tan_ * CARTEL_L / 2, monte * CARTEL_P / 2, normale * 0.0125, CARTEL)
+ALU_PIECES.append((pied + Vector((0, 0, CARTEL_H)), tan_ * CARTEL_L / 2, monte * CARTEL_P / 2, normale * 0.0125))
 z1 = CARTEL_H - 0.012
-ACIER_PIECES.append((pied + Vector((0, 0, (z1 - 0.01) / 2)), tan_ * 0.025, rad * 0.025, Vector((0, 0, (z1 + 0.01) / 2))))
+ALU_PIECES.append((pied + Vector((0, 0, (z1 - 0.01) / 2)), tan_ * 0.025, rad * 0.025, Vector((0, 0, (z1 + 0.01) / 2))))
 
 
 def finir(nom, b, materiaux, uv=True):
@@ -525,22 +533,26 @@ for q in range(4):
 # Acier des repères d'échelle : pieds des bancs, pied du cartel, anneau de mise à distance autour de l'œuvre
 for centre_, ax, ay, az in ACIER_PIECES:
     boite(b, centre_, ax, ay, az)
-n_ = 180
-anneau = []
-for r_, z_ in ((ANNEAU_R, -0.01), (ANNEAU_R + ANNEAU_L, -0.01), (ANNEAU_R + ANNEAU_L, ANNEAU_H), (ANNEAU_R, ANNEAU_H)):
-    anneau += [(r_ * math.cos(2 * math.pi * k / n_), r_ * math.sin(2 * math.pi * k / n_), z_) for k in range(n_)]
-faces_ = []
+ALU_I = 3   # indice de l'aluminium dans les huisseries (après Acier, Lampe, Borne)
+for centre_, ax, ay, az in ALU_PIECES:
+    boite(b, centre_, ax, ay, az, ALU_I)
+# Barrière autour de l'œuvre : main courante (tore) et montants
+n_, m_ = 192, 12
+rb_ = ANNEAU_R + ANNEAU_L / 2
+zm_ = BARRIERE_H - BARRIERE_MAIN
+tore = []
 for k in range(n_):
-    k2 = (k + 1) % n_
-    i0, i1, i2, i3 = 0, n_, 2 * n_, 3 * n_
-    faces_ += [(i1 + k, i1 + k2, i2 + k2, i2 + k),     # côté extérieur
-               (i2 + k, i2 + k2, i3 + k2, i3 + k),     # dessus
-               (i3 + k, i3 + k2, i0 + k2, i0 + k)]     # côté intérieur
-piece(b, anneau, faces_)
+    a_ = 2 * math.pi * k / n_
+    for j in range(m_):
+        t_ = 2 * math.pi * j / m_
+        r_ = rb_ + BARRIERE_MAIN * math.cos(t_)
+        tore.append((r_ * math.cos(a_), r_ * math.sin(a_), zm_ + BARRIERE_MAIN * math.sin(t_)))
+piece(b, tore, [(k * m_ + j, ((k + 1) % n_) * m_ + j, ((k + 1) % n_) * m_ + (j + 1) % m_, k * m_ + (j + 1) % m_)
+                for k in range(n_) for j in range(m_)], ALU_I)
 
 
-def tube(b, centre, axe, rayon, longueur, mi_avant=None, n=16):
-    """Cylindre fermé le long de axe (vecteur unitaire) ; face avant (+axe) en matière mi_avant si donnée."""
+def tube(b, centre, axe, rayon, longueur, mi_avant=None, n=16, mi=None):
+    """Cylindre fermé le long de axe (vecteur unitaire) ; face avant (+axe) en matière mi_avant si donnée, le reste en mi."""
     axe = axe.normalized()
     u = axe.cross(Vector((0, 0, 1)) if abs(axe.z) < 0.9 else Vector((1, 0, 0))).normalized()
     v = axe.cross(u)
@@ -548,14 +560,24 @@ def tube(b, centre, axe, rayon, longueur, mi_avant=None, n=16):
     cercle_ = [u * math.cos(2 * math.pi * k / n) * rayon + v * math.sin(2 * math.pi * k / n) * rayon for k in range(n)]
     arriere = [b.verts.new(c0 + p_) for p_ in cercle_]
     avant = [b.verts.new(c1 + p_) for p_ in cercle_]
-    for k in range(n):
-        k2 = (k + 1) % n
-        b.faces.new([arriere[k], arriere[k2], avant[k2], avant[k]])
-    b.faces.new(arriere[::-1])
+    faces_ = [b.faces.new([arriere[k], arriere[(k + 1) % n], avant[(k + 1) % n], avant[k]]) for k in range(n)]
+    faces_.append(b.faces.new(arriere[::-1]))
     f = b.faces.new(avant)
+    faces_.append(f)
+    if mi is not None:
+        for f_ in faces_:
+            f_.material_index = mi
     if mi_avant is not None:
         f.material_index = mi_avant
     return c1
+
+
+# Montants de la barrière, aux angles des projecteurs, du dessous du sol jusque dans la main courante
+for k in range(PROJ_N):
+    a_ = math.radians(360 * k / PROJ_N + 22.5)
+    z0_, z1_ = -0.01, BARRIERE_H - BARRIERE_MAIN
+    tube(b, Vector((rb_ * math.cos(a_), rb_ * math.sin(a_), (z0_ + z1_) / 2)), Vector((0, 0, 1)), BARRIERE_MONTANT,
+         z1_ - z0_, n=12, mi=ALU_I)
 
 
 # Anneau suspendu : section carrée, comme l'anneau du sol (côtés et dessus), avec son dessous
@@ -589,23 +611,25 @@ for k in range(PROJ_N):
     axe_ = (CIBLE_OEUVRE - centre_).normalized()
     lentille = tube(b, centre_, axe_, PROJ_R, PROJ_L, mi_avant=1)
     PROJECTEURS.append((lentille + axe_ * 0.02, axe_))
-# Bornes de part et d'autre du chemin des deux ouvertures (axes à 45° et 225°)
+# Spots encastrés de part et d'autre du chemin des deux ouvertures (axes à 45° et 225°)
 for ang in (45.0, 225.0):
     axe_ = Vector((math.cos(math.radians(ang)), math.sin(math.radians(ang)), 0))
     cote = Vector((-axe_.y, axe_.x, 0))
     for d_ in BORNES_R:
         for sens in (-1, 1):
             p_ = axe_ * d_ + cote * sens * BORNES_ECART
-            demi = BORNE_COTE / 2
-            boite(b, p_ + Vector((0, 0, 0.16)), Vector((demi, 0, 0)), Vector((0, demi, 0)),
-                  Vector((0, 0, 0.17)))                                      # fût, de -1 à 33 cm (dans la bande)
-            boite(b, p_ + Vector((0, 0, BORNE_H - 0.055)), Vector((demi + 0.002, 0, 0)), Vector((0, demi + 0.002, 0)),
-                  Vector((0, 0, 0.02)), 2)                                   # bande lumineuse
-            boite(b, p_ + Vector((0, 0, 0.381)), Vector((demi, 0, 0)), Vector((0, demi, 0)),
-                  Vector((0, 0, 0.019)))                                     # chapeau, de 36,2 à 40 cm
+            demi, c_ = BORNE_COTE / 2, BORNE_CADRE / 2
+            boite(b, p_ + Vector((0, 0, -0.004)), Vector((demi, 0, 0)), Vector((0, demi, 0)),
+                  Vector((0, 0, 0.006)), 2)                                  # verre lumineux, de -1 cm à +2 mm
+            for sx, sy in ((1, 0), (-1, 0), (0, 1), (0, -1)):                # cadre autour du verre, de -1 cm à +3 mm
+                cote_x = Vector((c_, 0, 0)) if sx else Vector((demi + BORNE_CADRE, 0, 0))
+                cote_y = Vector((0, c_, 0)) if sy else Vector((0, demi, 0))
+                boite(b, p_ + Vector((sx * (demi + c_), sy * (demi + c_), -0.0035)), cote_x, cote_y,
+                      Vector((0, 0, 0.0065)))
 huisseries = objet("Huisseries", b); huisseries.data.materials.append(ACIER)
 huisseries.data.materials.append(emission("Lampe", (*lineaire(PROJ_COULEUR), 1), 0.0))
 huisseries.data.materials.append(emission("Borne", (*lineaire(BORNE_COULEUR), 1), BORNE_FORCE * ECHELLE))
+huisseries.data.materials.append(ALU)
 
 # --- L'œuvre dans le précalcul : sa lueur seulement (le verre laisse passer la lumière et luit en bleu, les
 # vaisseaux luisent en rouge) ; elle colore le socle, le sol et les murs proches. Depuis le 05/11, plus de lumière

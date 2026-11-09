@@ -3,9 +3,11 @@
 06/11), qui remplacent ceux de souffle.py. Même encombrement que les anciens : 3,4 m de large au plus, 3,6 m de
 haut au plus (de 1,15 à 4,75 m du sol dans le pavillon).
 
-    blender -b -P poumons.py
+    blender -b -P poumons.py [-- fichier]
 
-Lit sculpture-souffle/poumons.glb (millimètres, deux maillages texturés : les poumons, les bronches) et produit
+Lit sculpture-souffle/<fichier> (poumons.glb par défaut ; poumons-v2.glb depuis le 09/11, demande de Ludovic :
+poumons gauche et droit séparés, « Box001 » et « Box002 », réunis ici en un seul « Verre », et bronches retravaillées,
+sans coordonnées de texture : le site les dessine sans leurs couleurs) en millimètres, et produit
 dans sculpture-souffle/ :
   - poumons.blend   : les objets « Verre » (poumons) et « Vaisseaux » (bronches), lus par pavillon.py pour la lueur
                       de l'œuvre dans le précalcul
@@ -20,7 +22,7 @@ Puis, depuis musee/ :
       --prune-attributes false
   (--prune-attributes false : garde la couleur de sommet « dansVerre » des bronches, qu'aucune matière ne lit)
 """
-import bpy, os
+import bpy, os, sys
 from mathutils import Vector, Matrix
 from mathutils.bvhtree import BVHTree
 
@@ -33,7 +35,9 @@ LEVE = 0.35                     # bas de l'œuvre au-dessus de l'origine, comme 
 EPAISSEUR = 0.0   # 0,045 essayé le 07/11, refusé par Ludovic (« pas convaincu ») : paroi simple
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
-bpy.ops.import_scene.gltf(filepath=os.path.join(DOSSIER, "poumons.glb"))
+argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+SOURCE = argv[0] if argv else "poumons.glb"
+bpy.ops.import_scene.gltf(filepath=os.path.join(DOSSIER, SOURCE))
 objets = [o for o in bpy.context.scene.objects if o.type == "MESH"]
 
 # Transformations appliquées (nœuds de 3ds Max, millimètres)
@@ -45,12 +49,19 @@ for o in list(bpy.context.scene.objects):
     if o.type != "MESH":
         bpy.data.objects.remove(o)
 
-# Les poumons : le maillage le plus profond ; les bronches : l'autre (trachée comprise)
+# Les bronches : le maillage le moins profond (trachée comprise) ; les poumons : les autres, réunis en un seul
 def boite(o):
     pts = [v.co for v in o.data.vertices]
     return Vector([min(p[i] for p in pts) for i in range(3)]), Vector([max(p[i] for p in pts) for i in range(3)])
-poumons = max(objets, key=lambda o: (boite(o)[1] - boite(o)[0]).y)
-bronches = next(o for o in objets if o is not poumons)
+bronches = min(objets, key=lambda o: (boite(o)[1] - boite(o)[0]).y)
+autres = [o for o in objets if o is not bronches]
+poumons = autres[0]
+if len(autres) > 1:
+    for o in bpy.context.scene.objects:
+        o.select_set(o in autres)
+    bpy.context.view_layer.objects.active = poumons
+    bpy.ops.object.join()
+    objets = [poumons, bronches]
 
 mins, maxs = zip(*(boite(o) for o in objets))
 bas = Vector([min(m[i] for m in mins) for i in range(3)])

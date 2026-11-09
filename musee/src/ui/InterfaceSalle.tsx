@@ -182,7 +182,7 @@ export function InterfaceSalle({ oeuvre }: { oeuvre: Oeuvre }) {
               oeuvre={oeuvre}
               onglet="maladie"
               libelle="Maladie"
-              titre={oeuvre.maladie || 'À venir'}
+              titre={oeuvre.maladieTexte.titre || oeuvre.maladie || 'À venir'} // titre du popup Maladie (« Huntington », demande de Ludovic du 09/11)
             />
             <Cartouche oeuvre={oeuvre} onglet="manifeste" libelle="Manifeste" titre={oeuvre.manifesteTitre} />
           </div>
