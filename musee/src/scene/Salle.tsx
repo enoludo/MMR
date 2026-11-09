@@ -109,10 +109,10 @@ export function Salle({ config }: { config: SalleConfig }) {
     uReflet.uForceReflet.value = config.sculpture.reflet === false || sansReflets() ? 0 : reflet.force
   })
 
-  // Image de la salle vue depuis l'œuvre (EnvSalle), reflétée par les matières en métal et par l'œuvre de verre
+  // Image de la salle vue depuis l'œuvre (EnvSalle), reflétée par les matières en métal (le verre de l’œuvre la lisait aussi du 09/11, retiré avec les poumons v2 à la demande de Ludovic)
   const gl = useThree((s) => s.gl)
   const avecMetal = Object.values(config.matieres).some((m) => m.metal)
-  const avecEnv = avecMetal || !!config.sculpture.verre
+  const avecEnv = avecMetal
   const envSalle = useMemo(() => (avecEnv ? creerEnvSalle(gl) : null), [avecEnv, gl])
   useEffect(() => () => envSalle?.dispose(), [envSalle])
 
@@ -204,7 +204,7 @@ export function Salle({ config }: { config: SalleConfig }) {
       <Ciel config={config} />
       {config.sculpture.modele &&
         (config.sculpture.verre ? (
-          <OeuvreVerre config={config} modele={config.sculpture.modele} uSol={uReflet} longueurReflet={reflet.longueur} env={envSalle} />
+          <OeuvreVerre config={config} modele={config.sculpture.modele} uSol={uReflet} longueurReflet={reflet.longueur} />
         ) : (
           <Sculpture config={config} modele={config.sculpture.modele} uSol={uReflet} longueurReflet={reflet.longueur} />
         ))}

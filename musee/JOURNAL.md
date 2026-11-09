@@ -11,6 +11,10 @@ Une entrée par session, la plus récente en haut. Le détail technique est dans
 
 ---
 
+## 09/11/2026 (suite) — Claude Code (retour aux anciens poumons)
+- **Retour aux anciens poumons** (demande de Ludovic : « remets l'ancien glb […] le même état qu'avant le changement de glb ») : `public/models/poumons.glb`, `blender/sculpture-souffle/poumons.blend` et `scene/OeuvreVerre.tsx` repris de `13138ea` ; le verre ne lit plus l'image de la salle (`EnvSalle` gardée pour le métal seul, `Salle.tsx`). Lumière du pavillon recalculée avec les anciens poumons et les spots, la barrière et le pupitre d'aujourd'hui (`pavillon.py 2048 768 512`, `chaine.sh 2048 pavillon`). Gardés : spots encastrés qui ne clignotent plus, barrière et pupitre en aluminium, carte « Huntington ». Les poumons v2 et le verre réaliste restent dans Git (`dbf89fc`, `blender/sculpture-souffle/poumons-v2.glb`). Vu dans le navigateur intégré. **Mis en ligne sur le labo** (version du labo `a3325a2`). **[à voir]**
+- Poumons v2 et verre réaliste : **[abandonné]** pour l'instant (retour demandé par Ludovic).
+
 ## 09/11/2026 (suite) — Claude Code (mise en ligne, archive)
 - **Mis en ligne sur le labo** (version du labo `d71df06`, demande de Ludovic « pousse sur labs, garde l'autre en archive ») : nouveaux poumons, verre réaliste, spots encastrés, barrière et pupitre en aluminium, carte « Huntington ». Enregistré et envoyé sur GitHub (`dbf89fc`).
 - **Archive de la version précédente** : étiquette Git `labo-avant-poumons-v2` (enregistrement `13138ea`, envoyée sur GitHub) et version du labo `9e91cf6` (restaurable par le connecteur, `lab_restore_commit`). Le modèle d'origine des anciens poumons reste dans `blender/sculpture-souffle/poumons.glb`.
