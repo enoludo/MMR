@@ -11,6 +11,9 @@ Une entrée par session, la plus récente en haut. Le détail technique est dans
 
 ---
 
+## 09/11/2026 (suite) — Claude Code (couloir sauté chez un collègue)
+- **Passage par le couloir sauté** (collègue de Ludovic : « ça change d'un coup », une image de couloir, entre toutes les salles, tous navigateurs, cache vidé) : son ordinateur demande de réduire les animations (`prefers-reduced-motion`), et le passage durait alors 0 s. Reproduit sur le labo. Choix de Ludovic : garder le couloir ; le passage est maintenant joué dans tous les cas (`Navigation.tsx`, durée du passage). Les autres mouvements (transitions avec la spirale, grille, dérive) suivent toujours ce réglage. Vérifié en dev en simulant le réglage (passage de 7,8 s). **Mis en ligne sur le labo** (version du labo `43fa1cf`, demande de Ludovic). **[à voir]**
+
 ## 09/11/2026 (suite) — Claude Code (retour aux anciens poumons)
 - **Retour aux anciens poumons** (demande de Ludovic : « remets l'ancien glb […] le même état qu'avant le changement de glb ») : `public/models/poumons.glb`, `blender/sculpture-souffle/poumons.blend` et `scene/OeuvreVerre.tsx` repris de `13138ea` ; le verre ne lit plus l'image de la salle (`EnvSalle` gardée pour le métal seul, `Salle.tsx`). Lumière du pavillon recalculée avec les anciens poumons et les spots, la barrière et le pupitre d'aujourd'hui (`pavillon.py 2048 768 512`, `chaine.sh 2048 pavillon`). Gardés : spots encastrés qui ne clignotent plus, barrière et pupitre en aluminium, carte « Huntington ». Les poumons v2 et le verre réaliste restent dans Git (`dbf89fc`, `blender/sculpture-souffle/poumons-v2.glb`). Vu dans le navigateur intégré. **Mis en ligne sur le labo** (version du labo `a3325a2`). **[à voir]**
 - Poumons v2 et verre réaliste : **[abandonné]** pour l'instant (retour demandé par Ludovic).

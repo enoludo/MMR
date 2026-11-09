@@ -453,7 +453,9 @@ export function Navigation({
     s.mode = 'passage'
     s.cleArrivee = cle
     s.t = 0
-    s.duree = reduitMouvement() ? 0 : g.dureePassage * borner(s.courbe.getLength() / 40, 0.7, 1)
+    // Passage joué même quand l'ordinateur demande de réduire les animations (09/11, choix de Ludovic : sinon le
+    // couloir n'apparaît qu'une image et la salle change d'un coup)
+    s.duree = g.dureePassage * borner(s.courbe.getLength() / 40, 0.7, 1)
     s.departCible.copy(s.cible)
     s.devant.copy(s.cible)
     // Plus l'angle à parcourir pour regarder le fond du couloir est grand, plus on prend le temps
