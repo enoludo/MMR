@@ -11,6 +11,10 @@ Une entrée par session, la plus récente en haut. Le détail technique est dans
 
 ---
 
+## 09/11/2026 — Claude Code (fusion du pavillon, passation)
+- **Branche du pavillon fusionnée dans la branche principale** (demande de Ludovic, après explication des deux versions) : `claude/spirale-interactive-gallery-b4mzwd` contient désormais le pavillon de « Souffle d'éclats » ; `salle-pavillon` avancée au même point (plus qu'une seule version du site). Seul conflit : `JOURNAL.md`, version du pavillon gardée (elle contenait tout). Site construit identique à celui en ligne sur le labo (même fichier JavaScript) : pas de nouvelle mise en ligne nécessaire. Enregistré et envoyé sur GitHub.
+- **Passation** réécrite (`PASSATION.md`), à la demande de Ludovic.
+
 ## 08/11/2026 (nuit) — Claude Code (Souffle d'éclats ouverte sur le labo)
 - **Pavillon de « Souffle d'éclats » mis en ligne sur le labo `mmr-lab`** (version du labo `f0c90b0`), à la demande de Ludovic (« je veux qu'elle le soit ») : le labo sert désormais la branche `salle-pavillon` (la branche principale plus le pavillon), Souffle d'éclats ouverte. Avant, points de vue de Ludovic du 07/11 au soir (Seuil, Huntington, et premiers points de vue du pavillon) et captures du Seuil et de Huntington refaites par lui : enregistrés dans Git (`src/salles/points-de-vue.json` compris, à sa demande) et envoyés sur GitHub. Vérifié en ligne : salle de Souffle ouverte par son adresse, poumons et premier écran, aucune erreur. Branche `salle-pavillon` toujours pas fusionnée dans la branche principale.
 
