@@ -3,10 +3,11 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useControls } from 'leva'
 import * as THREE from 'three'
 import type { SalleConfig } from '../salles/types'
-import { boutonCopier, dossierSalle, valeursEnregistrees } from '../reglages'
+import { boutonCopier, dossierSalle, reglagesSalle, useReglagesSalle, valeursEnregistrees } from '../reglages'
 import { charge, ECHANTILLONS_DEFAUT } from '../performances'
 import { echantillonsMax, sansFlou, sansHalos } from '../renoncements'
-import { configActuelle, configArriveeLue, poidsArrivee } from './passage'
+import { configActuelle, configArriveeLue, poidsArrivee, salleActuelle, salleArrivee } from './passage'
+import { FLOU_SALLE_DEFAUT, PasseFlouSalle, distanceAxe, rayonFlou } from './FlouSalle'
 import { FLOU_DEFAUT, flouDeLaVue, vueEnCours } from '../salles/pointsDeVue'
 import {
   BlendFunction,
@@ -111,8 +112,28 @@ export function ReglagesEffetsSalle({ config }: { config: SalleConfig }) {
     grain: { value: r.grain, min: 0, max: 0.3, step: 0.005, label: 'grain' },
   })
   Object.assign(r, reglages)
+  useReglagesSalle(config, 'Flou de la salle', schemaFlouSalle(config))
   return null
 }
+
+/** Flou de la salle (FlouSalle.ts) : touche M, « Flou de la salle · <salle> » ; valeurs de départ dans la config */
+function schemaFlouSalle(salle: SalleConfig) {
+  const d = { ...FLOU_SALLE_DEFAUT, ...salle.flouSalle }
+  return {
+    actif: { value: d.actif, label: 'flou actif' },
+    flouPres: { value: d.flouPres, min: 0, max: 60, step: 0.5, label: 'flou de près (px)' },
+    pres: { value: d.pres, min: 0, max: 20, step: 0.1, label: 'de près : à (m)' },
+    flouLoin: { value: d.flouLoin, min: 0, max: 60, step: 0.5, label: 'flou de loin (px)' },
+    loin: { value: d.loin, min: 0.5, max: 30, step: 0.1, label: 'de loin : à (m)' },
+    debut: { value: d.debut, min: 0, max: 20, step: 0.1, label: 'nette jusqu’à (m)' },
+    progression: { value: d.progression, min: 0.5, max: 40, step: 0.5, label: 'progression (m)' },
+    haut: { value: d.haut, min: 0, max: 12, step: 0.05, label: 'haut de l’œuvre (m)' },
+  }
+}
+const reglagesFlouSalle = (salle: SalleConfig) => reglagesSalle(salle, 'Flou de la salle', schemaFlouSalle(salle))
+/** Flou de la salle en fondu (0 → 1), comme la profondeur de champ */
+const flouSalle = { valeur: 0 }
+const piedOeuvre = new THREE.Vector3()
 
 /**
  * Suréchantillonnage (05/11, demande de Ludovic : plus de marge pour l'anticrénelage) : la scène est
@@ -301,14 +322,15 @@ export function Effets() {
     // (on passe de l'une à l'autre selon la distance, sans recompiler)
     const halo = () => new BloomEffect({ mipmapBlur: true, luminanceThreshold: 1, luminanceSmoothing: 0.3, intensity: 0.35, radius: 0.7, levels: 6, resolutionScale: 0.5 })
     const bloom = [halo(), halo()]
-    // Trois jeux : avec profondeur de champ, sans, et sans halo (renoncements.ts)
-    const courbe = [new Courbe(), new Courbe(), new Courbe()]
+    // Quatre jeux : avec profondeur de champ, sans, sans halo (renoncements.ts), et la courbe seule (effets coupés,
+    // flou de la salle gardé)
+    const courbe = [new Courbe(), new Courbe(), new Courbe(), new Courbe()]
     // Anticrénelage et grain : un jeu par passe (de loin, ils rejoignent la passe du halo et de la courbe)
     const smaa = [0, 1, 2].map(() => new SMAAEffect({ preset: SMAAPreset.LOW }))
     const nouveauGrain = () => new NoiseEffect({ blendFunction: BlendFunction.OVERLAY, premultiply: false })
     const grain = [nouveauGrain(), nouveauGrain(), nouveauGrain()]
-    const passes = { avecFlou: [] as EffectPass[], sansFlou: [] as EffectPass[], sansHalo: [] as EffectPass[] }
-    return { composer, dof, bloom, courbe, smaa, grain, passes, rendu: new PasseScene(scene, camera) }
+    const passes = { avecFlou: [] as EffectPass[], sansFlou: [] as EffectPass[], sansHalo: [] as EffectPass[], brut: [] as EffectPass[] }
+    return { composer, dof, bloom, courbe, smaa, grain, passes, rendu: new PasseScene(scene, camera), flouSalle: new PasseFlouSalle(scene, camera) }
   }, [gl, scene, camera])
 
   // Passes, refaites quand on active ou coupe l'anticrénelage. Chaque passe relit et réécrit toute
@@ -321,13 +343,16 @@ export function Effets() {
     const aa = (i: number) => (avecSmaa ? [smaa[i]] : [])
     composer.removeAllPasses()
     composer.addPass(outils.rendu)
+    composer.addPass(outils.flouSalle)
     passes.avecFlou = [new EffectPass(camera, dof, bloom[0], courbe[0]), new EffectPass(camera, ...aa(0), grain[0])]
     passes.sansFlou = [new EffectPass(camera, bloom[1], courbe[1], ...aa(1), grain[1])]
     passes.sansHalo = [new EffectPass(camera, courbe[2], ...aa(2), grain[2])]
-    for (const p of [...passes.avecFlou, ...passes.sansFlou, ...passes.sansHalo]) composer.addPass(p)
+    passes.brut = [new EffectPass(camera, courbe[3])]
+    for (const p of [...passes.avecFlou, ...passes.sansFlou, ...passes.sansHalo, ...passes.brut]) composer.addPass(p)
     // Le composeur n'envoie à l'écran que la dernière passe : ici, la dernière de chaque jeu
     passes.avecFlou[1].renderToScreen = true
     passes.sansFlou[0].renderToScreen = true
+    passes.sansHalo[0].renderToScreen = true
   }, [outils, camera, avecSmaa])
 
   // Qualité du SMAA (basse jusqu'au 05/11) : plus haute, il suit mieux les bords fins et en biais
@@ -341,14 +366,14 @@ export function Effets() {
     charge.echantillons = e.actifs ? e.echantillons : 1
   }, [e.actifs, e.echantillons])
 
-  // La courbe de couleurs passe dans les effets : la scène est dessinée sans (sinon, deux fois)
+  // La courbe de couleurs passe dans les effets : la scène est dessinée sans (sinon, deux fois) ; réglée à chaque
+  // image (le flou de la salle passe par les effets même quand ils sont coupés), remise en partant
   useEffect(() => {
     const avant = gl.toneMapping
-    gl.toneMapping = e.actifs ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping
     return () => {
       gl.toneMapping = avant
     }
-  }, [gl, e.actifs])
+  }, [gl])
 
   // Taille des tampons : celle du canvas, à la résolution en cours (résolution adaptative)
   useEffect(() => {
@@ -397,17 +422,54 @@ export function Effets() {
     const rb = cb ? reglagesEffets(cb) : ra
     const w = cb ? poidsArrivee(camera) : 0
     const agx = melange(ra.courbe === 'agx' ? 1 : 0, rb.courbe === 'agx' ? 1 : 0, w)
-    uSortie.uLineaire.value = e.actifs ? 1 : 0
-    // Exposition appliquée par la courbe (three : ACES la divise par 0,6)
-    uSortie.uExpoSortie.value = gl.toneMappingExposure * melange(1 / 0.6, 1, agx)
-    outils.rendu.echantillons = e.actifs ? Math.min(e.echantillons, echantillonsMax()) : 1
-    if (!e.actifs) return void gl.render(scene, camera)
     const { dof, bloom, courbe: courbes, grain, passes } = outils
+    // Flou de la salle (FlouSalle.ts) : l'œuvre de chaque salle suivie, et la force mélangée pendant un passage.
+    // Indépendant de « effets actifs » (07/11, demande de Ludovic) : effets coupés, il passe seul, avec la courbe.
+    const fa = ca ? reglagesFlouSalle(ca) : null
+    const fb = cb ? reglagesFlouSalle(cb) : null
+    const passeFlou = outils.flouSalle
+    const rayons = [0, 0]
+    ;([[ca, fa, salleActuelle()], [cb, fb, salleArrivee()]] as const).forEach(([c, f, groupe], i) => {
+      const s = passeFlou.salles[i]
+      s.presente = !!(c && f && groupe)
+      if (!c || !f || !groupe) return
+      groupe.updateMatrixWorld()
+      s.pied.copy(groupe.localToWorld(piedOeuvre.set(c.sculpture.position[0], 0, c.sculpture.position[2])))
+      s.haut = f.haut
+      s.debut = f.debut
+      s.progression = f.progression
+      // Plus la caméra est près de l'œuvre, plus la salle est floue
+      rayons[i] = rayonFlou(f, distanceAxe(camera.position, s.pied, f.haut))
+    })
+    const actifA = fa?.actif ? 1 : 0
+    const actifB = cb ? (fb?.actif ? 1 : 0) : actifA
+    // Jamais coupé par l'échelle des renoncements pour le moment (07/11, décision de Ludovic ; ≈ 10 % d'images/s sur le M1)
+    const vouluSalle = melange(actifA, actifB, w)
+    flouSalle.valeur = rendu.capture ? vouluSalle : flouSalle.valeur + (vouluSalle - flouSalle.valeur) * (1 - Math.exp(-3 * delta))
+    passeFlou.force = flouSalle.valeur
+    passeFlou.rayon = melange(fa?.actif ? rayons[0] : rayons[1], fb?.actif ? rayons[1] : rayons[0], w)
+    passeFlou.enabled = flouSalle.valeur > 0.01
+
+    // Effets coupés : rendu direct (courbe ACES de three), ou, avec le flou de la salle, scène, flou et courbe ACES
+    const avecComposeur = e.actifs || passeFlou.enabled
+    gl.toneMapping = avecComposeur ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping
+    uSortie.uLineaire.value = avecComposeur ? 1 : 0
+    const agxVu = e.actifs ? agx : 0
+    // Exposition appliquée par la courbe (three : ACES la divise par 0,6)
+    uSortie.uExpoSortie.value = gl.toneMappingExposure * melange(1 / 0.6, 1, agxVu)
+    outils.rendu.echantillons = e.actifs ? Math.min(e.echantillons, echantillonsMax()) : 1
+    if (!avecComposeur) return void gl.render(scene, camera)
+    for (const c of courbes) c.uniforms.get('agx')!.value = agxVu
+    if (!e.actifs) {
+      for (const p of [...passes.avecFlou, ...passes.sansFlou, ...passes.sansHalo]) p.enabled = false
+      for (const p of passes.brut) p.enabled = true
+      return void outils.composer.render(delta)
+    }
+    for (const p of passes.brut) p.enabled = false
     for (const b of bloom) {
       b.intensity = melange(ra.halo, rb.halo, w)
       b.luminanceMaterial.threshold = melange(ra.seuilHalo, rb.seuilHalo, w)
     }
-    for (const c of courbes) c.uniforms.get('agx')!.value = agx
     // Profondeur de champ : seulement à une vue où elle est activée (popup ouvert, vue d'arrivée)
     const nom = vueEnCours.nom
     const reglage = ca && nom ? flouDeLaVue(ca, nom) : null

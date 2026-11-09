@@ -3,6 +3,7 @@ import { button, levaStore, useControls } from 'leva'
 import { oeuvres } from '../oeuvres'
 import { copierReglages, dossierSalle, ecouterMessages, lireReglages, signaler } from '../reglages'
 import { store } from '../store'
+import { couloirsEntreSalles } from '../salles/couloirs'
 
 /**
  * Dossier « Transmettre », en tête du panneau (touche M) :
@@ -88,10 +89,15 @@ async function enregistrer() {
   const visite = store.get().salle
   const salle = visite && oeuvres.find((o) => o.id === visite.oeuvre)?.salle
   if (!salle) return signaler('Ouvrez une salle pour enregistrer ses réglages')
-  const suffixe = dossierSalle('', salle)
-  const parties = Object.fromEntries(
-    Object.entries(lireReglages((d) => d.endsWith(suffixe))).map(([dossier, v]) => [dossier.slice(0, -suffixe.length), v]),
-  )
-  const reponse = await fetch('/__reglages', { method: 'POST', body: JSON.stringify({ salle: salle.id, reglages: parties }) })
-  signaler(reponse.ok ? `Réglages de « ${salle.titre} » enregistrés` : `Enregistrement refusé : ${await reponse.text()}`)
+  // Avec ceux des couloirs entre salles (salles/couloirs.ts), réglables depuis toutes les salles
+  for (const s of [salle, couloirsEntreSalles]) {
+    const suffixe = dossierSalle('', s)
+    const parties = Object.fromEntries(
+      Object.entries(lireReglages((d) => d.endsWith(suffixe))).map(([dossier, v]) => [dossier.slice(0, -suffixe.length), v]),
+    )
+    if (s !== salle && !Object.keys(parties).length) continue
+    const reponse = await fetch('/__reglages', { method: 'POST', body: JSON.stringify({ salle: s.id, reglages: parties }) })
+    if (!reponse.ok) return signaler(`Enregistrement refusé : ${await reponse.text()}`)
+  }
+  signaler(`Réglages de « ${salle.titre} » enregistrés`)
 }

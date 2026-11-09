@@ -3,6 +3,7 @@ import { resolutionMax } from '../resolution'
 import { FORMAT_CAPTURE, entree, type ReglagesTransition } from '../entree'
 import type { ReglagesCapture } from '../ui/ToileTransition'
 import { rendu } from '../scene/Effets'
+import { CALQUE_REFLET } from '../scene/Reflet'
 
 /** L'image telle qu'à l'écran : avec les effets d'image s'ils sont actifs (Effets.tsx), sans le grain */
 function dessiner(gl: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.Camera) {
@@ -108,11 +109,14 @@ export async function capturer({
     gl.setPixelRatio(ratio)
     rendu.redimensionner?.()
 
-    // Profondeur, sans la poussière ni le faisceau (transparents), sans lissage des bords
+    // Profondeur, sans la poussière ni le faisceau (transparents), sans lissage des bords. L'œuvre (calque
+    // CALQUE_REFLET) reste, même transparente : sans elle, les poumons de verre de « Souffle d'éclats »
+    // prenaient la profondeur de la salle derrière eux et glissaient avec elle pendant la parallaxe (07/11)
     const cachees: THREE.Object3D[] = []
     scene.traverse((o) => {
       const m = (o as THREE.Mesh).material as THREE.Material | undefined
-      if (o.visible && ((o as THREE.Points).isPoints || m?.transparent)) {
+      const oeuvre = (o as THREE.Mesh).isMesh && o.layers.isEnabled(CALQUE_REFLET)
+      if (o.visible && !oeuvre && ((o as THREE.Points).isPoints || m?.transparent)) {
         o.visible = false
         cachees.push(o)
       }

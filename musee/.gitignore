@@ -44,3 +44,10 @@ blender/salle-rotonde/lightmap-lisse.exr
 blender/salle-pavillon/*.exr
 blender/pavillon-apercu.blend
 blender/sculpture-souffle/souffle-raw.glb
+
+# « Souffle d'éclats » : export brut des poumons du collègue (60 Mo, refait par poumons.py)
+blender/sculpture-souffle/poumons-raw.glb
+
+# Pillow pour chaine.sh, lancé par le bouton « Figer » de l’éclairage (vite.config.ts) ; journal du calcul
+blender/.pylib
+blender/salle-pavillon/figer.log

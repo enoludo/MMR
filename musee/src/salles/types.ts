@@ -1,5 +1,6 @@
 import type { ReglagesTransition } from '../entree'
 import type { ReglagesEffets } from '../scene/Effets'
+import type { ReglagesFlouSalle } from '../scene/FlouSalle'
 export type Vec3 = [number, number, number]
 
 /** Étape de la visite : un point de vue particulier, hors du cercle, avec un texte. */
@@ -97,7 +98,10 @@ export interface SalleConfig {
   /** `echelle` : agrandissement du modèle (le même que ECHELLE_OEUVRE dans blender/salle.py) */
   /** `reflet` : false pour une œuvre sur socle (pas de reflet au sol) */
   sculpture: {
-    modele: string
+    /** Modèle de l'œuvre ; absent : pas d'œuvre en 3D (socle seul, salle du pavillon) */
+    modele?: string
+    /** Œuvre de verre (matières « Verre » et « Vaisseaux » du modèle, voir scene/OeuvreVerre.tsx) */
+    verre?: boolean
     position: Vec3
     rotationY: number
     echelle?: number
@@ -109,6 +113,8 @@ export interface SalleConfig {
   transition?: Partial<ReglagesTransition>
   /** Effets d'image (rendu photographique) : réglages propres à la salle (sinon ceux par défaut, voir scene/Effets.tsx) */
   effets?: Partial<ReglagesEffets>
+  /** Flou de la salle autour de l'œuvre, qui reste nette (scene/FlouSalle.ts) : valeurs de départ (touche M ensuite) */
+  flouSalle?: Partial<ReglagesFlouSalle>
   /**
    * Portes de la salle : une entrée et une sortie. « Œuvre suivante » part par la sortie et
    * arrive par l'entrée de la salle suivante ; « Œuvre précédente », l'inverse.
@@ -157,6 +163,44 @@ export interface SalleConfig {
    * comprise. Les bancs n'en sont pas : la caméra passe au-dessus.
    */
   obstacles?: { centre: [number, number]; rayon: number }[]
+  /**
+   * false : pas de faisceau du puits dans l'air ni de poussière (salle sans puits, comme le pavillon,
+   * éclairé par ses baies). Le soleil reste décrit pour l'éclairage de l'œuvre.
+   */
+  faisceau?: false
+  /**
+   * true : la salle a un vrai dehors, vu par ses baies (pavillon : sol et ciel dans son modèle). Ses
+   * couloirs n'ont alors pas leur paroi ensoleillée factice derrière les fentes, qu'on verrait par les baies.
+   */
+  dehors?: boolean
   /** Ouvertures sur le ciel (vues depuis l'intérieur) : centre et taille [x, z] */
   ciel: { centre: Vec3; taille: [number, number] }[]
+  /**
+   * Éclairage réglable en direct puis figé (pavillon, 07/11 ; scene/EclairageDirect.tsx, en dev) : réglages figés
+   * (lus par le script Blender de la salle), place de ses lumières (écrite par ce script) et atlas de lightmap des
+   * matières éclairées en direct.
+   */
+  eclairage?: { reglages: EclairageSite; lumieres: LumieresSite; atlas: string }
+  /** Joints du sol dessinés par le site sur ces matières (pavillon, 07/11 ; pierre.ts, réglables à la touche M) */
+  /** Lueur de l'œuvre sur la salle, qui suit ses variations (pavillon, 07/11 ; pierre.ts, Salle.tsx) */
+  lueurOeuvre?: { position: Vec3; couleur: string; force: number; portee: number }
+  joints?: { matieres: string[]; longueur: number; largeur: number; joint: number; force: number; angle: number; decalage?: number }
+}
+
+/** Réglages de l'éclairage figés (src/salles/pavillon/eclairage.json, lu par blender/pavillon.py) */
+export interface EclairageSite {
+  puits: { actif: boolean; force: number; couleur: string; ouverture: number }
+  /** Alternance douce de couleur et couleur2 sur `periode` mètres, `melange` de 0 à 1 (07/11) */
+  rubans: { actif: boolean; force: number; couleur: string; couleur2?: string; melange?: number; periode?: number }
+  lueur: { bleu: number; rouge: number }
+  /** Projecteurs de l'anneau suspendu et bornes (07/11) : au calcul seulement, sans aperçu en direct */
+  projecteurs?: { actif: boolean; force: number; couleur: string; cone: number }
+  bornes?: { actif: boolean; force: number; couleur: string }
+  couleurs: Record<string, string>
+}
+
+/** Place des lumières du précalcul, dans le repère de la salle (écrite par blender/pavillon.py) */
+export interface LumieresSite {
+  puits: { source: number[]; rayonSource: number; rayon: number; hauteurOuverture: number; echelle: number }
+  rubans: { a: number[]; b: number[]; axe: number[] }[]
 }
