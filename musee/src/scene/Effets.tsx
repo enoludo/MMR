@@ -17,6 +17,7 @@ import {
   EffectComposer,
   EffectPass,
   NoiseEffect,
+  Pass,
   RenderPass,
   SMAAEffect,
   SMAAPreset,
@@ -147,10 +148,64 @@ const piedOeuvre = new THREE.Vector3()
  * Le reflet du sol est lu au pixel : il suit `surEchantillonnage.echelle`. La poussière (`dessinsDirects`) est
  * dessinée après la réduction, à la taille de l'image : ses grains, souvent plus petits qu'un pixel,
  * perdaient leur éclat dans la moyenne.
+ * Calque de la poussière (09/11, demande de Ludovic) : elle est dessinée dans une image à part (`calque`), cachée
+ * par la scène grâce à sa profondeur recopiée, puis ajoutée à l'image après le flou de la salle (`PassePoussiere`).
+ * Dessinée dans l'image de la scène, elle prenait le flou de ce qu'il y a derrière chaque grain (la poussière
+ * n'écrit pas sa profondeur) : floue devant les murs du fond, nette devant l'œuvre. Elle reçoit toujours le halo,
+ * la courbe et le grain ; la profondeur de champ, réglée vue par vue, la floute encore (aucune vue ne l'a activée).
  */
 export const surEchantillonnage = { echelle: 1 }
 /** Objets dessinés à la taille de l'image, après la réduction (profondeur de la scène réduite) */
 export const dessinsDirects = new Set<THREE.Object3D>()
+
+/**
+ * Ajoute le calque de la poussière (PasseScene) à l'image, après le flou de la salle et avant le halo, la courbe
+ * et le grain. Dessine dans l'image en cours (pas d'échange d'images).
+ */
+class PassePoussiere extends Pass {
+  private ajout = new THREE.ShaderMaterial({
+    uniforms: { tCalque: { value: null } },
+    vertexShader: /* glsl */ `
+      varying vec2 vUv;
+      void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+    fragmentShader: /* glsl */ `
+      uniform sampler2D tCalque;
+      varying vec2 vUv;
+      void main() { gl_FragColor = vec4(texture2D(tCalque, vUv).rgb, 0.0); }`,
+    // Addition pure des couleurs (AdditiveBlending de three multiplie par l'alpha), alpha de l'image gardé
+    blending: THREE.CustomBlending,
+    blendEquation: THREE.AddEquation,
+    blendSrc: THREE.OneFactor,
+    blendDst: THREE.OneFactor,
+    blendSrcAlpha: THREE.ZeroFactor,
+    blendDstAlpha: THREE.OneFactor,
+    depthTest: false,
+    depthWrite: false,
+    transparent: true,
+  })
+  private ecran = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.ajout)
+  private camOrtho = new THREE.OrthographicCamera()
+
+  constructor(private source: { calque: THREE.WebGLRenderTarget | null; calquePret: boolean }) {
+    super('Poussiere')
+    this.needsSwap = false
+    this.ecran.frustumCulled = false
+  }
+
+  render(renderer: THREE.WebGLRenderer, inputBuffer: THREE.WebGLRenderTarget) {
+    const { calque, calquePret } = this.source
+    if (!calque || !calquePret) return
+    this.ajout.uniforms.tCalque.value = calque.texture
+    renderer.setRenderTarget(this.renderToScreen ? null : inputBuffer)
+    renderer.render(this.ecran, this.camOrtho)
+  }
+
+  dispose() {
+    this.ajout.dispose()
+    this.ecran.geometry.dispose()
+    super.dispose()
+  }
+}
 
 /** Au plus 40 millions d'échantillons (captures en 5120 × 2880 : ×6 demanderait plus d'un Go) */
 const ECHANTILLONS_MAX = 40e6
@@ -205,10 +260,66 @@ class PasseScene extends RenderPass {
   })
   private ecran = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.reduction)
   private camOrtho = new THREE.OrthographicCamera()
+  /** Calque de la poussière (lumière ajoutée, fond noir), lu par PassePoussiere ; null quand il n'y a rien à ajouter */
+  calque: THREE.WebGLRenderTarget | null = null
+  calquePret = false
+  private recopieProfondeur = new THREE.ShaderMaterial({
+    uniforms: { tProfondeur: { value: null } },
+    vertexShader: /* glsl */ `
+      varying vec2 vUv;
+      void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+    fragmentShader: /* glsl */ `
+      uniform sampler2D tProfondeur;
+      varying vec2 vUv;
+      void main() { gl_FragDepth = texture2D(tProfondeur, vUv).r; gl_FragColor = vec4(0.0); }`,
+    colorWrite: false,
+    depthTest: true,
+    depthWrite: true,
+    depthFunc: THREE.AlwaysDepth,
+  })
+  private noir = new THREE.Color(0, 0, 0)
+  private fondAvant = new THREE.Color()
 
   constructor(scene: THREE.Scene, camera: THREE.Camera) {
     super(scene, camera)
     this.ecran.frustumCulled = false
+  }
+
+  /**
+   * Poussière dans son calque, à la taille de l'image : profondeur de la scène recopiée (les grains restent cachés
+   * par l'œuvre et les colonnes), puis les grains, en lumière ajoutée sur fond noir. Sans profondeur (composeur sans
+   * passe qui la demande), dessinée dans l'image comme avant.
+   */
+  private dessinerPoussiere(renderer: THREE.WebGLRenderer, inputBuffer: THREE.WebGLRenderTarget) {
+    this.calquePret = false
+    const visibles = [...dessinsDirects].filter(estVisible)
+    if (!visibles.length) return
+    const ombres = renderer.shadowMap.autoUpdate
+    renderer.shadowMap.autoUpdate = false
+    const profondeur = inputBuffer.depthTexture
+    if (!profondeur) {
+      renderer.setRenderTarget(inputBuffer)
+      for (const o of visibles) renderer.render(o, this.camera!)
+    } else {
+      const { width: w, height: h } = inputBuffer
+      if (!this.calque) {
+        this.calque = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, depthBuffer: true })
+        this.calque.texture.generateMipmaps = false
+      } else if (this.calque.width !== w || this.calque.height !== h) this.calque.setSize(w, h)
+      const alpha = renderer.getClearAlpha()
+      renderer.getClearColor(this.fondAvant)
+      renderer.setRenderTarget(this.calque)
+      renderer.setClearColor(this.noir, 0)
+      renderer.clear(true, true, false)
+      renderer.setClearColor(this.fondAvant, alpha)
+      this.recopieProfondeur.uniforms.tProfondeur.value = profondeur
+      this.ecran.material = this.recopieProfondeur
+      renderer.render(this.ecran, this.camOrtho)
+      this.ecran.material = this.reduction
+      for (const o of visibles) renderer.render(o, this.camera!)
+      this.calquePret = true
+    }
+    renderer.shadowMap.autoUpdate = ombres
   }
 
   render(renderer: THREE.WebGLRenderer, inputBuffer: THREE.WebGLRenderTarget, outputBuffer: THREE.WebGLRenderTarget, delta?: number, stencil?: boolean) {
@@ -218,7 +329,12 @@ class PasseScene extends RenderPass {
     if (s <= 1.01 || this.renderToScreen) {
       surEchantillonnage.echelle = 1
       if (this.grand) this.grand = (this.grand.dispose(), null)
-      return super.render(renderer, inputBuffer, outputBuffer, delta, stencil)
+      this.calquePret = false
+      if (this.renderToScreen) return super.render(renderer, inputBuffer, outputBuffer, delta, stencil)
+      for (const o of dessinsDirects) o.visible = false
+      super.render(renderer, inputBuffer, outputBuffer, delta, stencil)
+      for (const o of dessinsDirects) o.visible = true
+      return this.dessinerPoussiere(renderer, inputBuffer)
     }
     const gw = Math.round(w * s)
     const gh = Math.round(h * s)
@@ -245,15 +361,14 @@ class PasseScene extends RenderPass {
     u.uPrises.value = this.echantillons > 4 ? 3 : 2
     renderer.setRenderTarget(inputBuffer)
     renderer.render(this.ecran, this.camOrtho)
-    // Poussière : par-dessus, testée contre la profondeur réduite (sans fond ni ombres recalculés)
-    const ombres = renderer.shadowMap.autoUpdate
-    renderer.shadowMap.autoUpdate = false
-    for (const o of dessinsDirects) if (estVisible(o)) renderer.render(o, this.camera!)
-    renderer.shadowMap.autoUpdate = ombres
+    // Poussière : dans son calque, testée contre la profondeur réduite (sans fond ni ombres recalculés)
+    this.dessinerPoussiere(renderer, inputBuffer)
   }
 
   dispose() {
     this.grand?.dispose()
+    this.calque?.dispose()
+    this.recopieProfondeur.dispose()
     this.reduction.dispose()
     this.ecran.geometry.dispose()
     super.dispose()
@@ -330,7 +445,8 @@ export function Effets() {
     const nouveauGrain = () => new NoiseEffect({ blendFunction: BlendFunction.OVERLAY, premultiply: false })
     const grain = [nouveauGrain(), nouveauGrain(), nouveauGrain()]
     const passes = { avecFlou: [] as EffectPass[], sansFlou: [] as EffectPass[], sansHalo: [] as EffectPass[], brut: [] as EffectPass[] }
-    return { composer, dof, bloom, courbe, smaa, grain, passes, rendu: new PasseScene(scene, camera), flouSalle: new PasseFlouSalle(scene, camera) }
+    const rendu = new PasseScene(scene, camera)
+    return { composer, dof, bloom, courbe, smaa, grain, passes, rendu, flouSalle: new PasseFlouSalle(scene, camera), poussiere: new PassePoussiere(rendu) }
   }, [gl, scene, camera])
 
   // Passes, refaites quand on active ou coupe l'anticrénelage. Chaque passe relit et réécrit toute
@@ -344,6 +460,7 @@ export function Effets() {
     composer.removeAllPasses()
     composer.addPass(outils.rendu)
     composer.addPass(outils.flouSalle)
+    composer.addPass(outils.poussiere)
     passes.avecFlou = [new EffectPass(camera, dof, bloom[0], courbe[0]), new EffectPass(camera, ...aa(0), grain[0])]
     passes.sansFlou = [new EffectPass(camera, bloom[1], courbe[1], ...aa(1), grain[1])]
     passes.sansHalo = [new EffectPass(camera, courbe[2], ...aa(2), grain[2])]
