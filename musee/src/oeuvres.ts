@@ -182,6 +182,8 @@ export const oeuvres: Oeuvre[] = [
     vueEntree: '/assets/captures/souffle-d-eclats',
     cartouches: capturesCartouches('souffle-d-eclats'),
     survol: videosSurvol('souffle-d-eclats'),
+    // Demande de Ludovic (09/11) : « Avec le soutien de l'Association Cœur Couleur » (pas de logo, nom en texte)
+    partenaire: { nom: 'Association Cœur Couleur' },
     // Texte reçu par Ludovic le 07/11 (prévalence : sa source, notée ⁽¹⁾, reste à citer) ; bouton sans lien (démo)
     maladieTexte: {
       titre: 'Sarcoïdose',

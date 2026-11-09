@@ -11,6 +11,10 @@ Une entrée par session, la plus récente en haut. Le détail technique est dans
 
 ---
 
+## 09/11/2026 (suite) — Claude Code (soutien de Souffle d'éclats)
+- Dossier `~/MMR` repassé sur la branche principale (comme prévu par la passation).
+- **« Souffle d'éclats » : « Avec le soutien de l'Association Cœur Couleur »** (demande de Ludovic) : `partenaire` de l'œuvre dans `oeuvres.ts`, sans logo (nom en texte, en capitales comme le style du soutien) ; aussi en étiquette rouge sous sa vignette dans la grille. Vu dans le navigateur intégré. **[à voir]** Pas encore enregistré dans Git ni mis en ligne.
+
 ## 09/11/2026 — Claude Code (fusion du pavillon, passation)
 - **Branche du pavillon fusionnée dans la branche principale** (demande de Ludovic, après explication des deux versions) : `claude/spirale-interactive-gallery-b4mzwd` contient désormais le pavillon de « Souffle d'éclats » ; `salle-pavillon` avancée au même point (plus qu'une seule version du site). Seul conflit : `JOURNAL.md`, version du pavillon gardée (elle contenait tout). Site construit identique à celui en ligne sur le labo (même fichier JavaScript) : pas de nouvelle mise en ligne nécessaire. Enregistré et envoyé sur GitHub.
 - **Passation** réécrite (`PASSATION.md`), à la demande de Ludovic.
